@@ -9,6 +9,10 @@ import '../../../../core/network/dio_client.dart';
 import '../../../../core/storage/local_storage.dart';
 import '../../../../core/error/failures.dart';
 import '../../../notifications/data/datasources/fcm_service.dart';
+import '../../../booking/presentation/providers/booking_flow_provider.dart';
+import '../../../booking/presentation/providers/booking_provider.dart';
+import '../../../notifications/presentation/providers/notification_provider.dart';
+import '../../../profile/presentation/providers/address_provider.dart';
 
 // ── Auth Status ───────────────────────────────────────────────
 
@@ -154,6 +158,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     state = state.copyWith(status: AuthStatus.verifying);
     try {
+      _resetUserSession();
       final response = await _repository.verifyOtp(phone: phone, otp: otp);
       state = state.copyWith(
         status: AuthStatus.authenticated,
@@ -207,7 +212,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Logout and clear session.
   Future<void> logout() async {
     await _repository.logout();
+    _resetUserSession();
     state = const AuthState(status: AuthStatus.unauthenticated);
+  }
+
+  void _resetUserSession() {
+    _ref.invalidate(bookingFlowProvider);
+    _ref.invalidate(bookingsProvider);
+    _ref.invalidate(notificationsProvider);
+    _ref.invalidate(addressesProvider);
   }
 
   /// Clear error state.

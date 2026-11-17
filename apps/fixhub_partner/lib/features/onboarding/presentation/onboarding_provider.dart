@@ -87,12 +87,14 @@ class SetupWizardState {
 }
 
 final setupWizardProvider =
-    NotifierProvider<SetupWizardNotifier, SetupWizardState>(
+    NotifierProvider.autoDispose<SetupWizardNotifier, SetupWizardState>(
         SetupWizardNotifier.new);
 
 class SetupWizardNotifier extends Notifier<SetupWizardState> {
   @override
   SetupWizardState build() => const SetupWizardState();
+
+  void reset() => state = const SetupWizardState();
 
   void setName(String name) =>
       state = state.copyWith(name: name, error: null);

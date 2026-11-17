@@ -1,17 +1,20 @@
 'use client';
 
-import * as React from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { useRouter } from 'next/navigation';
 import { Shield, ShieldCheck, ShieldX } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import * as React from 'react';
+import { toast } from 'sonner';
 
-import { useTechnicians, useUpdateTechnicianStatus } from '@/lib/api/queries/use-technicians';
+import { DataTable, SortableHeader } from '@/components/data-table/data-table';
+import { Avatar, Badge, Button, Dialog, Select } from '@/components/ui';
+import {
+  useCreateTechnician,
+  useTechnicians,
+  useUpdateTechnicianStatus,
+} from '@/lib/api/queries/use-technicians';
 import type { Technician, VerificationStatus } from '@/lib/types';
 import { formatDate, verificationStatusVariant } from '@/lib/utils';
-import { Avatar, Badge, Button, Select, Dialog } from '@/components/ui';
-import { DataTable, SortableHeader } from '@/components/data-table/data-table';
-import { toast } from 'sonner';
-import { useCreateTechnician } from '@/lib/api/queries/use-technicians';
 
 const VERIFICATION_OPTIONS = [
   { label: 'All Verification', value: '' },
@@ -53,7 +56,7 @@ function CreateTechnicianDialog({ open, onClose }: { open: boolean; onClose: () 
           onClose();
         },
         onError: () => toast.error('Failed to create technician'),
-      }
+      },
     );
   };
 
@@ -91,8 +94,15 @@ function CreateTechnicianDialog({ open, onClose }: { open: boolean; onClose: () 
           />
         </div>
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" onClick={handleCreate} loading={createMutation.isPending} disabled={!name.trim() || !phone.trim()}>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleCreate}
+            loading={createMutation.isPending}
+            disabled={!name.trim() || !phone.trim()}
+          >
             Create Technician
           </Button>
         </div>
@@ -142,7 +152,7 @@ export default function TechniciansPage() {
   const { data, isLoading } = useTechnicians({
     page,
     limit,
-    verificationStatus: verificationFilter as VerificationStatus | undefined || undefined,
+    verificationStatus: (verificationFilter as VerificationStatus | undefined) || undefined,
     isAvailable: availabilityFilter === '' ? undefined : availabilityFilter === 'true',
     sortBy: 'createdAt',
     sortOrder: 'desc',
@@ -157,11 +167,18 @@ export default function TechniciansPage() {
       cell: ({ row }) => {
         const t = row.original;
         const name = t.user?.name;
+        const hasName = Boolean(name && name.trim());
         return (
           <div className="flex items-center gap-3">
-            <Avatar name={name} src={t.profilePictureUrl} size="md" />
+            <Avatar name={hasName ? name : 'Incomplete'} src={t.profilePictureUrl} size="md" />
             <div>
-              <div className="text-sm font-semibold text-[#111827]">{name ?? '—'}</div>
+              <div className="text-sm font-semibold text-[#111827]">
+                {hasName ? (
+                  name
+                ) : (
+                  <span className="text-[#9CA3AF] italic">Incomplete Registration</span>
+                )}
+              </div>
               <div className="text-xs text-[#9CA3AF]">{t.user?.phone}</div>
             </div>
           </div>
@@ -210,12 +227,17 @@ export default function TechniciansPage() {
         return (
           <div className="flex flex-wrap gap-1">
             {areas.map((a) => (
-              <span key={a.serviceArea.id} className="rounded bg-[#F3F4F6] px-1.5 py-0.5 text-[10px] text-[#6B7280]">
+              <span
+                key={a.serviceArea.id}
+                className="rounded bg-[#F3F4F6] px-1.5 py-0.5 text-[10px] text-[#6B7280]"
+              >
                 {a.serviceArea.name}
               </span>
             ))}
             {extra > 0 && (
-              <span className="rounded bg-[#F3F4F6] px-1.5 py-0.5 text-[10px] text-[#9CA3AF]">+{extra}</span>
+              <span className="rounded bg-[#F3F4F6] px-1.5 py-0.5 text-[10px] text-[#9CA3AF]">
+                +{extra}
+              </span>
             )}
           </div>
         );
@@ -252,10 +274,13 @@ export default function TechniciansPage() {
               size="sm"
               variant={t.user?.isActive ? 'ghost' : 'secondary'}
               onClick={() =>
-                updateStatus.mutate({ userId: t.userId, isActive: !t.user?.isActive }, {
-                  onSuccess: () =>
-                    toast.success(`Account ${t.user?.isActive ? 'suspended' : 'activated'}`),
-                })
+                updateStatus.mutate(
+                  { userId: t.userId, isActive: !t.user?.isActive },
+                  {
+                    onSuccess: () =>
+                      toast.success(`Account ${t.user?.isActive ? 'suspended' : 'activated'}`),
+                  },
+                )
               }
             >
               {t.user?.isActive ? 'Suspend' : 'Activate'}
@@ -301,14 +326,20 @@ export default function TechniciansPage() {
             <Select
               options={VERIFICATION_OPTIONS}
               value={verificationFilter}
-              onChange={(e) => { setVerificationFilter(e.target.value); setPage(1); }}
+              onChange={(e) => {
+                setVerificationFilter(e.target.value);
+                setPage(1);
+              }}
               className="w-[170px]"
               placeholder=""
             />
             <Select
               options={AVAILABILITY_OPTIONS}
               value={availabilityFilter}
-              onChange={(e) => { setAvailabilityFilter(e.target.value); setPage(1); }}
+              onChange={(e) => {
+                setAvailabilityFilter(e.target.value);
+                setPage(1);
+              }}
               className="w-[160px]"
               placeholder=""
             />
@@ -316,10 +347,7 @@ export default function TechniciansPage() {
         }
       />
 
-      <CreateTechnicianDialog 
-        open={createDialogOpen} 
-        onClose={() => setCreateDialogOpen(false)} 
-      />
+      <CreateTechnicianDialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} />
     </div>
   );
 }

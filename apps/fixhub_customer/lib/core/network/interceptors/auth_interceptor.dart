@@ -57,6 +57,8 @@ class AuthInterceptor extends QueuedInterceptor {
 
       if (accessToken != null && accessToken.isNotEmpty) {
         options.headers['Authorization'] = 'Bearer $accessToken';
+      } else {
+        options.headers.remove('Authorization');
       }
     } catch (e) {
       debugPrint('[AuthInterceptor] Failed to read token: $e');

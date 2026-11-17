@@ -1,14 +1,29 @@
 'use client';
 
-import * as React from 'react';
-import Link from 'next/link';
 import { ArrowLeft, MapPin, ShieldCheck, Star } from 'lucide-react';
+import Link from 'next/link';
+import * as React from 'react';
 import { toast } from 'sonner';
 
-import { useTechnician, useVerifyTechnician, useUpdateTechnicianStatus, useUpdateTechnicianDetails } from '@/lib/api/queries/use-technicians';
+import {
+  Avatar,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Dialog,
+  Skeleton,
+} from '@/components/ui';
+import {
+  useTechnician,
+  useUpdateTechnicianDetails,
+  useUpdateTechnicianStatus,
+  useVerifyTechnician,
+} from '@/lib/api/queries/use-technicians';
+import type { Technician, VerificationStatus } from '@/lib/types';
 import { formatDate, formatDateTime, verificationStatusVariant } from '@/lib/utils';
-import type { VerificationStatus } from '@/lib/types';
-import { Avatar, Badge, Button, Card, CardContent, CardHeader, CardTitle, Skeleton, Dialog } from '@/components/ui';
 
 function ActionDialog({
   open,
@@ -58,10 +73,12 @@ function ActionDialog({
           />
         </div>
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button 
-            variant={isDanger ? 'danger' : 'primary'} 
-            onClick={handleConfirm} 
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant={isDanger ? 'danger' : 'primary'}
+            onClick={handleConfirm}
             loading={loading}
             disabled={requireNote && !note.trim()}
           >
@@ -80,7 +97,7 @@ function EditTechnicianDialog({
 }: {
   open: boolean;
   onClose: () => void;
-  technician: any;
+  technician: Technician | null;
 }) {
   const [name, setName] = React.useState(technician?.user?.name ?? '');
   const [email, setEmail] = React.useState(technician?.user?.email ?? '');
@@ -102,7 +119,7 @@ function EditTechnicianDialog({
           onClose();
         },
         onError: () => toast.error('Failed to update details'),
-      }
+      },
     );
   };
 
@@ -128,7 +145,9 @@ function EditTechnicianDialog({
           />
         </div>
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
           <Button variant="primary" onClick={handleSave} loading={updateMutation.isPending}>
             Save Changes
           </Button>
@@ -143,7 +162,7 @@ export default function TechnicianProfilePage({ params }: { params: Promise<{ id
   const { data: tech, isLoading } = useTechnician(resolvedParams.id);
   const verifyMutation = useVerifyTechnician();
   const statusMutation = useUpdateTechnicianStatus();
-  
+
   const [actionState, setActionState] = React.useState<{
     open: boolean;
     type: 'verify' | 'reject' | 'suspend' | 'activate' | null;
@@ -155,7 +174,9 @@ export default function TechnicianProfilePage({ params }: { params: Promise<{ id
       <div className="space-y-4">
         <Skeleton className="h-8 w-48" />
         <div className="grid gap-4 lg:grid-cols-3">
-          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-xl" />)}
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-48 rounded-xl" />
+          ))}
         </div>
       </div>
     );
@@ -163,7 +184,8 @@ export default function TechnicianProfilePage({ params }: { params: Promise<{ id
 
   if (!tech) return <div className="text-sm text-[#9CA3AF]">Technician not found.</div>;
 
-  const name = tech.user?.name ?? 'Unknown';
+  const hasName = Boolean(tech.user?.name && tech.user.name.trim());
+  const name = hasName ? tech.user!.name! : 'Incomplete Registration';
   const vs = tech.verificationStatus as VerificationStatus;
 
   return (
@@ -176,10 +198,17 @@ export default function TechnicianProfilePage({ params }: { params: Promise<{ id
           </Button>
         </Link>
         <div className="flex flex-1 items-center gap-4">
-          <Avatar name={name} src={tech.profilePictureUrl} size="lg" />
+          <Avatar name={hasName ? name : 'Incomplete'} src={tech.profilePictureUrl} size="lg" />
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-[#111827]">{name}</h1>
+              <h1 className="text-lg font-bold text-[#111827]">
+                {hasName ? (
+                  name
+                ) : (
+                  <span className="text-[#9CA3AF] italic">Incomplete Registration</span>
+                )}
+              </h1>
+              {!hasName && <Badge variant="warning">Onboarding Pending</Badge>}
               <Badge variant={verificationStatusVariant(vs)}>{vs.replace('_', ' ')}</Badge>
               <Badge variant={tech.user?.isActive ? 'success' : 'danger'}>
                 {tech.user?.isActive ? 'Active' : 'Suspended'}
@@ -190,11 +219,7 @@ export default function TechnicianProfilePage({ params }: { params: Promise<{ id
             </p>
           </div>
           <div className="ml-auto flex gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setEditDialogOpen(true)}
-            >
+            <Button variant="secondary" size="sm" onClick={() => setEditDialogOpen(true)}>
               Edit Details
             </Button>
             {(vs === 'PENDING' || vs === 'UNDER_REVIEW') && (
@@ -218,7 +243,9 @@ export default function TechnicianProfilePage({ params }: { params: Promise<{ id
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => setActionState({ open: true, type: tech.user?.isActive ? 'suspend' : 'activate' })}
+              onClick={() =>
+                setActionState({ open: true, type: tech.user?.isActive ? 'suspend' : 'activate' })
+              }
             >
               {tech.user?.isActive ? 'Suspend' : 'Activate'}
             </Button>
@@ -226,169 +253,226 @@ export default function TechnicianProfilePage({ params }: { params: Promise<{ id
         </div>
       </div>
 
+      {!hasName && (
+        <div className="rounded-xl border border-[#FDE68A] bg-[#FEF3C7] p-4 text-sm text-[#92400E]">
+          <p className="font-semibold">Technician Registration Incomplete</p>
+          <p className="text-xs text-[#B45309] mt-0.5">
+            This user verified their phone number via OTP but has not finished submitting the
+            onboarding setup (name, services, and coverage areas).
+          </p>
+        </div>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-3">
-          {/* Personal Details */}
-          <Card className="lg:col-span-2">
-            <CardHeader><CardTitle>Personal Details</CardTitle></CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                {[
-                  { label: 'Full Name', value: name },
-                  { label: 'Phone', value: tech.user?.phone ?? '—' },
-                  { label: 'Email', value: tech.user?.email ?? '—' },
-                  { label: 'Verification', value: vs.replace('_', ' ') },
-                  { label: 'Total Jobs', value: String(tech.totalJobs) },
-                  { label: 'Rating', value: `★ ${Number(tech.rating).toFixed(1)}` },
-                  { label: 'Availability', value: tech.isAvailable ? 'Available' : 'Offline' },
-                  { label: 'Last Active', value: tech.lastLocationAt ? formatDateTime(tech.lastLocationAt) : 'Never' },
-                  { label: 'Account Status', value: tech.user?.isActive ? 'Active' : 'Suspended' },
-                  { label: 'Joined', value: formatDate(tech.createdAt) },
-                ].map(({ label, value }) => (
-                  <div key={label}>
-                    <p className="text-[11px] text-[#9CA3AF] uppercase tracking-wide">{label}</p>
-                    <p className="mt-0.5 text-sm font-medium text-[#111827]">{value}</p>
-                  </div>
-                ))}
+        {/* Personal Details */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Personal Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { label: 'Full Name', value: name },
+                { label: 'Phone', value: tech.user?.phone ?? '—' },
+                { label: 'Email', value: tech.user?.email ?? '—' },
+                { label: 'Verification', value: vs.replace('_', ' ') },
+                { label: 'Total Jobs', value: String(tech.totalJobs) },
+                { label: 'Rating', value: `★ ${Number(tech.rating).toFixed(1)}` },
+                { label: 'Availability', value: tech.isAvailable ? 'Available' : 'Offline' },
+                {
+                  label: 'Last Active',
+                  value: tech.lastLocationAt ? formatDateTime(tech.lastLocationAt) : 'Never',
+                },
+                { label: 'Account Status', value: tech.user?.isActive ? 'Active' : 'Suspended' },
+                { label: 'Joined', value: formatDate(tech.createdAt) },
+              ].map(({ label, value }) => (
+                <div key={label}>
+                  <p className="text-[11px] text-[#9CA3AF] uppercase tracking-wide">{label}</p>
+                  <p className="mt-0.5 text-sm font-medium text-[#111827]">{value}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="space-y-4">
+          <Card>
+            <CardContent className="pt-5">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-[#111827]">{tech.totalJobs}</div>
+                <div className="mt-1 text-xs text-[#9CA3AF]">Total Jobs Completed</div>
               </div>
             </CardContent>
           </Card>
-
-          <div className="space-y-4">
-            <Card>
-              <CardContent className="pt-5">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-[#111827]">{tech.totalJobs}</div>
-                  <div className="mt-1 text-xs text-[#9CA3AF]">Total Jobs Completed</div>
+          <Card>
+            <CardContent className="pt-5">
+              <div className="text-center">
+                <div className="flex items-center justify-center gap-1">
+                  <Star className="h-5 w-5 fill-[#F59E0B] text-[#F59E0B]" />
+                  <span className="text-3xl font-bold text-[#111827]">
+                    {Number(tech.rating).toFixed(1)}
+                  </span>
                 </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-5">
-                <div className="text-center">
-                  <div className="flex items-center justify-center gap-1">
-                    <Star className="h-5 w-5 fill-[#F59E0B] text-[#F59E0B]" />
-                    <span className="text-3xl font-bold text-[#111827]">{Number(tech.rating).toFixed(1)}</span>
-                  </div>
-                  <div className="mt-1 text-xs text-[#9CA3AF]">Average Rating · {tech._count?.reviews ?? 0} reviews</div>
+                <div className="mt-1 text-xs text-[#9CA3AF]">
+                  Average Rating · {tech._count?.reviews ?? 0} reviews
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
+      </div>
 
-        <Card>
-          <CardHeader><CardTitle>Documents</CardTitle></CardHeader>
-          <CardContent>
-            {tech.documents && tech.documents.length > 0 ? (
-              <div className="divide-y divide-[#F3F4F6]">
-                {tech.documents.map((doc) => (
-                  <div key={doc.id} className="flex items-center justify-between py-3">
-                    <div>
-                      <p className="text-sm font-medium text-[#111827]">{doc.documentType.replace('_', ' ')}</p>
-                      <p className="text-xs text-[#9CA3AF]">
-                        Uploaded {formatDate(doc.createdAt)}
-                        {doc.verifiedAt && ` · Verified ${formatDate(doc.verifiedAt)}`}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={doc.isVerified ? 'success' : 'warning'}>
-                        {doc.isVerified ? 'Verified' : 'Pending'}
-                      </Badge>
-                      <a href={doc.url} target="_blank" rel="noreferrer">
-                        <Button variant="secondary" size="sm">View</Button>
-                      </a>
-                    </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Documents</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {tech.documents && tech.documents.length > 0 ? (
+            <div className="divide-y divide-[#F3F4F6]">
+              {tech.documents.map((doc) => (
+                <div key={doc.id} className="flex items-center justify-between py-3">
+                  <div>
+                    <p className="text-sm font-medium text-[#111827]">
+                      {doc.documentType.replace('_', ' ')}
+                    </p>
+                    <p className="text-xs text-[#9CA3AF]">
+                      Uploaded {formatDate(doc.createdAt)}
+                      {doc.verifiedAt && ` · Verified ${formatDate(doc.verifiedAt)}`}
+                    </p>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-[#9CA3AF]">No documents uploaded yet.</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle>Service Specializations</CardTitle></CardHeader>
-          <CardContent>
-            {tech.specializations && tech.specializations.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {tech.specializations.map((spec) => (
-                  <div key={spec.subService.id} className="rounded-lg border border-[#E5E7EB] px-3 py-2">
-                    <p className="text-sm font-medium text-[#111827]">{spec.subService.name}</p>
-                    <p className="text-xs text-[#9CA3AF]">{spec.subService.category?.name}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-[#9CA3AF]">No specializations configured.</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle>Service Areas</CardTitle></CardHeader>
-          <CardContent>
-            {tech.serviceAreas && tech.serviceAreas.length > 0 ? (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {tech.serviceAreas.map(({ serviceArea: area }) => (
-                  <div key={area.id} className="flex items-center gap-2 rounded-lg border border-[#E5E7EB] px-3 py-2.5">
-                    <MapPin className="h-4 w-4 text-[#9CA3AF]" />
-                    <div>
-                      <p className="text-sm font-medium text-[#111827]">{area.name}</p>
-                      <p className="text-xs text-[#9CA3AF]">{area.pincode}</p>
-                    </div>
-                    <Badge variant={area.isActive ? 'success' : 'neutral'} className="ml-auto text-[10px]">
-                      {area.isActive ? 'Active' : 'Off'}
+                  <div className="flex items-center gap-2">
+                    <Badge variant={doc.isVerified ? 'success' : 'warning'}>
+                      {doc.isVerified ? 'Verified' : 'Pending'}
                     </Badge>
+                    <a href={doc.url} target="_blank" rel="noreferrer">
+                      <Button variant="secondary" size="sm">
+                        View
+                      </Button>
+                    </a>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-[#9CA3AF]">No service areas assigned.</p>
-            )}
-          </CardContent>
-        </Card>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-[#9CA3AF]">No documents uploaded yet.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Service Specializations</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {tech.specializations && tech.specializations.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {tech.specializations.map((spec) => (
+                <div
+                  key={spec.subService.id}
+                  className="rounded-lg border border-[#E5E7EB] px-3 py-2"
+                >
+                  <p className="text-sm font-medium text-[#111827]">{spec.subService.name}</p>
+                  <p className="text-xs text-[#9CA3AF]">{spec.subService.category?.name}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-[#9CA3AF]">No specializations configured.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Service Areas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {tech.serviceAreas && tech.serviceAreas.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {tech.serviceAreas.map(({ serviceArea: area }) => (
+                <div
+                  key={area.id}
+                  className="flex items-center gap-2 rounded-lg border border-[#E5E7EB] px-3 py-2.5"
+                >
+                  <MapPin className="h-4 w-4 text-[#9CA3AF]" />
+                  <div>
+                    <p className="text-sm font-medium text-[#111827]">{area.name}</p>
+                    <p className="text-xs text-[#9CA3AF]">{area.pincode}</p>
+                  </div>
+                  <Badge
+                    variant={area.isActive ? 'success' : 'neutral'}
+                    className="ml-auto text-[10px]"
+                  >
+                    {area.isActive ? 'Active' : 'Off'}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-[#9CA3AF]">No service areas assigned.</p>
+          )}
+        </CardContent>
+      </Card>
 
       <ActionDialog
         open={actionState.open}
         onClose={() => setActionState({ open: false, type: null })}
         title={
-          actionState.type === 'verify' ? 'Verify Technician' :
-          actionState.type === 'reject' ? 'Reject Technician' :
-          actionState.type === 'suspend' ? 'Suspend Account' :
-          'Activate Account'
+          actionState.type === 'verify'
+            ? 'Verify Technician'
+            : actionState.type === 'reject'
+              ? 'Reject Technician'
+              : actionState.type === 'suspend'
+                ? 'Suspend Account'
+                : 'Activate Account'
         }
         actionLabel={
-          actionState.type === 'verify' ? 'Verify' :
-          actionState.type === 'reject' ? 'Reject' :
-          actionState.type === 'suspend' ? 'Suspend' :
-          'Activate'
+          actionState.type === 'verify'
+            ? 'Verify'
+            : actionState.type === 'reject'
+              ? 'Reject'
+              : actionState.type === 'suspend'
+                ? 'Suspend'
+                : 'Activate'
         }
         isDanger={actionState.type === 'reject' || actionState.type === 'suspend'}
         requireNote={actionState.type === 'reject' || actionState.type === 'suspend'}
-        loading={actionState.type === 'verify' || actionState.type === 'reject' ? verifyMutation.isPending : statusMutation.isPending}
+        loading={
+          actionState.type === 'verify' || actionState.type === 'reject'
+            ? verifyMutation.isPending
+            : statusMutation.isPending
+        }
         onConfirm={(note) => {
           if (!tech) return;
           if (actionState.type === 'verify') {
             verifyMutation.mutate(
               { id: tech.id, status: 'VERIFIED' },
-              { 
-                onSuccess: () => { toast.success('Technician verified'); setActionState({ open: false, type: null }); }
-              }
+              {
+                onSuccess: () => {
+                  toast.success('Technician verified');
+                  setActionState({ open: false, type: null });
+                },
+              },
             );
           } else if (actionState.type === 'reject') {
             verifyMutation.mutate(
               { id: tech.id, status: 'REJECTED', rejectionNote: note },
-              { 
-                onSuccess: () => { toast.error('Technician rejected'); setActionState({ open: false, type: null }); }
-              }
+              {
+                onSuccess: () => {
+                  toast.error('Technician rejected');
+                  setActionState({ open: false, type: null });
+                },
+              },
             );
           } else if (actionState.type === 'suspend' || actionState.type === 'activate') {
             statusMutation.mutate(
               { userId: tech.userId, isActive: actionState.type === 'activate' },
-              { 
-                onSuccess: () => { toast.success(`Account ${actionState.type}d`); setActionState({ open: false, type: null }); }
-              }
+              {
+                onSuccess: () => {
+                  toast.success(`Account ${actionState.type}d`);
+                  setActionState({ open: false, type: null });
+                },
+              },
             );
           }
         }}

@@ -4,6 +4,12 @@ import '../../../core/services/fcm_service.dart';
 import '../../../core/storage/local_storage.dart';
 import '../data/auth_repository.dart';
 import '../domain/auth_state.dart';
+import '../../onboarding/presentation/onboarding_provider.dart';
+import '../../profile/presentation/profile_provider.dart';
+import '../../notifications/presentation/notification_provider.dart';
+import '../../jobs/presentation/job_provider.dart';
+import '../../jobs/presentation/offer_provider.dart';
+import '../../earnings/presentation/earnings_provider.dart';
 
 final authProvider = NotifierProvider<AuthNotifier, AuthState>(() {
   return AuthNotifier();
@@ -70,6 +76,10 @@ class AuthNotifier extends Notifier<AuthState> {
   /// On success, transitions to AuthAuthenticated.
   Future<void> verifyOtp(String phone, String otp) async {
     try {
+      // 1. Wipe previous session data and state completely
+      await _storage.clearAll();
+      _resetUserSession();
+
       final result = await _repo.verifyOtp(phone, otp);
 
       final accessToken = result['accessToken'] as String?;
@@ -109,13 +119,31 @@ class AuthNotifier extends Notifier<AuthState> {
       debugPrint('[AuthNotifier] Logout API call failed: $e');
     }
     await _storage.clearAll();
+    _resetUserSession();
     state = const AuthUnauthenticated();
   }
 
   /// Called by AuthInterceptor when tokens are irrecoverably expired.
   /// Does NOT call the logout API (token is already invalid).
   void forceLogout() {
+    _storage.clearAll();
+    _resetUserSession();
     state = const AuthUnauthenticated();
+  }
+
+  /// Reset all user-scoped providers to prevent data leak across accounts
+  void _resetUserSession() {
+    ref.invalidate(setupWizardProvider);
+    ref.invalidate(profileProvider);
+    ref.invalidate(notificationsProvider);
+    ref.invalidate(unreadCountProvider);
+    ref.invalidate(activeJobProvider);
+    ref.invalidate(currentJobProvider);
+    ref.invalidate(upcomingJobsProvider);
+    ref.invalidate(jobHistoryProvider);
+    ref.invalidate(offersProvider);
+    ref.invalidate(offerCountProvider);
+    ref.invalidate(earningsProvider);
   }
 
   /// Refresh the user profile from the server.

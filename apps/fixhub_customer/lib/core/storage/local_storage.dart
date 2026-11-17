@@ -24,6 +24,7 @@ class LocalStorage {
   // --- Tokens ---
   Future<void> saveTokens({required String accessToken, required String refreshToken}) async {
     final box = await _getBox(_tokenBox);
+    await box.clear();
     await box.put(_accessTokenKey, accessToken);
     await box.put(_refreshTokenKey, refreshToken);
   }
@@ -46,6 +47,7 @@ class LocalStorage {
   // --- User ---
   Future<void> saveUserData(Map<String, dynamic> userData) async {
     final box = await _getBox(_userBox);
+    await box.clear();
     try {
       await box.put(_userJsonDataKey, jsonEncode(userData));
     } catch (_) {

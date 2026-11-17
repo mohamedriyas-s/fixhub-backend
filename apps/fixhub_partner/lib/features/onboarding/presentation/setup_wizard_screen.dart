@@ -7,6 +7,8 @@ import '../../../core/config/theme/app_radius.dart';
 import '../../../core/widgets/fp_button.dart';
 import '../../../core/widgets/fp_card.dart';
 import '../../../core/widgets/fp_skeleton.dart';
+import '../../auth/presentation/auth_provider.dart';
+import '../../auth/domain/auth_state.dart';
 import 'onboarding_provider.dart';
 
 class SetupWizardScreen extends ConsumerWidget {
@@ -160,8 +162,19 @@ class _Step1BasicInfoState extends ConsumerState<_Step1BasicInfo> {
   void initState() {
     super.initState();
     final s = ref.read(setupWizardProvider);
-    _nameCtrl = TextEditingController(text: s.name ?? '');
-    _emailCtrl = TextEditingController(text: s.email ?? '');
+    final authState = ref.read(authProvider);
+    String initialName = s.name ?? '';
+    String initialEmail = s.email ?? '';
+    if (initialName.isEmpty && authState is AuthAuthenticated && authState.user.name != null && authState.user.name!.isNotEmpty) {
+      initialName = authState.user.name!;
+      ref.read(setupWizardProvider.notifier).setName(initialName);
+    }
+    if (initialEmail.isEmpty && authState is AuthAuthenticated && authState.user.email != null && authState.user.email!.isNotEmpty) {
+      initialEmail = authState.user.email!;
+      ref.read(setupWizardProvider.notifier).setEmail(initialEmail);
+    }
+    _nameCtrl = TextEditingController(text: initialName);
+    _emailCtrl = TextEditingController(text: initialEmail);
   }
 
   @override
@@ -173,6 +186,9 @@ class _Step1BasicInfoState extends ConsumerState<_Step1BasicInfo> {
 
   @override
   Widget build(BuildContext context) {
+    final s = ref.watch(setupWizardProvider);
+    final hasNameError = s.error != null && (s.name == null || s.name!.trim().isEmpty);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.screenPadding),
       child: Column(
@@ -221,10 +237,12 @@ class _Step1BasicInfoState extends ConsumerState<_Step1BasicInfo> {
           TextFormField(
             controller: _nameCtrl,
             textCapitalization: TextCapitalization.words,
-            onChanged: (v) => ref.read(setupWizardProvider.notifier).setName(v),
-            decoration: const InputDecoration(
+            onChanged: (v) => ref.read(setupWizardProvider.notifier).setName(v.trim()),
+            validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter your full name' : null,
+            decoration: InputDecoration(
               hintText: 'e.g. Ramesh Kumar',
-              prefixIcon: Icon(Icons.person_outline_rounded),
+              prefixIcon: const Icon(Icons.person_outline_rounded),
+              errorText: hasNameError ? 'Please enter your full name' : null,
             ),
           ),
 
@@ -236,7 +254,7 @@ class _Step1BasicInfoState extends ConsumerState<_Step1BasicInfo> {
             controller: _emailCtrl,
             keyboardType: TextInputType.emailAddress,
             onChanged: (v) =>
-                ref.read(setupWizardProvider.notifier).setEmail(v),
+                ref.read(setupWizardProvider.notifier).setEmail(v.trim()),
             decoration: const InputDecoration(
               hintText: 'e.g. ramesh@example.com',
               prefixIcon: Icon(Icons.email_outlined),
