@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -28,14 +29,33 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   bool _isTogglingAvailability = false;
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
-    // Initialize FCM after dashboard mounts (technician is authenticated at this point)
+    // Initialize FCM and refresh data on mount
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(fcmServiceProvider).initialize();
+      ref.read(notificationsProvider.notifier).load(silent: true);
+      ref.invalidate(myJobsProvider(null));
+      ref.invalidate(activeJobProvider);
     });
+
+    // Periodic real-time poll for unread notifications and assigned jobs (every 8 seconds)
+    _pollTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (mounted) {
+        ref.read(notificationsProvider.notifier).load(silent: true);
+        ref.invalidate(myJobsProvider(null));
+        ref.invalidate(activeJobProvider);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _toggleAvailability(bool value) async {
@@ -70,6 +90,80 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     final user = authState is AuthAuthenticated ? authState.user : null;
     final profile = profileAsync.value;
+
+    // Listen for newly assigned jobs and notify the technician immediately with an in-app banner
+    ref.listen<int>(assignedJobsCountProvider, (previous, current) {
+      if ((previous == null || previous == 0) && current > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.work_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '🔧 $current new job${current > 1 ? 's' : ''} assigned! Tap to view.',
+                    style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF1F1F1F),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 6),
+            action: SnackBarAction(
+              label: 'View',
+              textColor: Colors.white,
+              onPressed: () => context.go('/jobs'),
+            ),
+          ),
+        );
+      }
+    });
+
+    // Listen for newly received unread notifications and pop up a notification banner
+    ref.listen<int>(unreadCountProvider, (previous, current) {
+      if ((previous ?? 0) < current) {
+        final notifs = ref.read(notificationsProvider).value;
+        final latest = (notifs != null && notifs.isNotEmpty) ? notifs.first : null;
+        if (latest != null && !latest.isRead) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    latest.title,
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white),
+                  ),
+                  if (latest.body.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        latest.body,
+                        style: const TextStyle(fontSize: 13, color: Colors.white70),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+              ),
+              backgroundColor: const Color(0xFF1F1F1F),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              duration: const Duration(seconds: 5),
+              action: SnackBarAction(
+                label: 'Open',
+                textColor: Colors.white,
+                onPressed: () => context.push('/notifications'),
+              ),
+            ),
+          );
+        }
+      }
+    });
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -130,14 +224,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           ),
                           if (unreadCount > 0)
                             Positioned(
-                              right: 8,
-                              top: 8,
+                              right: 2,
+                              top: 2,
                               child: Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                                decoration: BoxDecoration(
                                   color: AppColors.error,
-                                  shape: BoxShape.circle,
+                                  borderRadius: BorderRadius.circular(9),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  unreadCount > 99 ? '99+' : '$unreadCount',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    height: 1,
+                                  ),
                                 ),
                               ),
                             ),

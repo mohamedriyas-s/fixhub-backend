@@ -1,16 +1,15 @@
-import {
-  ConflictException,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { BookingStatus, Role } from '@prisma/client';
 
+import { PrismaService } from '../../../common/database/prisma.service';
 import { StorageService } from '../../../common/storage/storage.service';
+import { AdminNotificationService } from '../../admin/services/admin-notification.service';
+import { NotificationService } from '../../notification/services/notification.service';
 import { BookingRepository } from '../repositories/booking.repository';
+import { BookingService } from './booking.service';
 import { BookingLockService } from './booking-lock.service';
 import { BookingQueryCacheService } from './booking-query-cache.service';
-import { BookingService } from './booking.service';
 
 describe('BookingService creation', () => {
   let service: BookingService;
@@ -85,6 +84,8 @@ describe('BookingService creation', () => {
             findActiveService: jest.fn(),
             findActiveServiceAreaByPincode: jest.fn(),
             countSlotConflicts: jest.fn(),
+            countServiceCapacity: jest.fn().mockResolvedValue(5),
+            countSlotBookings: jest.fn().mockResolvedValue(0),
             createBooking: jest.fn(),
             updateBookingStatus: jest.fn(),
             updateDraftAndConfirm: jest.fn(),
@@ -117,6 +118,25 @@ describe('BookingService creation', () => {
             invalidate: jest.fn(),
           },
         },
+        {
+          provide: PrismaService,
+          useValue: {
+            technician: { findUnique: jest.fn() },
+            customer: { findUnique: jest.fn() },
+          },
+        },
+        {
+          provide: AdminNotificationService,
+          useValue: {
+            createAndBroadcast: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: NotificationService,
+          useValue: {
+            sendPushNotification: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
@@ -126,14 +146,14 @@ describe('BookingService creation', () => {
     storageService = module.get(StorageService);
     queryCacheService = module.get(BookingQueryCacheService);
 
-    repository.findCustomerByUserId.mockResolvedValue(customer as any);
-    repository.findAddressForCustomer.mockResolvedValue(address as any);
-    repository.findActiveServiceAreaByPincode.mockResolvedValue(serviceArea as any);
-    repository.findActiveService.mockResolvedValue(serviceItem as any);
+    repository.findCustomerByUserId.mockResolvedValue(customer as never);
+    repository.findAddressForCustomer.mockResolvedValue(address as never);
+    repository.findActiveServiceAreaByPincode.mockResolvedValue(serviceArea as never);
+    repository.findActiveService.mockResolvedValue(serviceItem as never);
     repository.countSlotConflicts.mockResolvedValue(0);
     lockService.acquire.mockResolvedValue('lock-token');
     lockService.nextBookingNumber.mockResolvedValue('FH-20990720-0001');
-    repository.createBooking.mockResolvedValue(booking as any);
+    repository.createBooking.mockResolvedValue(booking as never);
   });
 
   it('returns a booking summary after validating customer, address, area, service, and slot', async () => {
@@ -146,9 +166,9 @@ describe('BookingService creation', () => {
   });
 
   it('rejects non-customer booking creation', async () => {
-    await expect(
-      service.getSummary({ ...user, role: Role.TECHNICIAN }, dto),
-    ).rejects.toThrow(ForbiddenException);
+    await expect(service.getSummary({ ...user, role: Role.TECHNICIAN }, dto)).rejects.toThrow(
+      ForbiddenException,
+    );
   });
 
   it('throws when customer address is missing', async () => {
@@ -190,12 +210,12 @@ describe('BookingService creation', () => {
   });
 
   it('confirms an active draft booking', async () => {
-    repository.findDraftForCustomer.mockResolvedValue(booking as any);
+    repository.findDraftForCustomer.mockResolvedValue(booking as never);
     lockService.isDraftActive.mockResolvedValue(true);
     repository.updateBookingStatus.mockResolvedValue({
       ...booking,
       status: BookingStatus.CONFIRMED,
-    } as any);
+    } as never);
 
     const result = await service.confirmBooking(user, booking.id, {});
 
@@ -211,17 +231,17 @@ describe('BookingService creation', () => {
   });
 
   it('rejects expired draft confirmation', async () => {
-    repository.findDraftForCustomer.mockResolvedValue(booking as any);
+    repository.findDraftForCustomer.mockResolvedValue(booking as never);
     lockService.isDraftActive.mockResolvedValue(false);
 
     await expect(service.confirmBooking(user, booking.id, {})).rejects.toThrow();
   });
 
   it('prepares media upload and persists media when URL is supplied', async () => {
-    repository.findById.mockResolvedValue({ ...booking, status: BookingStatus.DRAFT } as any);
+    repository.findById.mockResolvedValue({ ...booking, status: BookingStatus.DRAFT } as never);
     storageService.generateKey.mockReturnValue('bookings/booking-uuid-1/photo.jpg');
     storageService.getUploadUrl.mockResolvedValue('https://signed-upload-url');
-    repository.createMedia.mockResolvedValue({ id: 'media-uuid-1' } as any);
+    repository.createMedia.mockResolvedValue({ id: 'media-uuid-1' } as never);
 
     const result = await service.prepareMediaUpload(user, booking.id, {
       fileName: 'photo.jpg',

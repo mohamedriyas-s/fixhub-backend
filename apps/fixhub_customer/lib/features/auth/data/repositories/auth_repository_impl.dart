@@ -42,7 +42,10 @@ class AuthRepositoryImpl implements AuthRepository {
     );
 
     // Persist user data
-    await _localStorage.saveUserData(authResponse.user.toJson());
+    final rawUserMap = (data is Map && data['user'] is Map)
+        ? Map<String, dynamic>.from(data['user'] as Map)
+        : authResponse.user.toJson();
+    await _localStorage.saveUserData(rawUserMap);
 
     return authResponse;
   }

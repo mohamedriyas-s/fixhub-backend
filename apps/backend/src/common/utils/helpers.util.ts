@@ -30,3 +30,24 @@ export function generateBookingNumber(sequence: number): string {
 export function hashString(input: string): string {
   return crypto.createHash('sha256').update(input).digest('hex');
 }
+
+/**
+ * Normalize an Indian phone number to standard E.164 (+91XXXXXXXXXX)
+ */
+export function normalizePhone(rawPhone: string): string {
+  if (!rawPhone) return rawPhone;
+  const cleaned = rawPhone.replace(/[\s\-()]/g, '').trim();
+  if (cleaned.startsWith('+91')) {
+    return cleaned;
+  }
+  if (cleaned.startsWith('91') && cleaned.length === 12) {
+    return `+${cleaned}`;
+  }
+  if (cleaned.startsWith('0') && cleaned.length === 11) {
+    return `+91${cleaned.slice(1)}`;
+  }
+  if (cleaned.length === 10) {
+    return `+91${cleaned}`;
+  }
+  return cleaned;
+}

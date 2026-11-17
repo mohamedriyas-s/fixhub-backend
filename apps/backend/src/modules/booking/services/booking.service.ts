@@ -4,17 +4,29 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
 } from '@nestjs/common';
 import { BookingStatus, Role } from '@prisma/client';
 
+import { PrismaService } from '../../../common/database/prisma.service';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { AuthenticatedUser } from '../../../common/interfaces/auth.interface';
 import { StorageService } from '../../../common/storage/storage.service';
-import { PrismaService } from '../../../common/database/prisma.service';
-import { AdminNotificationService, AdminNotifType } from '../../admin/services/admin-notification.service';
-import { BookingSummaryDto, ConfirmBookingDto, CreateBookingDto, CreateBookingMediaDto, CreateReviewDto, ProposeRevisionDto } from '../dto';
+import {
+  AdminNotificationService,
+  AdminNotifType,
+} from '../../admin/services/admin-notification.service';
+import { NotificationService } from '../../notification/services/notification.service';
+import {
+  BookingSummaryDto,
+  ConfirmBookingDto,
+  CreateBookingDto,
+  CreateBookingMediaDto,
+  CreateReviewDto,
+  ProposeRevisionDto,
+} from '../dto';
 import { BookingRepository } from '../repositories/booking.repository';
 import { BookingLockService } from './booking-lock.service';
 import { BookingQueryCacheService } from './booking-query-cache.service';
@@ -23,6 +35,8 @@ const DRAFT_TTL_SECONDS = 15 * 60;
 
 @Injectable()
 export class BookingService {
+  private readonly logger = new Logger(BookingService.name);
+
   constructor(
     private readonly bookingRepository: BookingRepository,
     private readonly bookingLockService: BookingLockService,
@@ -30,13 +44,14 @@ export class BookingService {
     private readonly bookingQueryCacheService: BookingQueryCacheService,
     private readonly prisma: PrismaService,
     @Optional() private readonly adminNotifService?: AdminNotificationService,
+    @Optional() private readonly notificationService?: NotificationService,
   ) {}
 
   async listByUser(userId: string, role: string, pagination: PaginationDto) {
     return this.bookingRepository.findByUser(userId, role, pagination);
   }
 
-  async findById(id: string, user: AuthenticatedUser) {
+  async findById(id: string, _user: AuthenticatedUser) {
     const booking = await this.bookingRepository.findById(id);
     if (!booking) {
       throw new NotFoundException({
@@ -183,12 +198,18 @@ export class BookingService {
       await this.bookingQueryCacheService.invalidate();
 
       // Notify admin of new confirmed booking (fire-and-forget)
-      this.adminNotifService?.createAndBroadcast(
-        AdminNotifType.NEW_BOOKING,
-        '📋 New Booking Confirmed',
-        `Booking #${confirmed.bookingNumber} has been confirmed by a customer.`,
-        { bookingId: confirmed.id, bookingNumber: confirmed.bookingNumber },
-      ).catch(() => { /* silent */ });
+      this.adminNotifService
+        ?.createAndBroadcast(
+          AdminNotifType.NEW_BOOKING,
+          '📋 New Booking Confirmed',
+          `Booking #${confirmed.bookingNumber} has been confirmed by a customer.`,
+          { bookingId: confirmed.id, bookingNumber: confirmed.bookingNumber },
+        )
+        .catch((err) => {
+          this.logger.warn(
+            `Failed to broadcast booking confirmation to admin: ${err?.message ?? err}`,
+          );
+        });
 
       return {
         booking: confirmed,
@@ -205,11 +226,7 @@ export class BookingService {
     }
   }
 
-  async prepareMediaUpload(
-    user: AuthenticatedUser,
-    bookingId: string,
-    dto: CreateBookingMediaDto,
-  ) {
+  async prepareMediaUpload(user: AuthenticatedUser, bookingId: string, dto: CreateBookingMediaDto) {
     const customer = await this.validateCustomer(user);
     const booking = await this.bookingRepository.findById(bookingId);
 
@@ -248,7 +265,9 @@ export class BookingService {
       key,
       uploadUrl,
       media,
-      message: dto.url ? 'Booking media attached successfully' : 'Upload URL generated successfully',
+      message: dto.url
+        ? 'Booking media attached successfully'
+        : 'Upload URL generated successfully',
     };
   }
 
@@ -262,7 +281,10 @@ export class BookingService {
       });
     }
 
-    if (booking.status !== BookingStatus.CONFIRMED && booking.status !== BookingStatus.PENDING_PAYMENT) {
+    if (
+      booking.status !== BookingStatus.CONFIRMED &&
+      booking.status !== BookingStatus.PENDING_PAYMENT
+    ) {
       throw new BadRequestException({
         message: 'Can only assign technicians to confirmed or pending payment bookings',
         errorCode: ErrorCodes.BOOKING_INVALID_STATUS,
@@ -273,6 +295,18 @@ export class BookingService {
       throw new ConflictException({
         message: 'Technician is already assigned to this booking',
         errorCode: ErrorCodes.BOOKING_ALREADY_ASSIGNED,
+      });
+    }
+
+    const tech = await this.prisma.technician.findUnique({
+      where: { id: technicianId, deletedAt: null },
+      include: { user: true },
+    });
+
+    if (!tech) {
+      throw new NotFoundException({
+        message: 'Technician not found',
+        errorCode: ErrorCodes.TECHNICIAN_NOT_FOUND,
       });
     }
 
@@ -297,12 +331,62 @@ export class BookingService {
     await this.bookingQueryCacheService.invalidate();
 
     // Notify admin of technician assignment (fire-and-forget)
-    this.adminNotifService?.createAndBroadcast(
-      AdminNotifType.TECHNICIAN_ASSIGNED,
-      '🔧 Technician Assigned',
-      `A technician has been assigned to booking #${updated.bookingNumber}.`,
-      { bookingId: updated.id, bookingNumber: updated.bookingNumber, technicianId },
-    ).catch(() => { /* silent */ });
+    this.adminNotifService
+      ?.createAndBroadcast(
+        AdminNotifType.TECHNICIAN_ASSIGNED,
+        '🔧 Technician Assigned',
+        `A technician has been assigned to booking #${updated.bookingNumber}.`,
+        { bookingId: updated.id, bookingNumber: updated.bookingNumber, technicianId },
+      )
+      .catch((err) => {
+        this.logger.warn(
+          `Failed to broadcast technician assignment to admin: ${err?.message ?? err}`,
+        );
+      });
+
+    // Notify assigned technician via in-app notification & high-priority push
+    if (tech.user?.id && this.notificationService) {
+      try {
+        await this.notificationService.sendPushNotification({
+          userId: tech.user.id,
+          title: '🔧 New Job Assigned',
+          body: `You have been assigned to booking #${updated.bookingNumber}. Tap to view details and accept.`,
+          type: 'ASSIGNMENT',
+          payload: { bookingId: updated.id, screen: 'job_details' },
+        });
+      } catch (err: unknown) {
+        this.logger.error(
+          `Failed to send notification to technician (${tech.user.id}): ${(err as Error)?.message ?? String(err)}`,
+        );
+      }
+    } else if (!tech.user?.id) {
+      this.logger.warn(
+        `Technician ${technicianId} has no linked user account for push notifications`,
+      );
+    }
+
+    // Notify customer that a technician has been assigned
+    if (updated.customerId && this.notificationService) {
+      try {
+        const cust = await this.prisma.customer.findUnique({
+          where: { id: updated.customerId },
+          include: { user: true },
+        });
+        if (cust?.user?.id) {
+          await this.notificationService.sendPushNotification({
+            userId: cust.user.id,
+            title: 'Technician Assigned ✅',
+            body: `A technician has been assigned to your booking #${updated.bookingNumber}.`,
+            type: 'BOOKING_UPDATE',
+            payload: { bookingId: updated.id, screen: 'booking_detail' },
+          });
+        }
+      } catch (err: unknown) {
+        this.logger.error(
+          `Failed to send notification to customer: ${(err as Error)?.message ?? String(err)}`,
+        );
+      }
+    }
 
     return updated;
   }
@@ -327,7 +411,10 @@ export class BookingService {
     const booking = await this.bookingRepository.findById(bookingId);
 
     if (!booking || booking.customerId !== customer.id) {
-      throw new NotFoundException({ message: 'Booking not found', errorCode: ErrorCodes.BOOKING_NOT_FOUND });
+      throw new NotFoundException({
+        message: 'Booking not found',
+        errorCode: ErrorCodes.BOOKING_NOT_FOUND,
+      });
     }
 
     if (booking.status !== BookingStatus.COMPLETED) {
@@ -362,7 +449,10 @@ export class BookingService {
     const booking = await this.bookingRepository.findById(bookingId);
 
     if (!booking || booking.technicianId !== technicianId) {
-      throw new NotFoundException({ message: 'Job not found', errorCode: ErrorCodes.BOOKING_NOT_FOUND });
+      throw new NotFoundException({
+        message: 'Job not found',
+        errorCode: ErrorCodes.BOOKING_NOT_FOUND,
+      });
     }
 
     if (booking.status !== BookingStatus.IN_PROGRESS) {
@@ -373,7 +463,13 @@ export class BookingService {
     }
 
     const updated = await this.bookingRepository.transaction((tx) =>
-      this.bookingRepository.setPriceRevision(tx, bookingId, dto.revisedAmount, dto.note, user.userId),
+      this.bookingRepository.setPriceRevision(
+        tx,
+        bookingId,
+        dto.revisedAmount,
+        dto.note,
+        user.userId,
+      ),
     );
 
     await this.bookingQueryCacheService.invalidate();
@@ -385,7 +481,10 @@ export class BookingService {
     const booking = await this.bookingRepository.findById(bookingId);
 
     if (!booking || booking.customerId !== customer.id) {
-      throw new NotFoundException({ message: 'Booking not found', errorCode: ErrorCodes.BOOKING_NOT_FOUND });
+      throw new NotFoundException({
+        message: 'Booking not found',
+        errorCode: ErrorCodes.BOOKING_NOT_FOUND,
+      });
     }
 
     if (booking.status !== BookingStatus.PRICE_REVISION_PENDING) {
@@ -408,7 +507,10 @@ export class BookingService {
     const booking = await this.bookingRepository.findById(bookingId);
 
     if (!booking || booking.customerId !== customer.id) {
-      throw new NotFoundException({ message: 'Booking not found', errorCode: ErrorCodes.BOOKING_NOT_FOUND });
+      throw new NotFoundException({
+        message: 'Booking not found',
+        errorCode: ErrorCodes.BOOKING_NOT_FOUND,
+      });
     }
 
     if (booking.status !== BookingStatus.PRICE_REVISION_PENDING) {
@@ -422,7 +524,10 @@ export class BookingService {
       this.bookingRepository.updateLifecycleStatus(
         tx,
         bookingId,
-        { status: BookingStatus.CANCELLED, cancelReason: 'Customer rejected technician price revision' },
+        {
+          status: BookingStatus.CANCELLED,
+          cancelReason: 'Customer rejected technician price revision',
+        },
         user.userId,
       ),
     );
@@ -434,11 +539,17 @@ export class BookingService {
   /** Resolve the technician profile ID for a technician-role user. */
   private async resolveLinkedTechnicianId(user: AuthenticatedUser): Promise<string> {
     if (user.role !== Role.TECHNICIAN) {
-      throw new ForbiddenException({ message: 'Only technicians can perform this action', errorCode: ErrorCodes.AUTH_FORBIDDEN });
+      throw new ForbiddenException({
+        message: 'Only technicians can perform this action',
+        errorCode: ErrorCodes.AUTH_FORBIDDEN,
+      });
     }
     const technician = await this.bookingRepository.findTechnicianProfileByUserId(user.userId);
     if (!technician) {
-      throw new NotFoundException({ message: 'Technician profile not found', errorCode: ErrorCodes.TECHNICIAN_NOT_FOUND });
+      throw new NotFoundException({
+        message: 'Technician profile not found',
+        errorCode: ErrorCodes.TECHNICIAN_NOT_FOUND,
+      });
     }
     return technician.id;
   }
@@ -514,13 +625,7 @@ export class BookingService {
     }
 
     const scheduledDate = new Date(`${query.date}T00:00:00.000Z`);
-    const slots = [
-      '09:00-11:00',
-      '11:00-13:00',
-      '13:00-15:00',
-      '15:00-17:00',
-      '17:00-19:00',
-    ];
+    const slots = ['09:00-11:00', '11:00-13:00', '13:00-15:00', '15:00-17:00', '17:00-19:00'];
 
     const availableSlots: string[] = [];
     const draftCreatedAfter = new Date(Date.now() - DRAFT_TTL_SECONDS * 1000);
@@ -528,12 +633,12 @@ export class BookingService {
     for (const slot of slots) {
       // Check if the slot is in the past
       const [startHour, startMinute] = slot.split('-')[0].split(':').map(Number);
-      
+
       // The slots are in local time (IST, +05:30)
       const formattedHour = String(startHour).padStart(2, '0');
       const formattedMinute = String(startMinute).padStart(2, '0');
       const slotTime = new Date(`${query.date}T${formattedHour}:${formattedMinute}:00.000+05:30`);
-      
+
       // If it's today and the slot is in the past (adding 1 hour buffer for now), skip
       if (slotTime.getTime() < Date.now() + 60 * 60 * 1000) {
         continue;
@@ -601,7 +706,7 @@ export class BookingService {
     // Since countSlotBookings doesn't take excludeBookingId, we could have a false positive
     // if a user is confirming their own draft and that draft brings activeBookings == capacity.
     // Actually, countSlotBookings counts all bookings. If the user is confirming their draft,
-    // the draft is ALREADY in activeBookings. 
+    // the draft is ALREADY in activeBookings.
     // Thus activeBookings <= capacity is fine if we are confirming.
     // If it's a new draft, we need activeBookings < capacity.
     if (excludeBookingId) {

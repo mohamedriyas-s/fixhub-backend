@@ -1,20 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/config/theme/app_colors.dart';
 import '../../../core/config/theme/app_spacing.dart';
 import '../../../core/config/theme/app_radius.dart';
-import '../../../core/widgets/fp_card.dart';
 import '../../../core/widgets/fp_skeleton.dart';
 import '../../../core/widgets/fp_offline_banner.dart';
 import '../data/notification_repository.dart';
 import 'notification_provider.dart';
 
-class NotificationsScreen extends ConsumerWidget {
+class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<NotificationsScreen> createState() => _NotificationsScreenState();
+}
+
+class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
+  @override
+  Widget build(BuildContext context) {
     final notificationsAsync = ref.watch(notificationsProvider);
 
     return Scaffold(
@@ -44,36 +49,42 @@ class NotificationsScreen extends ConsumerWidget {
         color: AppColors.primary,
         onRefresh: () => ref.read(notificationsProvider.notifier).load(),
         child: notificationsAsync.when(
+          skipLoadingOnReload: true,
+          skipLoadingOnRefresh: true,
           loading: () => ListView.separated(
             padding: const EdgeInsets.all(AppSpacing.screenPadding),
             itemCount: 6,
             separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
             itemBuilder: (_, __) => const FpSkeleton(height: 72),
           ),
-          error: (e, _) => FpErrorState(
-            message: 'Could not load notifications',
-            onRetry: () => ref.read(notificationsProvider.notifier).load(),
-          ),
-          data: (notifications) {
-            if (notifications.isEmpty) {
-              return const FpEmptyState(
-                title: 'All Caught Up!',
-                subtitle: 'You have no notifications right now.',
-                icon: Icons.notifications_none_rounded,
-              );
-            }
-
-            return ListView.builder(
-              padding: const EdgeInsets.all(AppSpacing.screenPadding),
-              itemCount: notifications.length,
-              itemBuilder: (context, i) {
-                final n = notifications[i];
-                return _NotificationTile(notification: n);
-              },
-            );
-          },
+          error: (e, _) => notificationsAsync.hasValue
+              ? _buildList(notificationsAsync.value!)
+              : FpErrorState(
+                  message: 'Could not load notifications',
+                  onRetry: () => ref.read(notificationsProvider.notifier).load(),
+                ),
+          data: (notifications) => _buildList(notifications),
         ),
       ),
+    );
+  }
+
+  Widget _buildList(List<AppNotification> notifications) {
+    if (notifications.isEmpty) {
+      return const FpEmptyState(
+        title: 'All Caught Up!',
+        subtitle: 'You have no notifications right now.',
+        icon: Icons.notifications_none_rounded,
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(AppSpacing.screenPadding),
+      itemCount: notifications.length,
+      itemBuilder: (context, i) {
+        final n = notifications[i];
+        return _NotificationTile(notification: n);
+      },
     );
   }
 }
@@ -89,6 +100,11 @@ class _NotificationTile extends ConsumerWidget {
       onTap: () {
         if (!notification.isRead) {
           ref.read(notificationsProvider.notifier).markAsRead(notification.id);
+        }
+        final data = notification.data;
+        final bookingId = data?['bookingId'] ?? data?['payload']?['bookingId'];
+        if (bookingId != null && bookingId.toString().isNotEmpty) {
+          context.push('/job-details/$bookingId');
         }
       },
       child: Container(

@@ -22,6 +22,12 @@ final myJobsProvider = FutureProvider.family<PaginatedJobs, String?>((ref, statu
   return ref.read(jobRepositoryProvider).listJobs(status: status);
 });
 
+// ── Assigned jobs count (pending technician acceptance) ───────────
+final assignedJobsCountProvider = Provider<int>((ref) {
+  final jobsAsync = ref.watch(myJobsProvider(null));
+  return jobsAsync.value?.items.where((j) => j.status == 'ASSIGNED').length ?? 0;
+});
+
 // ── Job history ──────────────────────────────────────────────────
 final jobHistoryProvider = FutureProvider<PaginatedJobs>((ref) async {
   return ref.read(jobRepositoryProvider).listJobHistory();

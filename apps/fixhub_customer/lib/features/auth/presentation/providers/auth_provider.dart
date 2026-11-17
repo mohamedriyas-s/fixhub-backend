@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import '../../data/datasources/auth_remote_datasource.dart';
@@ -7,6 +8,7 @@ import '../../domain/repositories/auth_repository.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/storage/local_storage.dart';
 import '../../../../core/error/failures.dart';
+import '../../../notifications/data/datasources/fcm_service.dart';
 
 // ── Auth Status ───────────────────────────────────────────────
 
@@ -43,13 +45,14 @@ class AuthState {
     UserModel? user,
     String? phone,
     String? devOtp,
+    bool clearDevOtp = false,
   }) {
     return AuthState(
       status: status ?? this.status,
       errorMessage: errorMessage,
       user: user ?? this.user,
       phone: phone ?? this.phone,
-      devOtp: devOtp ?? this.devOtp,
+      devOtp: clearDevOtp ? null : (devOtp ?? this.devOtp),
     );
   }
 
@@ -69,15 +72,16 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 
 /// Auth state notifier provider
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  return AuthNotifier(ref.watch(authRepositoryProvider));
+  return AuthNotifier(ref.watch(authRepositoryProvider), ref);
 });
 
 // ── Auth Notifier ─────────────────────────────────────────────
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _repository;
+  final Ref _ref;
 
-  AuthNotifier(this._repository) : super(const AuthState());
+  AuthNotifier(this._repository, this._ref) : super(const AuthState());
 
   /// Check if user is already logged in (on app start).
   Future<void> checkAuthStatus() async {
@@ -90,6 +94,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
           status: AuthStatus.authenticated,
           user: cachedUser,
         );
+
+        // Register FCM device token
+        try {
+          await _ref.read(fcmServiceProvider).registerAfterLogin();
+        } catch (_) {}
 
         // Refresh profile in background
         try {
@@ -111,6 +120,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(
       status: AuthStatus.loading,
       phone: phone,
+      clearDevOtp: true,
     );
     try {
       final devOtp = await _repository.sendOtp(phone);
@@ -119,6 +129,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(
         status: AuthStatus.error,
         errorMessage: e.message,
+      );
+    } on DioException catch (e) {
+      String msg = 'Failed to send OTP. Please try again.';
+      if (e.response?.data is Map && e.response?.data['message'] != null) {
+        msg = e.response!.data['message'].toString();
+      }
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: msg,
       );
     } catch (e) {
       state = state.copyWith(
@@ -140,15 +159,30 @@ class AuthNotifier extends StateNotifier<AuthState> {
         status: AuthStatus.authenticated,
         user: response.user,
       );
+      // Register FCM device token on login
+      try {
+        await _ref.read(fcmServiceProvider).registerAfterLogin();
+      } catch (_) {}
     } on Failure catch (e) {
       state = state.copyWith(
         status: AuthStatus.error,
         errorMessage: e.message,
       );
+    } on DioException catch (e) {
+      String msg = 'Verification failed. Please try again.';
+      if (e.error is Failure) {
+        msg = (e.error as Failure).message;
+      } else if (e.response?.data is Map && e.response?.data['message'] != null) {
+        msg = e.response!.data['message'].toString();
+      }
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: msg,
+      );
     } catch (e) {
       state = state.copyWith(
         status: AuthStatus.error,
-        errorMessage: 'Verification failed. Please try again.',
+        errorMessage: 'Verification failed: ${e.toString().replaceFirst('Exception: ', '')}',
       );
     }
   }

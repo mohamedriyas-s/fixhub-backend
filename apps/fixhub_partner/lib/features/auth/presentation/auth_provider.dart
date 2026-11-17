@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/services/fcm_service.dart';
 import '../../../core/storage/local_storage.dart';
 import '../data/auth_repository.dart';
 import '../domain/auth_state.dart';
@@ -24,6 +25,10 @@ class AuthNotifier extends Notifier<AuthState> {
       final cachedUser = await _repo.getCachedUser();
       if (cachedUser != null) {
         state = AuthAuthenticated(cachedUser);
+        // Sync FCM token for cached session
+        ref.read(fcmServiceProvider).initialize().catchError((e) {
+          debugPrint('[AuthNotifier] FCM cached session sync error: $e');
+        });
         // 2. Background refresh from server (non-blocking)
         _refreshProfileInBackground();
         return;
@@ -39,6 +44,10 @@ class AuthNotifier extends Notifier<AuthState> {
       // 4. Tokens exist but no cache — try to fetch from server
       final user = await _repo.getCurrentUser();
       state = AuthAuthenticated(user);
+      // Sync FCM token
+      ref.read(fcmServiceProvider).initialize().catchError((e) {
+        debugPrint('[AuthNotifier] FCM init error: $e');
+      });
     } catch (e) {
       debugPrint('[AuthNotifier] checkAuthStatus failed: $e');
       state = const AuthUnauthenticated();
@@ -82,6 +91,10 @@ class AuthNotifier extends Notifier<AuthState> {
 
       final user = AuthUser.fromJson(userData);
       state = AuthAuthenticated(user);
+      // Sync FCM token on successful login
+      ref.read(fcmServiceProvider).initialize().catchError((e) {
+        debugPrint('[AuthNotifier] FCM login sync error: $e');
+      });
     } catch (e) {
       state = AuthError(_humanizeError(e), phone: phone);
       rethrow;

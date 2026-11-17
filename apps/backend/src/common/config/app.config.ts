@@ -69,6 +69,26 @@ export class AppConfig {
 
   @IsOptional()
   @IsString()
+  FIREBASE_PRIVATE_KEY?: string;
+
+  @IsOptional()
+  @IsString()
+  FIREBASE_CLIENT_EMAIL?: string;
+
+  @IsOptional()
+  @IsString()
+  SMS_PROVIDER?: string;
+
+  @IsOptional()
+  @IsString()
+  SMS_API_KEY?: string;
+
+  @IsOptional()
+  @IsString()
+  SMS_SENDER_ID?: string;
+
+  @IsOptional()
+  @IsString()
   CORS_ORIGINS?: string;
 
   @IsInt()
@@ -78,6 +98,21 @@ export class AppConfig {
   @IsInt()
   @Type(() => Number)
   THROTTLE_LIMIT: number;
+}
+
+function cleanEnvString(val?: string): string | undefined {
+  if (!val) return undefined;
+  let str = val.trim();
+  if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
+    str = str.slice(1, -1);
+  }
+  return str;
+}
+
+function cleanPrivateKey(val?: string): string | undefined {
+  const str = cleanEnvString(val);
+  if (!str) return undefined;
+  return str.replace(/\\n/g, '\n');
 }
 
 export const appConfig = () => ({
@@ -123,15 +158,20 @@ export const appConfig = () => ({
   },
 
   firebase: {
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    privateKey: process.env.FIREBASE_PRIVATE_KEY,
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    projectId: cleanEnvString(process.env.FIREBASE_PROJECT_ID),
+    privateKey: cleanPrivateKey(process.env.FIREBASE_PRIVATE_KEY),
+    clientEmail: cleanEnvString(process.env.FIREBASE_CLIENT_EMAIL),
+  },
+
+  sms: {
+    provider: cleanEnvString(process.env.SMS_PROVIDER) || 'DEV',
+    apiKey: cleanEnvString(process.env.SMS_API_KEY),
+    senderId: cleanEnvString(process.env.SMS_SENDER_ID) || 'FIXHUB',
   },
 
   cors: {
     origins: (
-      process.env.CORS_ORIGINS ||
-      'http://localhost:3001,https://fixhub-admin-neon.vercel.app'
+      process.env.CORS_ORIGINS || 'http://localhost:3001,https://fixhub-admin-neon.vercel.app'
     )
       .split(',')
       .map((origin) => origin.trim())
@@ -165,7 +205,12 @@ export function validateConfig(config: Record<string, unknown>): AppConfig {
     RAZORPAY_KEY_ID: config.RAZORPAY_KEY_ID,
     RAZORPAY_KEY_SECRET: config.RAZORPAY_KEY_SECRET,
     RAZORPAY_WEBHOOK_SECRET: config.RAZORPAY_WEBHOOK_SECRET,
-    FIREBASE_PROJECT_ID: config.FIREBASE_PROJECT_ID,
+    FIREBASE_PROJECT_ID: cleanEnvString(config.FIREBASE_PROJECT_ID as string),
+    FIREBASE_PRIVATE_KEY: cleanPrivateKey(config.FIREBASE_PRIVATE_KEY as string),
+    FIREBASE_CLIENT_EMAIL: cleanEnvString(config.FIREBASE_CLIENT_EMAIL as string),
+    SMS_PROVIDER: cleanEnvString(config.SMS_PROVIDER as string),
+    SMS_API_KEY: cleanEnvString(config.SMS_API_KEY as string),
+    SMS_SENDER_ID: cleanEnvString(config.SMS_SENDER_ID as string),
     CORS_ORIGINS: config.CORS_ORIGINS,
     THROTTLE_TTL: config.THROTTLE_TTL || 60,
     THROTTLE_LIMIT: config.THROTTLE_LIMIT || 100,
@@ -177,7 +222,9 @@ export function validateConfig(config: Record<string, unknown>): AppConfig {
 
   if (errors.length > 0) {
     const messages = errors
-      .flatMap((error) => Object.values(error.constraints ?? {}).map((message) => `${error.property}: ${message}`))
+      .flatMap((error) =>
+        Object.values(error.constraints ?? {}).map((message) => `${error.property}: ${message}`),
+      )
       .join('; ');
 
     throw new Error(`Invalid environment configuration: ${messages}`);

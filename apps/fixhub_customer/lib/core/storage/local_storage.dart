@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
@@ -8,6 +9,7 @@ class LocalStorage {
   static const String _accessTokenKey = 'access_token';
   static const String _refreshTokenKey = 'refresh_token';
   static const String _userBox = 'user_data';
+  static const String _userJsonDataKey = 'user_data_json';
   static const String _locationBox = 'location_data';
   static const String _locationPincodeKey = 'pincode';
   static const String _locationStatusKey = 'status';
@@ -44,11 +46,22 @@ class LocalStorage {
   // --- User ---
   Future<void> saveUserData(Map<String, dynamic> userData) async {
     final box = await _getBox(_userBox);
-    await box.putAll(userData);
+    try {
+      await box.put(_userJsonDataKey, jsonEncode(userData));
+    } catch (_) {
+      // In case jsonEncode fails, store primitives only
+      await box.putAll(userData.map((k, v) => MapEntry(k, v?.toString())));
+    }
   }
 
   Future<Map<String, dynamic>?> getUserData() async {
     final box = await _getBox(_userBox);
+    final userJson = box.get(_userJsonDataKey);
+    if (userJson is String) {
+      try {
+        return jsonDecode(userJson) as Map<String, dynamic>;
+      } catch (_) {}
+    }
     if (box.isEmpty) return null;
     return Map<String, dynamic>.from(box.toMap());
   }

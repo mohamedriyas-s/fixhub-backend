@@ -47,13 +47,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           .read(authProvider.notifier)
           .sendOtp(_formattedPhone);
       if (!mounted) return;
-      final cooldown = result['cooldownSeconds'] as int?;
-      if (cooldown != null && cooldown > 0) {
-        setState(
-          () => _errorMessage = 'OTP already sent. Please wait ${cooldown}s.',
-        );
-        return;
-      }
       final devOtp = result['devOtp'] as String?;
       context.push('/otp', extra: {'phone': _formattedPhone, 'devOtp': devOtp});
     } catch (e) {

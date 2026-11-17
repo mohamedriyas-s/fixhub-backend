@@ -4,6 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'core/services/fcm_service.dart';
 import 'firebase_options.dart';
 import 'app.dart';
 
@@ -31,6 +32,12 @@ Future<void> main() async {
   }
 
   final container = ProviderContainer();
+
+  try {
+    await container.read(fcmServiceProvider).initialize();
+  } catch (e) {
+    debugPrint('FCM init failed: $e');
+  }
 
   runApp(
     UncontrolledProviderScope(

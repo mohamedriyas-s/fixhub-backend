@@ -8,17 +8,35 @@ class AddressRemoteDataSource {
 
   Future<List<dynamic>> getAddresses() async {
     final response = await _dio.get(ApiEndpoints.customerAddresses);
-    return response.data['data'] ?? response.data;
+    final raw = response.data;
+    if (raw is Map && raw['data'] is List) {
+      return raw['data'] as List<dynamic>;
+    } else if (raw is List) {
+      return raw;
+    }
+    return <dynamic>[];
   }
 
   Future<Map<String, dynamic>> addAddress(Map<String, dynamic> data) async {
     final response = await _dio.post(ApiEndpoints.customerAddresses, data: data);
-    return response.data['data'] ?? response.data;
+    final raw = response.data;
+    if (raw is Map && raw['data'] is Map) {
+      return Map<String, dynamic>.from(raw['data'] as Map);
+    } else if (raw is Map) {
+      return Map<String, dynamic>.from(raw);
+    }
+    return <String, dynamic>{};
   }
 
   Future<Map<String, dynamic>> updateAddress(String id, Map<String, dynamic> data) async {
     final response = await _dio.put(ApiEndpoints.customerAddress(id), data: data);
-    return response.data['data'] ?? response.data;
+    final raw = response.data;
+    if (raw is Map && raw['data'] is Map) {
+      return Map<String, dynamic>.from(raw['data'] as Map);
+    } else if (raw is Map) {
+      return Map<String, dynamic>.from(raw);
+    }
+    return <String, dynamic>{};
   }
 
   Future<void> deleteAddress(String id) async {

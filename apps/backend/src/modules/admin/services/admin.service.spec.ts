@@ -1,10 +1,12 @@
 import { ErrorCodes } from '@fixhub/shared';
 import { NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { VerificationStatus } from '@prisma/client';
 
 import { AdminRepository } from '../repositories/admin.repository';
 import { AdminService } from './admin.service';
+import { AdminNotificationService } from './admin-notification.service';
 
 describe('AdminService', () => {
   let service: AdminService;
@@ -26,6 +28,18 @@ describe('AdminService', () => {
             verifyTechnician: jest.fn(),
           },
         },
+        {
+          provide: AdminNotificationService,
+          useValue: {
+            createAndBroadcast: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: EventEmitter2,
+          useValue: {
+            emit: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -41,16 +55,14 @@ describe('AdminService', () => {
     it('should throw NotFoundException if customer not found', async () => {
       adminRepository.getCustomerDetails.mockResolvedValue(null);
 
-      await expect(service.getCustomerDetails('invalid-id')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.getCustomerDetails('invalid-id')).rejects.toThrow(NotFoundException);
       await expect(service.getCustomerDetails('invalid-id')).rejects.toMatchObject({
         response: { errorCode: ErrorCodes.CUSTOMER_NOT_FOUND },
       });
     });
 
     it('should return customer if found', async () => {
-      adminRepository.getCustomerDetails.mockResolvedValue({ id: 'valid-id' } as any);
+      adminRepository.getCustomerDetails.mockResolvedValue({ id: 'valid-id' } as never);
 
       const result = await service.getCustomerDetails('valid-id');
       expect(result.id).toBe('valid-id');
@@ -59,11 +71,18 @@ describe('AdminService', () => {
 
   describe('verifyTechnician', () => {
     it('should update verification status', async () => {
-      adminRepository.verifyTechnician.mockResolvedValue({ id: 'tech-1', verificationStatus: VerificationStatus.VERIFIED } as any);
+      adminRepository.verifyTechnician.mockResolvedValue({
+        id: 'tech-1',
+        verificationStatus: VerificationStatus.VERIFIED,
+      } as never);
 
       const result = await service.verifyTechnician('tech-1', VerificationStatus.VERIFIED);
       expect(result.verificationStatus).toBe(VerificationStatus.VERIFIED);
-      expect(adminRepository.verifyTechnician).toHaveBeenCalledWith('tech-1', VerificationStatus.VERIFIED, undefined);
+      expect(adminRepository.verifyTechnician).toHaveBeenCalledWith(
+        'tech-1',
+        VerificationStatus.VERIFIED,
+        undefined,
+      );
     });
 
     it('should throw NotFoundException if technician not found', async () => {

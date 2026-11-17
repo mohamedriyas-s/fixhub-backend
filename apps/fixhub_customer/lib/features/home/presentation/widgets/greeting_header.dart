@@ -74,12 +74,17 @@ class GreetingHeader extends ConsumerWidget {
                         color: AppColors.textPrimary,
                       ),
                       const SizedBox(width: 3),
-                      Text(
-                        locationDisplay,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w600,
-                            ),
+                      Flexible(
+                        child: Text(
+                          locationDisplay,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                        ),
                       ),
                       const SizedBox(width: 3),
                       const Icon(
@@ -118,22 +123,44 @@ class GreetingHeader extends ConsumerWidget {
               Consumer(
                 builder: (context, ref, _) {
                   final notificationsAsync = ref.watch(notificationsProvider);
-                  final hasUnread = notificationsAsync.maybeWhen(
-                    data: (notifications) => notifications.any((n) => !n.isRead),
-                    orElse: () => false,
+                  final unreadCount = notificationsAsync.maybeWhen(
+                    data: (notifications) =>
+                        notifications.where((n) => !n.isRead).length,
+                    orElse: () => 0,
                   );
 
-                  if (!hasUnread) return const SizedBox.shrink();
+                  if (unreadCount <= 0) return const SizedBox.shrink();
 
                   return Positioned(
-                    right: 10,
-                    top: 10,
+                    right: 2,
+                    top: 2,
                     child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 1,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      decoration: BoxDecoration(
                         color: AppColors.error,
-                        shape: BoxShape.circle,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: AppColors.surface,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          unreadCount > 99 ? '99+' : '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            height: 1,
+                          ),
+                        ),
                       ),
                     ),
                   );

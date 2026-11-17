@@ -147,11 +147,15 @@ class _ServiceCardState extends State<_ServiceCard>
                         ),
                   ),
                   const SizedBox(width: AppSpacing.xs),
-                  Text(
-                    '· ${service.formattedDuration}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
+                  Flexible(
+                    child: Text(
+                      '· ${service.formattedDuration}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                    ),
                   ),
                 ],
               ),

@@ -1,15 +1,28 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { Test, TestingModule } from '@nestjs/testing';
+import * as crypto from 'crypto';
 
-import { OtpService } from './otp.service';
 import { RedisService } from '../../../common/redis/redis.service';
+import { OtpService } from './otp.service';
 
 describe('OtpService', () => {
   let otpService: OtpService;
   let redisService: jest.Mocked<RedisService>;
 
+  const mockPipeline = {
+    set: jest.fn().mockReturnThis(),
+    del: jest.fn().mockReturnThis(),
+    incr: jest.fn().mockReturnThis(),
+    expire: jest.fn().mockReturnThis(),
+    exec: jest.fn().mockResolvedValue([
+      [null, 1],
+      [null, 1],
+    ]),
+  };
+
   const mockRedisClient = {
     ttl: jest.fn(),
+    pipeline: jest.fn(() => mockPipeline),
   };
 
   beforeEach(async () => {
@@ -19,11 +32,11 @@ describe('OtpService', () => {
         {
           provide: ConfigService,
           useValue: {
-            get: jest.fn((key: string, defaultValue?: any) => {
-              const config: Record<string, any> = {
+            get: jest.fn((key: string, defaultValue?: unknown) => {
+              const config: Record<string, unknown> = {
                 'otp.expirationSeconds': 300,
                 'otp.length': 6,
-                'nodeEnv': 'test',
+                nodeEnv: 'test',
               };
               return config[key] ?? defaultValue;
             }),
@@ -65,25 +78,22 @@ describe('OtpService', () => {
       expect(result.otp).toHaveLength(6);
       expect(result.otp).toMatch(/^\d{6}$/);
       expect(result.expiresInSeconds).toBe(300);
-      // Should store hashed OTP
-      expect(redisService.set).toHaveBeenCalledWith(
+      expect(mockPipeline.set).toHaveBeenCalledWith(
         'otp:+919876543210',
         expect.any(String),
+        'EX',
         300,
       );
-      // Should set cooldown
-      expect(redisService.set).toHaveBeenCalledWith(
-        'otp_cooldown:+919876543210',
-        '1',
-        60,
-      );
-      // Should reset attempts
-      expect(redisService.del).toHaveBeenCalledWith('otp_attempts:+919876543210');
+      expect(mockPipeline.del).toHaveBeenCalledWith('otp_attempts:+919876543210');
+      expect(mockPipeline.set).toHaveBeenCalledWith('otp_cooldown:+919876543210', '1', 'EX', 60);
     });
 
     it('should return empty OTP when on cooldown', async () => {
       redisService.exists.mockResolvedValue(true);
-      mockRedisClient.ttl.mockResolvedValue(45);
+      mockRedisClient.ttl.mockImplementation(async (key: string) => {
+        if (key.includes('lockout')) return -2;
+        return 45;
+      });
 
       const result = await otpService.generateAndStore('+919876543210');
 
@@ -99,7 +109,6 @@ describe('OtpService', () => {
       redisService.incr.mockResolvedValue(1);
       redisService.expire.mockResolvedValue(undefined);
       // generateAndStore stores hash of the OTP
-      const crypto = require('crypto');
       const hash = crypto.createHash('sha256').update('123456').digest('hex');
       redisService.get.mockResolvedValue(hash);
       redisService.del.mockResolvedValue(undefined);
@@ -116,7 +125,6 @@ describe('OtpService', () => {
     it('should return INVALID for wrong OTP', async () => {
       redisService.incr.mockResolvedValue(1);
       redisService.expire.mockResolvedValue(undefined);
-      const crypto = require('crypto');
       const hash = crypto.createHash('sha256').update('123456').digest('hex');
       redisService.get.mockResolvedValue(hash);
 
@@ -139,8 +147,11 @@ describe('OtpService', () => {
     });
 
     it('should return MAX_ATTEMPTS when attempts exceeded', async () => {
-      redisService.incr.mockResolvedValue(6); // > 5
-      redisService.expire.mockResolvedValue(undefined);
+      mockPipeline.exec.mockResolvedValueOnce([
+        [null, 6],
+        [null, 1],
+      ]);
+      redisService.set.mockResolvedValue(undefined);
       redisService.del.mockResolvedValue(undefined);
 
       const result = await otpService.verify('+919876543210', '123456');
@@ -151,12 +162,13 @@ describe('OtpService', () => {
     });
 
     it('should track attempts correctly across multiple calls', async () => {
-      const crypto = require('crypto');
       const hash = crypto.createHash('sha256').update('123456').digest('hex');
 
       // First attempt — wrong OTP
-      redisService.incr.mockResolvedValueOnce(1);
-      redisService.expire.mockResolvedValue(undefined);
+      mockPipeline.exec.mockResolvedValueOnce([
+        [null, 1],
+        [null, 1],
+      ]);
       redisService.get.mockResolvedValue(hash);
 
       const r1 = await otpService.verify('+919876543210', '111111');
@@ -164,7 +176,10 @@ describe('OtpService', () => {
       expect(r1.remainingAttempts).toBe(4);
 
       // Third attempt — correct OTP
-      redisService.incr.mockResolvedValueOnce(3);
+      mockPipeline.exec.mockResolvedValueOnce([
+        [null, 3],
+        [null, 1],
+      ]);
       redisService.del.mockResolvedValue(undefined);
 
       const r2 = await otpService.verify('+919876543210', '123456');
@@ -180,10 +195,11 @@ describe('OtpService', () => {
 
       await otpService.cleanup('+919876543210');
 
-      expect(redisService.del).toHaveBeenCalledTimes(3);
+      expect(redisService.del).toHaveBeenCalledTimes(4);
       expect(redisService.del).toHaveBeenCalledWith('otp:+919876543210');
       expect(redisService.del).toHaveBeenCalledWith('otp_attempts:+919876543210');
       expect(redisService.del).toHaveBeenCalledWith('otp_cooldown:+919876543210');
+      expect(redisService.del).toHaveBeenCalledWith('dev_otp:+919876543210');
     });
   });
 });

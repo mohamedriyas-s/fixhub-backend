@@ -27,7 +27,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   bool _isVerifying = false;
   bool _isResending = false;
   String? _errorMessage;
-  int _countdown = 30;
+  int _countdown = 60;
   Timer? _timer;
 
   @override
@@ -45,7 +45,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   }
 
   void _startCountdown() {
-    _countdown = 30;
+    _countdown = 60;
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_countdown <= 0) {
@@ -95,11 +95,15 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       _errorMessage = null;
     });
     try {
-      await ref.read(authProvider.notifier).sendOtp(widget.phone);
+      final res = await ref.read(authProvider.notifier).sendOtp(widget.phone);
       _startCountdown();
       if (mounted) {
+        final devOtp = res['devOtp'] as String?;
+        if (devOtp != null && devOtp.isNotEmpty) {
+          _otpController.text = devOtp;
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('OTP resent successfully')),
+          const SnackBar(content: Text('OTP sent successfully')),
         );
       }
     } catch (e) {

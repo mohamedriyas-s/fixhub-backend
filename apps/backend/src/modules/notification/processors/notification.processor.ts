@@ -5,10 +5,14 @@ import { Job } from 'bullmq';
 import { QUEUE_NAMES } from '../../../common/queue/queue.constants';
 import { NotificationChannel } from '../dto';
 import { NotificationService } from '../services/notification.service';
+import { SmsNotificationChannel } from '../services/notification-channel.service';
 
 type NotificationJobData = {
-  notificationId: string;
-  channel: NotificationChannel;
+  notificationId?: string;
+  phone?: string;
+  message?: string;
+  otp?: string;
+  channel?: NotificationChannel;
 };
 
 abstract class NotificationWorkerBase extends WorkerHost {
@@ -23,7 +27,9 @@ abstract class NotificationWorkerBase extends WorkerHost {
 
   async process(job: Job<NotificationJobData>): Promise<void> {
     try {
-      await this.notificationService.processChannel(this.channel, job.data.notificationId);
+      if (job.data.notificationId) {
+        await this.notificationService.processChannel(this.channel, job.data.notificationId);
+      }
     } catch (error) {
       this.logger.error(`Failed ${this.channel} notification job ${job.id}`, error);
 
@@ -49,9 +55,46 @@ export class PushNotificationProcessor extends NotificationWorkerBase {
 }
 
 @Processor(QUEUE_NAMES.SMS)
-export class SmsNotificationProcessor extends NotificationWorkerBase {
-  constructor(notificationService: NotificationService) {
-    super(notificationService, NotificationChannel.SMS);
+export class SmsNotificationProcessor extends WorkerHost {
+  private readonly logger = new Logger(SmsNotificationProcessor.name);
+
+  constructor(
+    private readonly notificationService: NotificationService,
+    private readonly smsChannel: SmsNotificationChannel,
+  ) {
+    super();
+  }
+
+  async process(job: Job<NotificationJobData>): Promise<void> {
+    try {
+      if (job.name === 'send-otp' || job.data?.phone) {
+        await this.smsChannel.send({
+          phone: job.data.phone,
+          body: job.data.message || `Your FixHub OTP is: ${job.data.otp}`,
+        });
+        return;
+      }
+
+      if (job.data?.notificationId) {
+        await this.notificationService.processChannel(
+          NotificationChannel.SMS,
+          job.data.notificationId,
+        );
+      }
+    } catch (error) {
+      this.logger.error(`Failed SMS job ${job.id}`, error);
+
+      if (job.attemptsMade + 1 >= (job.opts.attempts ?? 1)) {
+        await this.notificationService.moveToDeadLetter({
+          id: job.id,
+          name: job.name,
+          data: job.data,
+          failedReason: (error as Error).message,
+        });
+      }
+
+      throw error;
+    }
   }
 }
 

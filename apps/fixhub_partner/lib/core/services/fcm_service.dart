@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/auth/data/auth_repository.dart';
+import '../../features/notifications/presentation/notification_provider.dart';
+import '../../features/jobs/presentation/job_provider.dart';
 import '../routing/app_router.dart';
 import '../../app.dart';
 
@@ -43,31 +45,45 @@ class FcmService {
       // Listen for token refresh
       _messaging.onTokenRefresh.listen(syncToken);
 
-      // Foreground messages — show a SnackBar so the technician sees it
+      // Foreground messages — show a SnackBar and invalidate caches
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         debugPrint('FCM: Foreground message: ${message.messageId}');
+        _ref.invalidate(unreadCountProvider);
+        _ref.invalidate(notificationsProvider);
+        _ref.invalidate(activeJobProvider);
+        _ref.invalidate(myJobsProvider(null));
+        _ref.invalidate(assignedJobsCountProvider);
+
         final notification = message.notification;
-        if (notification != null) {
-          _showForegroundBanner(
-            title: notification.title ?? 'FixHub',
-            body: notification.body ?? '',
-          );
-        }
+        final bookingId = message.data['bookingId']?.toString();
+        _showForegroundBanner(
+          title: notification?.title ?? message.data['title']?.toString() ?? 'FixHub',
+          body: notification?.body ?? message.data['body']?.toString() ?? '',
+          bookingId: bookingId,
+        );
       });
+
+      void handleMessageNavigation(RemoteMessage message) {
+        final bookingId = message.data['bookingId']?.toString();
+        if (bookingId != null && bookingId.isNotEmpty) {
+          _ref.read(routerProvider).push('/job-details/$bookingId');
+        } else {
+          _ref.read(routerProvider).push('/notifications');
+        }
+      }
 
       // When app opened from a background notification tap
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
         debugPrint('FCM: Opened from notification: ${message.messageId}');
-        appNavigatorKey.currentState?.pushNamed('/notifications');
+        handleMessageNavigation(message);
       });
 
       // Check if app was launched from a terminated-state notification
       final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
       if (initialMessage != null) {
         debugPrint('FCM: App launched from notification: ${initialMessage.messageId}');
-        // Small delay so the router is ready
         await Future.delayed(const Duration(milliseconds: 500));
-        appNavigatorKey.currentState?.pushNamed('/notifications');
+        handleMessageNavigation(initialMessage);
       }
     } else {
       debugPrint('FCM: Permission not granted (${settings.authorizationStatus})');
@@ -75,7 +91,11 @@ class FcmService {
   }
 
   /// Show a floating SnackBar for foreground push notifications.
-  void _showForegroundBanner({required String title, required String body}) {
+  void _showForegroundBanner({
+    required String title,
+    required String body,
+    String? bookingId,
+  }) {
     scaffoldMessengerKey.currentState?.showSnackBar(
       SnackBar(
         content: Column(
@@ -111,7 +131,11 @@ class FcmService {
           label: 'View',
           textColor: Colors.white,
           onPressed: () {
-            appNavigatorKey.currentState?.pushNamed('/notifications');
+            if (bookingId != null && bookingId.isNotEmpty) {
+              _ref.read(routerProvider).push('/job-details/$bookingId');
+            } else {
+              _ref.read(routerProvider).push('/notifications');
+            }
           },
         ),
       ),

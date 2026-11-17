@@ -496,6 +496,30 @@ class _JobDetailsBodyState extends ConsumerState<_JobDetailsBody> {
                   ),
                 ],
 
+                if (job.notes != null && job.notes!.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.base),
+                  _Section(
+                    title: 'Assignment Note / Instructions',
+                    trailing: const Icon(
+                      Icons.assignment_outlined,
+                      size: 20,
+                      color: AppColors.primary,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.xs,
+                      ),
+                      child: Text(
+                        job.notes!,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppColors.textPrimary,
+                              height: 1.4,
+                            ),
+                      ),
+                    ),
+                  ),
+                ],
+
                 // ── Issue Media ──────────────────────────────────
                 if (job.media.where((m) => m.phase == 'BEFORE_SERVICE').isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.base),
@@ -735,6 +759,17 @@ class _TimelineRow extends StatelessWidget {
                     fontSize: 13,
                   ),
                 ),
+                if (entry.note != null && entry.note!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2, bottom: 2),
+                    child: Text(
+                      entry.note!,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
                 Text(
                   DateFormat('d MMM, h:mm a').format(entry.createdAt.toLocal()),
                   style: const TextStyle(

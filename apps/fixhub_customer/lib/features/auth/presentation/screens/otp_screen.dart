@@ -23,17 +23,34 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   final _otpController = TextEditingController();
   final _focusNode = FocusNode();
   Timer? _timer;
-  int _remainingSeconds = 30;
+  int _remainingSeconds = 60;
   bool _canResend = false;
+  bool _hasAutoFilled = false;
+  bool _isVerifying = false;
 
   @override
   void initState() {
     super.initState();
     _startTimer();
+    _otpController.addListener(_onOtpChanged);
+
+    // Auto-fill dev OTP once on initial mount
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final devOtp = ref.read(authProvider).devOtp;
+      if (devOtp != null && devOtp.isNotEmpty && !_hasAutoFilled) {
+        _hasAutoFilled = true;
+        _otpController.text = devOtp;
+      }
+    });
+  }
+
+  void _onOtpChanged() {
+    if (mounted) setState(() {});
   }
 
   void _startTimer() {
-    _remainingSeconds = 30;
+    _remainingSeconds = 60;
     _canResend = false;
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -51,24 +68,37 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   }
 
   Future<void> _verifyOtp(String otp) async {
+    if (_isVerifying) return;
     final phone = ref.read(authProvider).phone;
     if (phone == null) return;
 
-    await ref.read(authProvider.notifier).verifyOtp(
-          phone: phone,
-          otp: otp,
-        );
+    setState(() => _isVerifying = true);
+    try {
+      await ref.read(authProvider.notifier).verifyOtp(
+            phone: phone,
+            otp: otp,
+          );
+    } finally {
+      if (mounted) setState(() => _isVerifying = false);
+    }
   }
 
   Future<void> _resendOtp() async {
-    if (!_canResend) return;
+    if (!_canResend || _isVerifying) return;
     _otpController.clear();
+    _hasAutoFilled = false;
     await ref.read(authProvider.notifier).resendOtp();
     _startTimer();
+    final devOtp = ref.read(authProvider).devOtp;
+    if (devOtp != null && devOtp.isNotEmpty) {
+      _hasAutoFilled = true;
+      _otpController.text = devOtp;
+    }
   }
 
   @override
   void dispose() {
+    _otpController.removeListener(_onOtpChanged);
     _timer?.cancel();
     _otpController.dispose();
     _focusNode.dispose();
@@ -86,19 +116,9 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
         context.go(RouteNames.home);
       } else if (next.status == AuthStatus.error && next.errorMessage != null) {
         FixHubSnackbar.error(context, next.errorMessage!);
-        _otpController.clear();
         ref.read(authProvider.notifier).clearError();
       }
     });
-
-    // Pre-fill dev OTP if available
-    if (authState.devOtp != null && _otpController.text.isEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _otpController.text.isEmpty) {
-          _otpController.text = authState.devOtp!;
-        }
-      });
-    }
 
     // Pinput theme
     final defaultPinTheme = PinTheme(
@@ -243,10 +263,10 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
               // Verify button
               FixHubButton(
                 label: 'Verify',
-                onPressed: _otpController.text.length == 6
+                onPressed: _otpController.text.length == 6 && !_isVerifying
                     ? () => _verifyOtp(_otpController.text)
                     : null,
-                isLoading: authState.status == AuthStatus.verifying,
+                isLoading: authState.status == AuthStatus.verifying || _isVerifying,
               ),
 
               const SizedBox(height: AppSpacing.bottomSafePadding),

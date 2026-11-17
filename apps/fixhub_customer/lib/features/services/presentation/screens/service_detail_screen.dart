@@ -224,22 +224,29 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
                   const SizedBox(height: AppSpacing.xs),
 
                   // Duration + category chips
-                  Row(
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: AppSpacing.sm,
+                    runSpacing: 4,
                     children: [
-                      const Icon(
-                        Icons.schedule_rounded,
-                        size: 15,
-                        color: AppColors.textSecondary,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.schedule_rounded,
+                            size: 15,
+                            color: AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Est. ${service.formattedDuration}',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Est. ${service.formattedDuration}',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                      ),
-                      if (service.category != null) ...[
-                        const SizedBox(width: AppSpacing.sm),
+                      if (service.category != null)
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.sm, vertical: 3),
@@ -258,7 +265,6 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
                                     ),
                           ),
                         ),
-                      ],
                     ],
                   ),
 

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../../core/config/app_config.dart';
 import '../../../../core/storage/local_storage.dart';
 import '../../data/datasources/tracking_remote_datasource.dart';
 import 'booking_provider.dart';
@@ -34,7 +35,7 @@ class TrackingState {
 // Data source provider
 @riverpod
 TrackingRemoteDataSource trackingRemoteDataSource(Ref ref) {
-  final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://192.168.29.26:3000/api/v1';
+  final baseUrl = AppConfig.apiBaseUrl;
   final dataSource = TrackingRemoteDataSource(baseUrl);
   
   ref.onDispose(() {

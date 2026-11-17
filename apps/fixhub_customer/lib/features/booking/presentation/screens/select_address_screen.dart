@@ -11,6 +11,8 @@ import '../providers/booking_flow_provider.dart';
 import '../../data/models/address_model.dart';
 import '../../../profile/presentation/providers/address_provider.dart';
 import '../../../../core/widgets/fixhub_empty_state.dart';
+import '../../../../core/widgets/fixhub_error_state.dart';
+import '../../../../core/widgets/fixhub_shimmer.dart';
 
 class SelectAddressScreen extends ConsumerStatefulWidget {
   const SelectAddressScreen({super.key});
@@ -89,9 +91,13 @@ class _SelectAddressScreenState extends ConsumerState<SelectAddressScreen> {
                                 children: [
                                   Row(
                                     children: [
-                                      Text(
-                                        address.label,
-                                        style: Theme.of(context).textTheme.titleMedium,
+                                      Flexible(
+                                        child: Text(
+                                          address.label,
+                                          style: Theme.of(context).textTheme.titleMedium,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
                                       if (address.isDefault) ...[
                                         const SizedBox(width: AppSpacing.sm),
@@ -162,8 +168,24 @@ class _SelectAddressScreenState extends ConsumerState<SelectAddressScreen> {
             ],
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Error: $err')),
+        loading: () => Padding(
+          padding: const EdgeInsets.all(AppSpacing.screenPadding),
+          child: Column(
+            children: [
+              FixHubShimmer.card(height: 80),
+              const SizedBox(height: AppSpacing.sm),
+              FixHubShimmer.card(height: 80),
+            ],
+          ),
+        ),
+        error: (err, stack) => Padding(
+          padding: const EdgeInsets.all(AppSpacing.screenPadding),
+          child: FixHubErrorState(
+            message: 'Could not load your saved addresses. Please try again.',
+            onRetry: () =>
+                ref.read(addressesProvider.notifier).fetchAddresses(),
+          ),
+        ),
       ),
     );
   }

@@ -53,16 +53,16 @@ class DefaultFirebaseOptions {
     apiKey: 'AIzaSyC2EelHLEbEf1c6ymXEqtySWVaAwHnXAeM',
     appId: '1:357670111092:android:3ffe26bf818cd0a4890e21',
     messagingSenderId: '357670111092',
-    projectId: 'fixhub-f21cc',
-    storageBucket: 'fixhub-f21cc.firebasestorage.app',
+    projectId: 'magnetic-signer-514910-e6',
+    storageBucket: 'magnetic-signer-514910-e6.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyCRXYx0EGA7kuuEyBYtiHENuplKnmG-_EE',
     appId: '1:357670111092:ios:63b6f76196e90b9d890e21',
     messagingSenderId: '357670111092',
-    projectId: 'fixhub-f21cc',
-    storageBucket: 'fixhub-f21cc.firebasestorage.app',
+    projectId: 'magnetic-signer-514910-e6',
+    storageBucket: 'magnetic-signer-514910-e6.firebasestorage.app',
     iosBundleId: 'com.fixhub.customer.fixhubCustomer',
   );
 }

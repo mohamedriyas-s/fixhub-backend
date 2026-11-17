@@ -53,7 +53,9 @@ export class OtpService {
     const lockoutKey = `${OTP_LOCKOUT_PREFIX}${phone}`;
     const lockoutTtl = await this.redisService.getClient().ttl(lockoutKey);
     if (lockoutTtl > 0) {
-      throw new ForbiddenException(`Too many attempts. Please try again after ${Math.ceil(lockoutTtl / 60)} minutes.`);
+      throw new ForbiddenException(
+        `Too many attempts. Please try again after ${Math.ceil(lockoutTtl / 60)} minutes.`,
+      );
     }
 
     // Check resend cooldown
@@ -65,29 +67,38 @@ export class OtpService {
 
     // If on cooldown, check if there's an existing OTP still valid
     if (isOnCooldown) {
-      const ttl = await this.redisService.getClient().ttl(cooldownKey);
-      return {
-        otp: '', // Don't regenerate — existing OTP is still valid
-        expiresInSeconds: ttl > 0 ? ttl : this.cooldownSeconds,
-        isResend: false,
-      };
+      const otpExists = await this.redisService.exists(otpKey);
+      if (otpExists) {
+        const ttl = await this.redisService.getClient().ttl(cooldownKey);
+        return {
+          otp: '', // Don't regenerate — existing OTP is still valid
+          expiresInSeconds: ttl > 0 ? ttl : this.cooldownSeconds,
+          isResend: false,
+        };
+      }
+      // If OTP does not exist in Redis (expired or cleaned up),
+      // clear the orphaned cooldown and proceed to generate a fresh OTP!
+      await this.redisService.del(cooldownKey);
     }
 
     // Generate new OTP
     const otp = generateOtp(this.otpLength);
     const hashedOtp = hashString(otp);
 
-    // Store hashed OTP in Redis
-    await this.redisService.set(otpKey, hashedOtp, this.otpExpiration);
+    // Atomic pipeline to set OTP, reset attempts, set cooldown, and store dev OTP if not prod
+    const client = this.redisService.getClient();
+    const pipeline = client.pipeline();
+    pipeline.set(otpKey, hashedOtp, 'EX', this.otpExpiration);
+    pipeline.del(attemptsKey);
+    pipeline.set(cooldownKey, '1', 'EX', this.cooldownSeconds);
 
-    // Reset attempt counter
-    await this.redisService.del(attemptsKey);
-
-    // Set resend cooldown
-    await this.redisService.set(cooldownKey, '1', this.cooldownSeconds);
+    if (this.configService.get<string>('nodeEnv') !== 'production') {
+      pipeline.set(`dev_otp:${phone}`, otp, 'EX', this.otpExpiration);
+    }
+    await pipeline.exec();
 
     // Dev-only logging — remove in production
-    if (this.configService.get<string>('nodeEnv') === 'development') {
+    if (this.configService.get<string>('nodeEnv') !== 'production') {
       this.logger.debug(`[DEV] OTP for ${phone}: ${otp}`);
     }
 
@@ -96,6 +107,16 @@ export class OtpService {
       expiresInSeconds: this.otpExpiration,
       isResend: false,
     };
+  }
+
+  /**
+   * Get dev OTP if in non-production environment
+   */
+  async getDevOtp(phone: string): Promise<string | null> {
+    if (this.configService.get<string>('nodeEnv') === 'production') {
+      return null;
+    }
+    return this.redisService.get(`dev_otp:${phone}`);
   }
 
   /**
@@ -109,7 +130,10 @@ export class OtpService {
    * @returns { valid: true } on success
    * @returns { valid: false, reason: string } on failure
    */
-  async verify(phone: string, otp: string): Promise<{
+  async verify(
+    phone: string,
+    otp: string,
+  ): Promise<{
     valid: boolean;
     reason?: 'EXPIRED' | 'INVALID' | 'MAX_ATTEMPTS';
     remainingAttempts?: number;
@@ -117,9 +141,14 @@ export class OtpService {
     const otpKey = `${OTP_PREFIX}${phone}`;
     const attemptsKey = `${OTP_ATTEMPTS_PREFIX}${phone}`;
 
-    // Check attempt count FIRST (before revealing if OTP exists)
-    const attempts = await this.redisService.incr(attemptsKey);
-    await this.redisService.expire(attemptsKey, this.otpExpiration);
+    // Atomic increment and set expiry in a pipeline
+    const client = this.redisService.getClient();
+    const pipeline = client.pipeline();
+    pipeline.incr(attemptsKey);
+    pipeline.expire(attemptsKey, this.otpExpiration);
+    const results = await pipeline.exec();
+
+    const attempts = (results?.[0]?.[1] as number) || 1;
 
     if (attempts > this.maxAttempts) {
       // Set lockout (e.g. 30 minutes)
@@ -138,7 +167,7 @@ export class OtpService {
       return {
         valid: false,
         reason: 'EXPIRED',
-        remainingAttempts: this.maxAttempts - attempts,
+        remainingAttempts: Math.max(0, this.maxAttempts - attempts),
       };
     }
 
@@ -149,7 +178,7 @@ export class OtpService {
       return {
         valid: false,
         reason: 'INVALID',
-        remainingAttempts: this.maxAttempts - attempts,
+        remainingAttempts: Math.max(0, this.maxAttempts - attempts),
       };
     }
 
@@ -166,6 +195,7 @@ export class OtpService {
       this.redisService.del(`${OTP_PREFIX}${phone}`),
       this.redisService.del(`${OTP_ATTEMPTS_PREFIX}${phone}`),
       this.redisService.del(`${OTP_COOLDOWN_PREFIX}${phone}`),
+      this.redisService.del(`dev_otp:${phone}`),
     ]);
   }
 

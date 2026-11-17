@@ -1,12 +1,16 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
+import { Transform } from 'class-transformer';
 import { IsIn, IsNotEmpty, IsPhoneNumber, IsString, Length, Matches } from 'class-validator';
+
+import { normalizePhone } from '../../../common/utils/helpers.util';
 
 export class VerifyOtpDto {
   @ApiProperty({
     example: '+919876543210',
     description: 'Phone number used to request OTP',
   })
+  @Transform(({ value }) => (typeof value === 'string' ? normalizePhone(value) : value))
   @IsString()
   @IsNotEmpty()
   @IsPhoneNumber('IN', { message: 'Phone number must be a valid Indian number' })

@@ -5,8 +5,9 @@ import { PrismaService } from '../../../common/database/prisma.service';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { JobQueryDto } from '../dto';
 
-/** Active job statuses — technician has accepted and is actively working */
+/** Active job statuses — technician has been assigned or accepted and is working */
 const ACTIVE_JOB_STATUSES = [
+  BookingStatus.ASSIGNED,
   BookingStatus.ACCEPTED,
   BookingStatus.EN_ROUTE,
   BookingStatus.ARRIVED,
@@ -119,7 +120,12 @@ export class TechnicianJobRepository {
 
   private jobOrderBy(query: JobQueryDto): Prisma.BookingOrderByWithRelationInput {
     const allowed = new Set([
-      'scheduledDate', 'status', 'totalAmount', 'createdAt', 'updatedAt', 'completedAt',
+      'scheduledDate',
+      'status',
+      'totalAmount',
+      'createdAt',
+      'updatedAt',
+      'completedAt',
     ]);
     const sortBy = allowed.has(query.sortBy ?? '') ? query.sortBy! : 'createdAt';
     return { [sortBy]: query.sortOrder ?? 'desc' };
@@ -156,7 +162,9 @@ export class TechnicianJobRepository {
 
   private jobDetailInclude(): Prisma.BookingInclude {
     return {
-      customer: { include: { user: { select: { id: true, name: true, phone: true, email: true } } } },
+      customer: {
+        include: { user: { select: { id: true, name: true, phone: true, email: true } } },
+      },
       subService: { include: { category: true } },
       address: true,
       timeline: { orderBy: { createdAt: 'desc' } },

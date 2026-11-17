@@ -113,8 +113,11 @@ export class NotificationService {
     }
 
     const payload =
-      notification.data && typeof notification.data === 'object' && !Array.isArray(notification.data)
-        ? ((notification.data as Record<string, unknown>).payload as Record<string, unknown> | undefined)
+      notification.data &&
+      typeof notification.data === 'object' &&
+      !Array.isArray(notification.data)
+        ? ((notification.data as Record<string, unknown>).payload as
+            Record<string, unknown> | undefined)
         : undefined;
     const result =
       channel === NotificationChannel.PUSH
@@ -143,7 +146,12 @@ export class NotificationService {
     return result;
   }
 
-  async moveToDeadLetter(job: { id?: string | number; name: string; data: unknown; failedReason?: string }) {
+  async moveToDeadLetter(job: {
+    id?: string | number;
+    name: string;
+    data: unknown;
+    failedReason?: string;
+  }) {
     await this.deadLetterQueue.add(
       'notification-dead-letter',
       {
@@ -199,19 +207,28 @@ export class NotificationService {
   }
 
   private async enqueueChannel(channel: NotificationChannel, data: { notificationId: string }) {
-    const queue =
-      channel === NotificationChannel.PUSH
-        ? this.notificationQueue
-        : channel === NotificationChannel.SMS
-          ? this.smsQueue
-          : this.emailQueue;
+    if (channel === NotificationChannel.PUSH) {
+      // Direct immediate execution for zero queue latency
+      this.processChannel(NotificationChannel.PUSH, data.notificationId).catch((err) => {
+        this.logger.error(
+          `Immediate push dispatch failed for ${data.notificationId}: ${err.message}`,
+        );
+      });
+      return;
+    }
 
-    await queue.add(channel.toLowerCase(), { channel, ...data }, {
-      attempts: 5,
-      backoff: { type: 'exponential', delay: 2000 },
-      removeOnComplete: 1000,
-      removeOnFail: false,
-    });
+    const queue = channel === NotificationChannel.SMS ? this.smsQueue : this.emailQueue;
+
+    await queue.add(
+      channel.toLowerCase(),
+      { channel, ...data },
+      {
+        attempts: 5,
+        backoff: { type: 'exponential', delay: 2000 },
+        removeOnComplete: 1000,
+        removeOnFail: false,
+      },
+    );
     this.logger.log(`Queued ${channel} notification ${data.notificationId}`);
   }
 
@@ -225,7 +242,8 @@ export class NotificationService {
 
   private applyVariables(template: string, variables?: Record<string, string | number | boolean>) {
     return Object.entries(variables ?? {}).reduce(
-      (message, [key, value]) => message.replace(new RegExp(`{{\\s*${key}\\s*}}`, 'g'), String(value)),
+      (message, [key, value]) =>
+        message.replace(new RegExp(`{{\\s*${key}\\s*}}`, 'g'), String(value)),
       template,
     );
   }

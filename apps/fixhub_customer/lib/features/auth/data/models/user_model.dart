@@ -3,7 +3,7 @@ import 'package:json_annotation/json_annotation.dart';
 part 'user_model.g.dart';
 
 /// User model matching the backend `/auth/verify-otp` and `/auth/me` response.
-@JsonSerializable()
+@JsonSerializable(explicitToJson: true)
 class UserModel {
   const UserModel({
     required this.id,
@@ -26,8 +26,13 @@ class UserModel {
   @JsonKey(name: 'customer')
   final CustomerProfile? profile;
 
-  factory UserModel.fromJson(Map<String, dynamic> json) =>
-      _$UserModelFromJson(json);
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    final normalized = Map<String, dynamic>.from(json);
+    if (normalized['customer'] == null && normalized['profile'] != null) {
+      normalized['customer'] = normalized['profile'];
+    }
+    return _$UserModelFromJson(normalized);
+  }
 
   Map<String, dynamic> toJson() => _$UserModelToJson(this);
 

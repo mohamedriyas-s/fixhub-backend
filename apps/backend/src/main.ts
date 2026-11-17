@@ -48,6 +48,7 @@ async function bootstrap() {
         origin.endsWith('.ngrok-free.app') ||
         origin.includes('localhost') ||
         origin.includes('127.0.0.1') ||
+        origin.includes('10.0.2.2') ||
         origin.includes('192.168.')
       ) {
         return callback(null, true);

@@ -4,6 +4,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../presentation/providers/notification_provider.dart';
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../firebase_options.dart';
@@ -192,6 +193,7 @@ class FCMService {
 
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
     debugPrint('[FCM] Foreground message: ${message.notification?.title}');
+    _ref.invalidate(notificationsProvider);
     await showLocalNotification(message);
   }
 
@@ -236,8 +238,8 @@ class FCMService {
     try {
       final dio = _ref.read(dioProvider);
       await dio.post(ApiEndpoints.registerDevice, data: {
-        'fcmToken': token,
-        'deviceType': _deviceType(),
+        'deviceToken': token,
+        'platform': _deviceType(),
       });
       debugPrint('[FCM] Token registered with backend.');
     } catch (e) {

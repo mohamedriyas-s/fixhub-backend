@@ -1,4 +1,5 @@
 import { ErrorCodes } from '@fixhub/shared';
+import { InjectQueue } from '@nestjs/bullmq';
 import {
   BadRequestException,
   ForbiddenException,
@@ -7,13 +8,14 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
+import { Queue } from 'bullmq';
 
-import { AuthenticatedUser } from '../../../common/interfaces/auth.interface';
+import { QUEUE_NAMES } from '../../../common/queue/queue.constants';
 import { AdminLoginDto, SendOtpDto, VerifyOtpDto } from '../dto';
 import { AuthRepository } from '../repositories/auth.repository';
 import { OtpService } from './otp.service';
 import { TokenService } from './token.service';
-import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AuthService {
@@ -23,28 +25,49 @@ export class AuthService {
     private readonly otpService: OtpService,
     private readonly tokenService: TokenService,
     private readonly authRepository: AuthRepository,
+    @InjectQueue(QUEUE_NAMES.SMS) private readonly smsQueue: Queue,
   ) {}
 
   // ── Send OTP ──────────────────────────────────────────────
 
   async sendOtp(dto: SendOtpDto) {
-    const { otp, expiresInSeconds, isResend } = await this.otpService.generateAndStore(dto.phone);
+    const { otp, expiresInSeconds } = await this.otpService.generateAndStore(dto.phone);
 
     if (!otp) {
       // Still on cooldown — tell user to wait
       const remaining = await this.otpService.getCooldownRemaining(dto.phone);
+      const devOtp = await this.otpService.getDevOtp(dto.phone);
       return {
         message: `OTP already sent. Please wait ${remaining}s before requesting again.`,
         cooldownSeconds: remaining,
+        expiresInSeconds,
+        devOtp: devOtp ?? undefined,
       };
     }
 
-    // TODO: Queue SMS delivery via BullMQ
-    // await this.smsQueue.add('send-otp', { phone: dto.phone, otp });
+    // Queue SMS delivery via BullMQ (processed asynchronously with retry)
+    try {
+      await this.smsQueue.add(
+        'send-otp',
+        {
+          phone: dto.phone,
+          message: `Your FixHub verification code is: ${otp}. Valid for 5 minutes. Do not share this code.`,
+          otp,
+        },
+        {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 1000 },
+          removeOnComplete: true,
+        },
+      );
+    } catch (err) {
+      this.logger.error(`Failed to enqueue SMS to ${dto.phone}`, err);
+    }
 
     return {
       message: 'OTP sent successfully',
       expiresInSeconds,
+      cooldownSeconds: 60,
       devOtp: process.env.NODE_ENV !== 'production' ? otp : undefined,
     };
   }
@@ -98,6 +121,24 @@ export class AuthService {
     // Generate token pair
     const tokens = await this.tokenService.generateTokenPair(user);
 
+    // Fetch full user with profile details
+    const fullUser = await this.authRepository.findUserById(user.id);
+    const profile = fullUser?.customer
+      ? {
+          id: fullUser.customer.id,
+          profilePictureUrl: fullUser.customer.profilePictureUrl,
+        }
+      : fullUser?.technician
+        ? {
+            id: fullUser.technician.id,
+            profilePictureUrl: fullUser.technician.profilePictureUrl,
+            isAvailable: fullUser.technician.isAvailable,
+            verificationStatus: fullUser.technician.verificationStatus,
+            rating: fullUser.technician.rating,
+            totalJobs: fullUser.technician.totalJobs,
+          }
+        : undefined;
+
     this.logger.log(
       `User ${user.id} (${user.role}) authenticated via OTP${isNewUser ? ' [NEW]' : ''}`,
     );
@@ -111,6 +152,12 @@ export class AuthService {
         name: user.name,
         email: user.email,
         role: user.role,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        profile,
+        // Backward-compatible customer / technician key
+        ...(fullUser?.customer && { customer: profile }),
+        ...(fullUser?.technician && { technician: profile }),
       },
     };
   }

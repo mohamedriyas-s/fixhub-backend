@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/network/dio_client.dart';
@@ -27,13 +28,15 @@ class AppNotification {
   });
 
   factory AppNotification.fromJson(Map<String, dynamic> json) => AppNotification(
-        id: json['id'] as String,
+        id: json['id'] as String? ?? '',
         title: json['title'] as String? ?? '',
         body: json['body'] as String? ?? '',
         type: json['type'] as String? ?? 'SYSTEM',
         isRead: json['isRead'] as bool? ?? false,
-        createdAt: DateTime.parse(json['createdAt'] as String),
-        data: json['data'] as Map<String, dynamic>?,
+        createdAt: json['createdAt'] != null
+            ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now()
+            : DateTime.now(),
+        data: json['data'] is Map ? Map<String, dynamic>.from(json['data'] as Map) : null,
       );
 }
 
@@ -43,16 +46,20 @@ class NotificationRepository {
   NotificationRepository(this._dio);
 
   Future<List<AppNotification>> listNotifications({int page = 1, int limit = 30}) async {
-    final response = await _dio.get(
-      ApiEndpoints.notifications,
-      queryParameters: {'page': page, 'limit': limit},
-    );
-    final data = _unwrapMap(response.data);
-    final dynamic rawItems = data['items'];
-    final items = (rawItems is List) ? rawItems : <dynamic>[];
-    return items
-        .map((i) => AppNotification.fromJson(i as Map<String, dynamic>))
-        .toList();
+    try {
+      final response = await _dio.get(
+        ApiEndpoints.notifications,
+        queryParameters: {'page': page, 'limit': limit},
+      );
+      final rawList = _extractList(response.data);
+      return rawList
+          .whereType<Map>()
+          .map((i) => AppNotification.fromJson(Map<String, dynamic>.from(i)))
+          .toList();
+    } catch (e) {
+      debugPrint('[NotificationRepository] listNotifications error: $e');
+      rethrow;
+    }
   }
 
   Future<void> markAsRead(String id) async {
@@ -63,13 +70,24 @@ class NotificationRepository {
     await _dio.patch(ApiEndpoints.notificationReadAll);
   }
 
-  Map<String, dynamic> _unwrapMap(dynamic data) {
-    if (data is Map<String, dynamic> && data.containsKey('data')) {
-      final d = data['data'];
-      if (d is Map<String, dynamic>) return d;
-      return {'items': d};
+  List<dynamic> _extractList(dynamic data) {
+    if (data is Map) {
+      final inner = data['data'] ?? data['items'];
+      if (inner is Map) {
+        final nested = inner['data'] ?? inner['items'];
+        if (nested is List) return nested;
+      } else if (inner is List) {
+        return inner;
+      }
+      if (data.containsKey('data') && data['data'] is List) {
+        return data['data'] as List<dynamic>;
+      }
+      if (data.containsKey('items') && data['items'] is List) {
+        return data['items'] as List<dynamic>;
+      }
+    } else if (data is List) {
+      return data;
     }
-    if (data is Map<String, dynamic>) return data;
-    return {'items': data};
+    return [];
   }
 }

@@ -1,11 +1,13 @@
+import { getQueueToken } from '@nestjs/bullmq';
 import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Role } from '@prisma/client';
 
+import { QUEUE_NAMES } from '../../../common/queue/queue.constants';
+import { AuthRepository } from '../repositories/auth.repository';
 import { AuthService } from './auth.service';
 import { OtpService } from './otp.service';
 import { TokenService } from './token.service';
-import { AuthRepository } from '../repositories/auth.repository';
 
 describe('AuthService', () => {
   let authService: AuthService;
@@ -37,11 +39,18 @@ describe('AuthService', () => {
       providers: [
         AuthService,
         {
+          provide: getQueueToken(QUEUE_NAMES.SMS),
+          useValue: {
+            add: jest.fn().mockResolvedValue({ id: 'mock-job-id' }),
+          },
+        },
+        {
           provide: OtpService,
           useValue: {
             generateAndStore: jest.fn(),
             verify: jest.fn(),
             getCooldownRemaining: jest.fn(),
+            getDevOtp: jest.fn().mockResolvedValue('123456'),
             cleanup: jest.fn(),
           },
         },
@@ -243,7 +252,7 @@ describe('AuthService', () => {
     it('should revoke all tokens, blacklist access token, and deactivate devices', async () => {
       tokenService.revokeAllTokens.mockResolvedValue(undefined);
       tokenService.blacklistAccessToken.mockResolvedValue(undefined);
-      authRepository.deactivateUserDeviceTokens.mockResolvedValue({ count: 1 } as any);
+      authRepository.deactivateUserDeviceTokens.mockResolvedValue({ count: 1 } as never);
 
       const result = await authService.logout('user-uuid-1', 'access-token');
 
@@ -255,7 +264,7 @@ describe('AuthService', () => {
 
     it('should handle logout without access token', async () => {
       tokenService.revokeAllTokens.mockResolvedValue(undefined);
-      authRepository.deactivateUserDeviceTokens.mockResolvedValue({ count: 0 } as any);
+      authRepository.deactivateUserDeviceTokens.mockResolvedValue({ count: 0 } as never);
 
       const result = await authService.logout('user-uuid-1');
 
@@ -279,7 +288,7 @@ describe('AuthService', () => {
           updatedAt: new Date(),
         },
         technician: null,
-      } as any);
+      } as never);
 
       const result = await authService.getMe('user-uuid-1');
 
@@ -301,7 +310,7 @@ describe('AuthService', () => {
         isActive: false,
         customer: null,
         technician: null,
-      } as any);
+      } as never);
 
       await expect(authService.getMe('user-uuid-1')).rejects.toThrow(ForbiddenException);
     });

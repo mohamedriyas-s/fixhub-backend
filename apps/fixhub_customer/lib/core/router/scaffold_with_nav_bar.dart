@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/notifications/data/datasources/fcm_service.dart';
+import '../../features/notifications/presentation/providers/notification_provider.dart';
 
 class ScaffoldWithNavBar extends ConsumerStatefulWidget {
   const ScaffoldWithNavBar({
@@ -16,6 +18,8 @@ class ScaffoldWithNavBar extends ConsumerStatefulWidget {
 }
 
 class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
+  Timer? _refreshTimer;
+
   @override
   void initState() {
     super.initState();
@@ -31,6 +35,19 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
         context.push('/booking-detail/$pendingRoute');
       }
     });
+
+    // Periodically refresh notifications (5s interval for low-latency real-time updates)
+    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) {
+        ref.invalidate(notificationsProvider);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   @override
