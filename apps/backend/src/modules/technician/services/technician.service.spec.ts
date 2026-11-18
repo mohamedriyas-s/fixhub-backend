@@ -1,9 +1,12 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { VerificationStatus } from '@prisma/client';
 
+import { PrismaService } from '../../../common/database/prisma.service';
 import { TechnicianRepository } from '../repositories/technician.repository';
 import { TechnicianService } from './technician.service';
+import { TechnicianHeartbeatService } from './technician-heartbeat.service';
 
 describe('TechnicianService', () => {
   let service: TechnicianService;
@@ -43,6 +46,22 @@ describe('TechnicianService', () => {
             updateLocation: jest.fn(),
           },
         },
+        {
+          provide: PrismaService,
+          useValue: {
+            booking: {
+              findFirst: jest.fn(),
+            },
+          },
+        },
+        {
+          provide: EventEmitter2,
+          useValue: { emit: jest.fn() },
+        },
+        {
+          provide: TechnicianHeartbeatService,
+          useValue: { ping: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -79,16 +98,21 @@ describe('TechnicianService', () => {
       const result = await service.updateProfile(userId, dto);
 
       expect(result).toBeDefined();
-      expect(repository.updateProfile).toHaveBeenCalledWith(userId, expect.objectContaining({
-        name: 'Ramesh Updated',
-        email: 'ramesh@example.com',
-      }));
+      expect(repository.updateProfile).toHaveBeenCalledWith(
+        userId,
+        expect.objectContaining({
+          name: 'Ramesh Updated',
+          email: 'ramesh@example.com',
+        }),
+      );
     });
 
     it('throws when technician not found', async () => {
       repository.findTechnicianIdByUserId.mockResolvedValue(null);
 
-      await expect(service.updateProfile(userId, { name: 'Test' })).rejects.toThrow(NotFoundException);
+      await expect(service.updateProfile(userId, { name: 'Test' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -98,7 +122,10 @@ describe('TechnicianService', () => {
         id: technicianId,
         verificationStatus: VerificationStatus.VERIFIED,
       });
-      repository.updateAvailability.mockResolvedValue({ ...technicianProfile, isAvailable: true } as any);
+      repository.updateAvailability.mockResolvedValue({
+        ...technicianProfile,
+        isAvailable: true,
+      } as any);
 
       const result = await service.updateAvailability(userId, { isAvailable: true });
 
@@ -111,9 +138,9 @@ describe('TechnicianService', () => {
         verificationStatus: VerificationStatus.PENDING,
       });
 
-      await expect(
-        service.updateAvailability(userId, { isAvailable: true }),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.updateAvailability(userId, { isAvailable: true })).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('allows unverified technician to go unavailable', async () => {
@@ -121,7 +148,10 @@ describe('TechnicianService', () => {
         id: technicianId,
         verificationStatus: VerificationStatus.PENDING,
       });
-      repository.updateAvailability.mockResolvedValue({ ...technicianProfile, isAvailable: false } as any);
+      repository.updateAvailability.mockResolvedValue({
+        ...technicianProfile,
+        isAvailable: false,
+      } as any);
 
       const result = await service.updateAvailability(userId, { isAvailable: false });
 

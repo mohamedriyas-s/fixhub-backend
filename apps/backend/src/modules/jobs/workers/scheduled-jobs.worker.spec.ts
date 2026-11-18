@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BookingStatus } from '@prisma/client';
 
 import { PrismaService } from '../../../common/database/prisma.service';
+import { BookingDispatchService } from '../../booking/services/booking-dispatch.service';
+import { PaymentService } from '../../payment/services/payment.service';
 import { ScheduledJobsWorker } from './scheduled-jobs.worker';
 
 describe('ScheduledJobsWorker', () => {
@@ -18,6 +20,18 @@ describe('ScheduledJobsWorker', () => {
             booking: {
               updateMany: jest.fn(),
             },
+          },
+        },
+        {
+          provide: BookingDispatchService,
+          useValue: {
+            dispatch: jest.fn(),
+          },
+        },
+        {
+          provide: PaymentService,
+          useValue: {
+            processRefund: jest.fn(),
           },
         },
       ],
@@ -47,11 +61,12 @@ describe('ScheduledJobsWorker', () => {
       expect(prisma.booking.updateMany).toHaveBeenCalledWith({
         where: {
           status: BookingStatus.PENDING_PAYMENT,
-          createdAt: { lt: expect.any(Date) },
+          updatedAt: { lt: expect.any(Date) },
         },
         data: {
           status: BookingStatus.CANCELLED,
           cancelReason: 'Automatically expired due to inactivity',
+          cancelledBy: 'SYSTEM',
         },
       });
       expect(result).toEqual({ success: true, count: 5 });

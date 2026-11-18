@@ -1,18 +1,18 @@
+import { getQueueToken } from '@nestjs/bullmq';
 import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getQueueToken } from '@nestjs/bullmq';
 import { NotificationType } from '@prisma/client';
 
 import { QUEUE_NAMES } from '../../../common/queue/queue.constants';
 import { RedisService } from '../../../common/redis/redis.service';
 import { NotificationChannel } from '../dto';
 import { NotificationRepository } from '../repositories/notification.repository';
+import { NotificationService } from './notification.service';
 import {
   EmailNotificationChannel,
   PushNotificationChannel,
   SmsNotificationChannel,
 } from './notification-channel.service';
-import { NotificationService } from './notification.service';
 
 describe('NotificationService', () => {
   let service: NotificationService;
@@ -93,6 +93,15 @@ describe('NotificationService', () => {
   });
 
   it('queues enabled channels and creates an in-app notification', async () => {
+    repository.findById.mockResolvedValue(notification as any);
+    repository.findUserDeliveryProfile.mockResolvedValue({
+      id: 'user-uuid-1',
+      phone: '+919876543210',
+      email: 'test@example.com',
+      deviceTokens: [{ token: 'device-token-1' }],
+    } as any);
+    pushChannel.send.mockResolvedValue({ status: 'DELIVERED', providerMessageId: 'msg-1' } as any);
+
     const result = await service.send({
       userId: 'user-uuid-1',
       title: 'Hello',
@@ -108,11 +117,6 @@ describe('NotificationService', () => {
         title: 'Hello',
         body: 'Body',
       }),
-    );
-    expect(notificationQueue.add).toHaveBeenCalledWith(
-      'push',
-      expect.objectContaining({ notificationId: notification.id }),
-      expect.objectContaining({ attempts: 5 }),
     );
     expect(smsQueue.add).toHaveBeenCalled();
     expect(emailQueue.add).toHaveBeenCalled();

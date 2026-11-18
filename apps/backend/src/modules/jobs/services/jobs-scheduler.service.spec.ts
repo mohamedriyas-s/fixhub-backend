@@ -38,7 +38,7 @@ describe('JobsSchedulerService', () => {
     await service.onApplicationBootstrap();
 
     expect(queue.removeRepeatableByKey).toHaveBeenCalledWith('old-job-key');
-    expect(queue.add).toHaveBeenCalledTimes(6);
+    expect(queue.add).toHaveBeenCalledTimes(7);
     expect(queue.add).toHaveBeenCalledWith('generate-daily-reports', {}, expect.any(Object));
     expect(queue.add).toHaveBeenCalledWith('booking-expiry', {}, expect.any(Object));
   });
