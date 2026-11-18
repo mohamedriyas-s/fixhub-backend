@@ -151,6 +151,8 @@ class Job {
   final String? notes;
   // Price revision fields
   final double? revisedAmount;
+  final double? additionalAmount;
+  final String? priceRevisionDescription;
   final String? priceRevisionNote;
   // Cancellation/failure fields
   final DateTime? cancelledAt;
@@ -175,6 +177,8 @@ class Job {
     required this.totalAmount,
     this.notes,
     this.revisedAmount,
+    this.additionalAmount,
+    this.priceRevisionDescription,
     this.priceRevisionNote,
     this.cancelledAt,
     this.cancelReason,
@@ -201,6 +205,10 @@ class Job {
     revisedAmount: json['revisedAmount'] != null
         ? double.tryParse(json['revisedAmount'].toString())
         : null,
+    additionalAmount: json['additionalAmount'] != null
+        ? double.tryParse(json['additionalAmount'].toString())
+        : null,
+    priceRevisionDescription: json['priceRevisionDescription'] as String?,
     priceRevisionNote: json['priceRevisionNote'] as String?,
     cancelledAt: json['cancelledAt'] != null
         ? DateTime.tryParse(json['cancelledAt'] as String)

@@ -41,6 +41,8 @@ class ApiEndpoints {
       '/technicians/jobs/$id/status';
   static String technicianJobProposeRevision(String id) =>
       '/technicians/jobs/$id/propose-revision';
+  static String technicianJobAdditionalCharge(String id) =>
+      '/technicians/jobs/$id/additional-charge';
 
   // ── Technician Job Offers (broadcast eligibility) ───────────────
   static const String technicianOffers = '/technicians/offers';

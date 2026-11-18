@@ -120,6 +120,32 @@ class BookingRemoteDataSource {
     return [];
   }
 
+  Future<bool> checkTechniciansAvailable(String subServiceId, String pincode) async {
+    try {
+      final response = await _dio.get(
+        ApiEndpoints.checkTechnicians,
+        queryParameters: {
+          'subServiceId': subServiceId,
+          'pincode': pincode,
+        },
+      );
+      final data = response.data;
+      if (data is Map) {
+        final inner = data['data'] ?? data;
+        return inner['available'] == true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> cancelDraft(String bookingId) async {
+    try {
+      await _dio.post(ApiEndpoints.bookingCancelDraft(bookingId));
+    } catch (_) {}
+  }
+
   List<dynamic> _extractList(dynamic data) {
     if (data is Map && data.containsKey('data')) {
       final innerData = data['data'];

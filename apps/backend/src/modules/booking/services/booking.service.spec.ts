@@ -17,6 +17,7 @@ describe('BookingService creation', () => {
   let lockService: jest.Mocked<BookingLockService>;
   let storageService: jest.Mocked<StorageService>;
   let queryCacheService: jest.Mocked<BookingQueryCacheService>;
+  let prisma: any;
 
   const user = {
     userId: 'user-uuid-1',
@@ -91,6 +92,11 @@ describe('BookingService creation', () => {
             updateDraftAndConfirm: jest.fn(),
             findDraftForCustomer: jest.fn(),
             createMedia: jest.fn(),
+            setPriceRevision: jest.fn(),
+            approveRevision: jest.fn(),
+            updateLifecycleStatus: jest.fn(),
+            createTimelineEntry: jest.fn(),
+            findTechnicianProfileByUserId: jest.fn(),
             transaction: jest.fn((fn) => fn({})),
           },
         },
@@ -121,8 +127,9 @@ describe('BookingService creation', () => {
         {
           provide: PrismaService,
           useValue: {
-            technician: { findUnique: jest.fn() },
+            technician: { findUnique: jest.fn(), count: jest.fn(), findMany: jest.fn() },
             customer: { findUnique: jest.fn() },
+            booking: { findFirst: jest.fn(), update: jest.fn(), findMany: jest.fn() },
           },
         },
         {
@@ -145,6 +152,7 @@ describe('BookingService creation', () => {
     lockService = module.get(BookingLockService);
     storageService = module.get(StorageService);
     queryCacheService = module.get(BookingQueryCacheService);
+    prisma = module.get(PrismaService);
 
     repository.findCustomerByUserId.mockResolvedValue(customer as never);
     repository.findAddressForCustomer.mockResolvedValue(address as never);
@@ -191,7 +199,7 @@ describe('BookingService creation', () => {
         bookingNumber: 'FH-20990720-0001',
       }),
     );
-    expect(lockService.setDraftExpiry).toHaveBeenCalledWith(booking.id, 900);
+    expect(lockService.setDraftExpiry).toHaveBeenCalledWith(booking.id, 600);
     expect(lockService.release).toHaveBeenCalledWith(expect.any(String), 'lock-token');
     expect(queryCacheService.invalidate).toHaveBeenCalled();
   });
@@ -225,6 +233,7 @@ describe('BookingService creation', () => {
       booking.id,
       BookingStatus.CONFIRMED,
       user.userId,
+      expect.any(String),
     );
     expect(lockService.clearDraftExpiry).toHaveBeenCalledWith(booking.id);
     expect(queryCacheService.invalidate).toHaveBeenCalled();
@@ -251,6 +260,183 @@ describe('BookingService creation', () => {
 
     expect(result.uploadUrl).toBe('https://signed-upload-url');
     expect(repository.createMedia).toHaveBeenCalled();
+    expect(queryCacheService.invalidate).toHaveBeenCalled();
+  });
+
+  it('cancels draft booking and clears draft expiry to release slot lock', async () => {
+    (prisma.booking.findFirst as jest.Mock).mockResolvedValue({
+      id: booking.id,
+      customerId: customer.id,
+      status: BookingStatus.DRAFT,
+    });
+    (prisma.booking.update as jest.Mock).mockResolvedValue({
+      id: booking.id,
+      status: BookingStatus.CANCELLED,
+    });
+
+    const result = await service.cancelDraft(user, booking.id);
+
+    expect(result.message).toContain('cancelled and slot released');
+    expect(lockService.clearDraftExpiry).toHaveBeenCalledWith(booking.id);
+    expect(queryCacheService.invalidate).toHaveBeenCalled();
+  });
+
+  it('checks technician availability in service area for pre-flight check', async () => {
+    (prisma.technician.count as jest.Mock).mockResolvedValue(2);
+
+    const result = await service.checkTechniciansAvailable({
+      subServiceId: 'sub-service-uuid',
+      pincode: '600099',
+    });
+
+    expect(result.available).toBe(true);
+    expect(result.count).toBe(2);
+  });
+
+  it('proposes an additional charge with description, reason, and amount', async () => {
+    const techUser = { userId: 'tech-user-uuid', phone: '+919999999999', role: Role.TECHNICIAN };
+    repository.findTechnicianProfileByUserId.mockResolvedValue({ id: 'tech-uuid-1' } as never);
+    repository.findById.mockResolvedValue({
+      id: booking.id,
+      technicianId: 'tech-uuid-1',
+      customerId: customer.id,
+      bookingNumber: 'FH-1234',
+      status: BookingStatus.IN_PROGRESS,
+      totalAmount: 100,
+    } as never);
+    repository.setPriceRevision.mockResolvedValue({
+      id: booking.id,
+      status: BookingStatus.PRICE_REVISION_PENDING,
+      totalAmount: 100,
+      revisedAmount: 150,
+      additionalAmount: 50,
+      priceRevisionDescription: 'Capacitor replacement',
+      priceRevisionNote: 'Burnt coil',
+    } as never);
+
+    const result = await service.proposeAdditionalCharge(techUser, booking.id, {
+      amount: 50,
+      description: 'Capacitor replacement',
+      reason: 'Burnt coil',
+    });
+
+    expect(result.status).toBe(BookingStatus.PRICE_REVISION_PENDING);
+    expect(repository.setPriceRevision).toHaveBeenCalledWith(
+      expect.anything(),
+      booking.id,
+      expect.objectContaining({
+        revisedAmount: 150,
+        additionalAmount: 50,
+        description: 'Capacitor replacement',
+        note: 'Burnt coil',
+      }),
+      techUser.userId,
+    );
+    expect(repository.createTimelineEntry).toHaveBeenCalled();
+    expect(queryCacheService.invalidate).toHaveBeenCalled();
+  });
+
+  it('proposes an additional charge with optional description and reason omitted', async () => {
+    const techUser = { userId: 'tech-user-uuid', phone: '+919999999999', role: Role.TECHNICIAN };
+    repository.findTechnicianProfileByUserId.mockResolvedValue({ id: 'tech-uuid-1' } as never);
+    repository.findById.mockResolvedValue({
+      id: booking.id,
+      technicianId: 'tech-uuid-1',
+      customerId: customer.id,
+      bookingNumber: 'FH-1234',
+      status: BookingStatus.IN_PROGRESS,
+      totalAmount: 200,
+    } as never);
+    repository.setPriceRevision.mockResolvedValue({
+      id: booking.id,
+      status: BookingStatus.PRICE_REVISION_PENDING,
+      totalAmount: 200,
+      revisedAmount: 275,
+      additionalAmount: 75,
+    } as never);
+
+    const result = await service.proposeAdditionalCharge(techUser, booking.id, {
+      amount: 75,
+    });
+
+    expect(result.status).toBe(BookingStatus.PRICE_REVISION_PENDING);
+    expect(repository.setPriceRevision).toHaveBeenCalledWith(
+      expect.anything(),
+      booking.id,
+      expect.objectContaining({
+        revisedAmount: 275,
+        additionalAmount: 75,
+        description: undefined,
+        note: undefined,
+      }),
+      techUser.userId,
+    );
+  });
+
+  it('allows customer to approve price revision and transitions back to IN_PROGRESS', async () => {
+    repository.findCustomerByUserId.mockResolvedValue(customer as never);
+    repository.findById.mockResolvedValue({
+      id: booking.id,
+      customerId: customer.id,
+      status: BookingStatus.PRICE_REVISION_PENDING,
+      totalAmount: 100,
+      revisedAmount: 150,
+    } as never);
+    repository.approveRevision.mockResolvedValue({
+      id: booking.id,
+      status: BookingStatus.IN_PROGRESS,
+      totalAmount: 150,
+      revisedAmount: null,
+    } as never);
+
+    const result = await service.approveRevision(user, booking.id);
+
+    expect(result.status).toBe(BookingStatus.IN_PROGRESS);
+    expect(result.totalAmount).toBe(150);
+    expect(repository.approveRevision).toHaveBeenCalledWith(
+      expect.anything(),
+      booking.id,
+      user.userId,
+    );
+    expect(queryCacheService.invalidate).toHaveBeenCalled();
+  });
+
+  it('rejects approval if booking status is not PRICE_REVISION_PENDING', async () => {
+    repository.findCustomerByUserId.mockResolvedValue(customer as never);
+    repository.findById.mockResolvedValue({
+      id: booking.id,
+      customerId: customer.id,
+      status: BookingStatus.IN_PROGRESS,
+    } as never);
+
+    await expect(service.approveRevision(user, booking.id)).rejects.toThrow();
+  });
+
+  it('allows customer to reject price revision and cancels booking', async () => {
+    repository.findCustomerByUserId.mockResolvedValue(customer as never);
+    repository.findById.mockResolvedValue({
+      id: booking.id,
+      customerId: customer.id,
+      status: BookingStatus.PRICE_REVISION_PENDING,
+    } as never);
+    repository.updateLifecycleStatus.mockResolvedValue({
+      id: booking.id,
+      status: BookingStatus.CANCELLED,
+      cancelReason: 'Customer rejected technician price revision',
+    } as never);
+
+    const result = await service.rejectRevision(user, booking.id);
+
+    expect(result.status).toBe(BookingStatus.CANCELLED);
+    expect(repository.updateLifecycleStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      booking.id,
+      expect.objectContaining({
+        status: BookingStatus.CANCELLED,
+        cancelReason: 'Customer rejected technician price revision',
+      }),
+      user.userId,
+    );
     expect(queryCacheService.invalidate).toHaveBeenCalled();
   });
 });

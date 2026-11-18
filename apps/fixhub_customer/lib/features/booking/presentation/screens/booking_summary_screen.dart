@@ -153,7 +153,8 @@ class _BookingSummaryScreenState extends ConsumerState<BookingSummaryScreen> {
       if (mounted) context.push(RouteNames.payment);
     } catch (e) {
       if (mounted) {
-        FixHubSnackbar.error(context, 'Failed to create booking: $e');
+        final rawMsg = e.toString().replaceAll(RegExp(r'^(Exception:\s*|DioException:\s*)'), '');
+        FixHubSnackbar.error(context, rawMsg);
       }
     }
   }

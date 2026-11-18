@@ -23,7 +23,9 @@ class ApiEndpoints {
   static const String bookingDraft = '/bookings/draft';
   static const String bookingSummary = '/bookings/summary';
   static const String availableSlots = '/bookings/available-slots';
+  static const String checkTechnicians = '/bookings/check-technicians';
   static String bookingConfirm(String id) => '/bookings/$id/confirm';
+  static String bookingCancelDraft(String id) => '/bookings/$id/cancel-draft';
   static String bookingDetail(String id) => '/bookings/$id';
   static String bookingMedia(String id) => '/bookings/$id/media';
   static String bookingMediaBatch(String id) => '/bookings/$id/media/batch';

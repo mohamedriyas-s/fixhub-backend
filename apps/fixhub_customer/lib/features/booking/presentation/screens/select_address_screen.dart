@@ -8,6 +8,7 @@ import '../../../../core/widgets/fixhub_button.dart';
 import '../../../../core/widgets/fixhub_card.dart';
 import '../../../../core/router/route_names.dart';
 import '../providers/booking_flow_provider.dart';
+import '../providers/booking_provider.dart';
 import '../../data/models/address_model.dart';
 import '../../../profile/presentation/providers/address_provider.dart';
 import '../../../../core/widgets/fixhub_empty_state.dart';
@@ -23,6 +24,89 @@ class SelectAddressScreen extends ConsumerStatefulWidget {
 
 class _SelectAddressScreenState extends ConsumerState<SelectAddressScreen> {
   AddressModel? _selectedAddress;
+  bool _isChecking = false;
+
+  Future<void> _handleContinue() async {
+    if (_selectedAddress == null || _isChecking) return;
+
+    final subServiceId = ref.read(bookingFlowProvider).selectedService?.id;
+    if (subServiceId == null) {
+      ref.read(bookingFlowProvider.notifier).setAddress(_selectedAddress!);
+      context.push(RouteNames.selectSlot);
+      return;
+    }
+
+    setState(() => _isChecking = true);
+
+    final isAvailable = await ref
+        .read(bookingRepositoryProvider)
+        .checkTechniciansAvailable(subServiceId, _selectedAddress!.pincode);
+
+    if (!mounted) return;
+    setState(() => _isChecking = false);
+
+    if (!isAvailable) {
+      showModalBottomSheet(
+        context: context,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        backgroundColor: AppColors.elevatedSurface,
+        builder: (ctx) => Padding(
+          padding: const EdgeInsets.all(AppSpacing.screenPadding),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 48,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: AppSpacing.lg),
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Container(
+                width: 64,
+                height: 64,
+                decoration: const BoxDecoration(
+                  color: AppColors.surface,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.engineering_outlined,
+                  size: 32,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                'No Technicians Available',
+                style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'Currently, there are no active technicians available for this service in your area (${_selectedAddress!.pincode}). Please try selecting a different address or check back later.',
+                style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              FixHubButton(
+                label: 'Select Different Address',
+                onPressed: () => Navigator.pop(ctx),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+          ),
+        ),
+      );
+      return;
+    }
+
+    ref.read(bookingFlowProvider.notifier).setAddress(_selectedAddress!);
+    context.push(RouteNames.selectSlot);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -153,15 +237,9 @@ class _SelectAddressScreenState extends ConsumerState<SelectAddressScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.screenPadding),
                   child: FixHubButton(
-                    label: 'Continue to Time Slot',
-                    onPressed: _selectedAddress != null
-                        ? () {
-                            ref
-                                .read(bookingFlowProvider.notifier)
-                                .setAddress(_selectedAddress!);
-                            context.push(RouteNames.selectSlot);
-                          }
-                        : null,
+                    label: _isChecking ? 'Checking Availability...' : 'Continue to Time Slot',
+                    isLoading: _isChecking,
+                    onPressed: _selectedAddress != null && !_isChecking ? _handleContinue : null,
                   ),
                 ),
               ),

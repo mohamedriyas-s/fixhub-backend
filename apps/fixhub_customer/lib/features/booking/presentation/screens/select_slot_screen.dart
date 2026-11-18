@@ -76,7 +76,7 @@ class _SelectSlotScreenState extends ConsumerState<SelectSlotScreen> {
     final locationState = ref.watch(locationProvider);
     final bookingFlowState = ref.watch(bookingFlowProvider);
     final subServiceId = bookingFlowState.selectedService?.id;
-    final pincode = locationState.currentPincode;
+    final pincode = bookingFlowState.selectedAddress?.pincode ?? locationState.currentPincode;
     final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
 
     AsyncValue<List<String>> availableSlotsAsync = const AsyncValue.data([]);
@@ -250,10 +250,10 @@ class _SelectSlotScreenState extends ConsumerState<SelectSlotScreen> {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
-                              '$availableCount slots',
-                              style: const TextStyle(
+                              availableCount > 0 ? '$availableCount available' : '0 available',
+                              style: TextStyle(
                                 fontSize: 11,
-                                color: AppColors.textSecondary,
+                                color: availableCount > 0 ? AppColors.textSecondary : AppColors.error,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -262,39 +262,73 @@ class _SelectSlotScreenState extends ConsumerState<SelectSlotScreen> {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    Expanded(
-                      child: slots.isEmpty || availableCount == 0
-                          ? FixHubEmptyState(
-                              icon: Icons.event_busy_rounded,
-                              title: 'No slots available',
-                              message: 'No slots available for this date.',
-                            )
-                          : ListView.separated(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.screenPadding,
-                              ),
-                              itemCount: slots.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(height: AppSpacing.sm),
-                              itemBuilder: (context, index) {
-                                final slot = slots[index];
-                                final isSelected = _selectedSlot == slot;
-                                final isPast = !slot.isAvailable;
 
-                                return _SlotTile(
-                                  slot: slot,
-                                  isSelected: isSelected,
-                                  isPast: isPast,
-                                  onTap: isPast
-                                      ? null
-                                      : () {
-                                          setState(() {
-                                            _selectedSlot = slot;
-                                          });
-                                        },
-                                );
-                              },
-                            ),
+                    if (availableCount == 0)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.screenPadding,
+                        ),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: AppRadius.mediumRadius,
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline_rounded,
+                                size: 20,
+                                color: AppColors.warning,
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: Text(
+                                  'There is no slot available for this day',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                    Expanded(
+                      child: ListView.separated(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.screenPadding,
+                        ),
+                        itemCount: slots.length,
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(height: AppSpacing.sm),
+                        itemBuilder: (context, index) {
+                          final slot = slots[index];
+                          final isSelected = _selectedSlot == slot;
+                          final isPast = !slot.isAvailable;
+
+                          return _SlotTile(
+                            slot: slot,
+                            isSelected: isSelected,
+                            isPast: isPast,
+                            onTap: isPast
+                                ? null
+                                : () {
+                                    setState(() {
+                                      _selectedSlot = slot;
+                                    });
+                                  },
+                          );
+                        },
+                      ),
                     ),
                   ],
                 );
@@ -351,7 +385,7 @@ class _SelectSlotScreenState extends ConsumerState<SelectSlotScreen> {
                   ],
                   FixHubButton(
                     label: 'Confirm & Continue',
-                    onPressed: _selectedSlot != null
+                    onPressed: (_selectedSlot != null && _selectedSlot!.isAvailable)
                         ? () {
                             ref
                                 .read(bookingFlowProvider.notifier)

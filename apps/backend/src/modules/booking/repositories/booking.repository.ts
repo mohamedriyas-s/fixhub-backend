@@ -103,7 +103,13 @@ export class BookingRepository {
       customerUserId: scope.customerUserId,
       technicianUserId: scope.technicianUserId,
     });
-    where.status = { in: scope.statuses ?? [BookingStatus.COMPLETED, BookingStatus.CANCELLED, BookingStatus.FAILED] };
+    where.status = {
+      in: scope.statuses ?? [
+        BookingStatus.COMPLETED,
+        BookingStatus.CANCELLED,
+        BookingStatus.FAILED,
+      ],
+    };
 
     const [items, total] = await this.prisma.$transaction([
       this.prisma.booking.findMany({
@@ -204,6 +210,7 @@ export class BookingRepository {
     scheduledDate: Date,
     scheduledSlot: string,
     draftCreatedAfter: Date,
+    excludeBookingId?: string,
   ) {
     return this.prisma.booking.count({
       where: {
@@ -217,8 +224,13 @@ export class BookingRepository {
         subServiceId,
         scheduledDate,
         scheduledSlot,
+        ...(excludeBookingId && { id: { not: excludeBookingId } }),
         OR: [
-          { status: { in: BLOCKING_BOOKING_STATUSES.filter((status) => status !== BookingStatus.DRAFT) } },
+          {
+            status: {
+              in: BLOCKING_BOOKING_STATUSES.filter((status) => status !== BookingStatus.DRAFT),
+            },
+          },
           {
             status: BookingStatus.DRAFT,
             createdAt: { gte: draftCreatedAfter },
@@ -242,7 +254,11 @@ export class BookingRepository {
         scheduledSlot: params.scheduledSlot,
         ...(params.excludeBookingId && { id: { not: params.excludeBookingId } }),
         OR: [
-          { status: { in: BLOCKING_BOOKING_STATUSES.filter((status) => status !== BookingStatus.DRAFT) } },
+          {
+            status: {
+              in: BLOCKING_BOOKING_STATUSES.filter((status) => status !== BookingStatus.DRAFT),
+            },
+          },
           {
             status: BookingStatus.DRAFT,
             createdAt: { gte: params.draftCreatedAfter },
@@ -290,11 +306,25 @@ export class BookingRepository {
     bookingId: string,
     status: BookingStatus,
     userId: string,
+    startOtp?: string,
   ) {
     return tx.booking.update({
       where: { id: bookingId },
-      data: { status, updatedBy: userId },
+      data: {
+        status,
+        updatedBy: userId,
+        ...(startOtp ? { startOtp } : {}),
+      },
       include: this.bookingInclude(),
+    });
+  }
+
+  async incrementStartOtpAttempts(id: string) {
+    return this.prisma.booking.update({
+      where: { id },
+      data: {
+        startOtpAttempts: { increment: 1 },
+      },
     });
   }
 
@@ -309,6 +339,10 @@ export class BookingRepository {
       where: { id },
       data: {
         status: dto.status,
+        ...(dto.status === BookingStatus.IN_PROGRESS && {
+          workStartedAt: new Date(),
+          startOtpAttempts: 0,
+        }),
         ...(dto.status === BookingStatus.CANCELLED && {
           cancelledAt: new Date(),
           cancelReason: dto.cancelReason,
@@ -341,12 +375,7 @@ export class BookingRepository {
     return updated;
   }
 
-  assignTechnician(
-    tx: PrismaTx,
-    bookingId: string,
-    technicianId: string,
-    actorUserId: string,
-  ) {
+  assignTechnician(tx: PrismaTx, bookingId: string, technicianId: string, actorUserId: string) {
     return tx.booking.update({
       where: { id: bookingId },
       data: {
@@ -426,6 +455,7 @@ export class BookingRepository {
       description?: string;
       totalAmount: Prisma.Decimal | number;
       userId: string;
+      startOtp?: string;
     },
   ) {
     return tx.booking.update({
@@ -438,6 +468,7 @@ export class BookingRepository {
         description: data.description,
         totalAmount: data.totalAmount,
         status: BookingStatus.CONFIRMED,
+        ...(data.startOtp ? { startOtp: data.startOtp } : {}),
         updatedBy: data.userId,
       },
       include: this.bookingInclude(),
@@ -511,15 +542,42 @@ export class BookingRepository {
   setPriceRevision(
     tx: PrismaTx,
     bookingId: string,
-    revisedAmount: number,
-    note: string | undefined,
-    actorUserId: string,
+    paramsOrRevisedAmount:
+      | number
+      | {
+          revisedAmount: number;
+          additionalAmount?: number;
+          description?: string;
+          note?: string;
+        },
+    legacyNoteOrActor?: string,
+    legacyActorUserId?: string,
   ) {
+    let revisedAmount: number;
+    let additionalAmount: number | undefined;
+    let priceRevisionDescription: string | undefined;
+    let priceRevisionNote: string | undefined;
+    let actorUserId: string;
+
+    if (typeof paramsOrRevisedAmount === 'number') {
+      revisedAmount = paramsOrRevisedAmount;
+      priceRevisionNote = legacyNoteOrActor;
+      actorUserId = legacyActorUserId!;
+    } else {
+      revisedAmount = paramsOrRevisedAmount.revisedAmount;
+      additionalAmount = paramsOrRevisedAmount.additionalAmount;
+      priceRevisionDescription = paramsOrRevisedAmount.description;
+      priceRevisionNote = paramsOrRevisedAmount.note;
+      actorUserId = legacyNoteOrActor!;
+    }
+
     return tx.booking.update({
       where: { id: bookingId },
       data: {
         revisedAmount,
-        priceRevisionNote: note,
+        additionalAmount,
+        priceRevisionDescription,
+        priceRevisionNote,
         status: 'PRICE_REVISION_PENDING',
         updatedBy: actorUserId,
       },
@@ -562,7 +620,10 @@ export class BookingRepository {
     } satisfies Prisma.BookingInclude;
   }
 
-  private buildBookingWhere(query: BookingQueryDto, scope: BookingQueryScope): Prisma.BookingWhereInput {
+  private buildBookingWhere(
+    query: BookingQueryDto,
+    scope: BookingQueryScope,
+  ): Prisma.BookingWhereInput {
     return {
       ...(scope.customerUserId && { customer: { userId: scope.customerUserId } }),
       ...(scope.technicianUserId && { technician: { userId: scope.technicianUserId } }),
@@ -647,8 +708,12 @@ export class BookingRepository {
 
   private detailInclude(): Prisma.BookingInclude {
     return {
-      customer: { include: { user: { select: { id: true, name: true, phone: true, email: true } } } },
-      technician: { include: { user: { select: { id: true, name: true, phone: true, email: true } } } },
+      customer: {
+        include: { user: { select: { id: true, name: true, phone: true, email: true } } },
+      },
+      technician: {
+        include: { user: { select: { id: true, name: true, phone: true, email: true } } },
+      },
       subService: { include: { category: true } },
       address: true,
       timeline: { orderBy: { createdAt: 'desc' } },

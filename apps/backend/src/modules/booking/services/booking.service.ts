@@ -14,24 +14,28 @@ import { PrismaService } from '../../../common/database/prisma.service';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { AuthenticatedUser } from '../../../common/interfaces/auth.interface';
 import { StorageService } from '../../../common/storage/storage.service';
+import { generateOtp } from '../../../common/utils/helpers.util';
 import {
   AdminNotificationService,
   AdminNotifType,
 } from '../../admin/services/admin-notification.service';
 import { NotificationService } from '../../notification/services/notification.service';
 import {
+  AvailableSlotsQueryDto,
   BookingSummaryDto,
+  CheckTechniciansQueryDto,
   ConfirmBookingDto,
   CreateBookingDto,
   CreateBookingMediaDto,
   CreateReviewDto,
+  ProposeAdditionalChargeDto,
   ProposeRevisionDto,
 } from '../dto';
 import { BookingRepository } from '../repositories/booking.repository';
 import { BookingLockService } from './booking-lock.service';
 import { BookingQueryCacheService } from './booking-query-cache.service';
 
-const DRAFT_TTL_SECONDS = 15 * 60;
+const DRAFT_TTL_SECONDS = 10 * 60;
 
 @Injectable()
 export class BookingService {
@@ -175,6 +179,7 @@ export class BookingService {
         draft.id,
       );
 
+      const startOtp = generateOtp(4);
       const confirmed = await this.bookingRepository.transaction((tx) =>
         dto.booking
           ? this.bookingRepository.updateDraftAndConfirm(tx, draft.id, {
@@ -185,12 +190,14 @@ export class BookingService {
               description: dto.booking.description,
               totalAmount: Number(context.service.basePrice),
               userId: user.userId,
+              startOtp,
             })
           : this.bookingRepository.updateBookingStatus(
               tx,
               draft.id,
               BookingStatus.CONFIRMED,
               user.userId,
+              startOtp,
             ),
       );
 
@@ -462,18 +469,102 @@ export class BookingService {
       });
     }
 
-    const updated = await this.bookingRepository.transaction((tx) =>
-      this.bookingRepository.setPriceRevision(
+    // Determine additionalAmount and revisedAmount
+    let additionalAmount: number;
+    let revisedAmount: number;
+    const currentTotal = Number(booking.totalAmount);
+
+    if (dto.amount !== undefined && dto.amount !== null) {
+      additionalAmount = Number(dto.amount);
+      revisedAmount =
+        dto.revisedAmount !== undefined && dto.revisedAmount !== null
+          ? Number(dto.revisedAmount)
+          : currentTotal + additionalAmount;
+    } else if (dto.revisedAmount !== undefined && dto.revisedAmount !== null) {
+      revisedAmount = Number(dto.revisedAmount);
+      additionalAmount = Math.max(0, revisedAmount - currentTotal);
+    } else {
+      throw new BadRequestException({
+        message: 'Either amount or revisedAmount must be provided',
+        errorCode: ErrorCodes.VALIDATION_ERROR,
+      });
+    }
+
+    const trimmedDesc = dto.description?.trim();
+    const trimmedReason = dto.reason?.trim() || dto.note?.trim();
+
+    const description = trimmedDesc || undefined;
+    const reason = trimmedReason || undefined;
+
+    const timelineNote = trimmedDesc
+      ? `Additional charge of ₹${additionalAmount.toFixed(0)} proposed (${trimmedDesc})${trimmedReason ? `: ${trimmedReason}` : ''}`
+      : `Additional charge of ₹${additionalAmount.toFixed(0)} proposed${trimmedReason ? `: ${trimmedReason}` : ''}`;
+
+    const updated = await this.bookingRepository.transaction(async (tx) => {
+      const b = await this.bookingRepository.setPriceRevision(
         tx,
         bookingId,
-        dto.revisedAmount,
-        dto.note,
+        {
+          revisedAmount,
+          additionalAmount,
+          description,
+          note: reason,
+        },
         user.userId,
-      ),
-    );
+      );
+
+      await this.bookingRepository.createTimelineEntry(tx, {
+        bookingId,
+        status: BookingStatus.PRICE_REVISION_PENDING,
+        changedByUserId: user.userId,
+        note: timelineNote,
+      });
+
+      return b;
+    });
+
+    // Notify customer about additional charge request
+    if (booking.customerId && this.notificationService) {
+      try {
+        const cust = await this.prisma.customer.findUnique({
+          where: { id: booking.customerId },
+          include: { user: true },
+        });
+        if (cust?.user?.id) {
+          const pushBody = trimmedDesc
+            ? `Technician requested ₹${additionalAmount.toFixed(0)} extra for "${trimmedDesc}". Please review and approve.`
+            : `Technician requested ₹${additionalAmount.toFixed(0)} additional charge for booking #${booking.bookingNumber}. Please review and approve.`;
+
+          await this.notificationService.sendPushNotification({
+            userId: cust.user.id,
+            title: 'Additional Charge Requested 💰',
+            body: pushBody,
+            type: 'PRICE_REVISION',
+            payload: { bookingId: booking.id, screen: 'booking_detail' },
+          });
+        }
+      } catch (err: unknown) {
+        this.logger.error(
+          `Failed to send additional charge notification to customer: ${(err as Error)?.message ?? String(err)}`,
+        );
+      }
+    }
 
     await this.bookingQueryCacheService.invalidate();
     return updated;
+  }
+
+  async proposeAdditionalCharge(
+    user: AuthenticatedUser,
+    bookingId: string,
+    dto: ProposeAdditionalChargeDto,
+  ) {
+    return this.proposeRevision(user, bookingId, {
+      amount: dto.amount,
+      description: dto.description,
+      reason: dto.reason,
+      note: dto.reason,
+    });
   }
 
   async approveRevision(user: AuthenticatedUser, bookingId: string) {
@@ -613,51 +704,173 @@ export class BookingService {
     return serviceArea;
   }
 
-  async getAvailableSlots(query: import('../dto/create-booking.dto').AvailableSlotsQueryDto) {
+  async checkTechniciansAvailable(query: CheckTechniciansQueryDto) {
     const serviceArea = await this.requireServiceArea(query.pincode);
-    const capacity = await this.bookingRepository.countServiceCapacity(
-      serviceArea.id,
-      query.subServiceId,
-    );
+    const count = await this.prisma.technician.count({
+      where: {
+        verificationStatus: 'VERIFIED',
+        isAvailable: true,
+        deletedAt: null,
+        user: { isActive: true, deletedAt: null },
+        serviceAreas: {
+          some: {
+            serviceAreaId: serviceArea.id,
+          },
+        },
+        specializations: {
+          some: {
+            subServiceId: query.subServiceId,
+          },
+        },
+      },
+    });
 
-    if (capacity === 0) {
+    return {
+      available: count > 0,
+      count,
+    };
+  }
+
+  async getAvailableSlots(query: AvailableSlotsQueryDto) {
+    const serviceArea = await this.requireServiceArea(query.pincode);
+
+    // 1. Find all active, verified technicians serving this area with this specialization
+    const eligibleTechnicians = await this.prisma.technician.findMany({
+      where: {
+        verificationStatus: 'VERIFIED',
+        isAvailable: true,
+        deletedAt: null,
+        user: { isActive: true, deletedAt: null },
+        serviceAreas: {
+          some: {
+            serviceAreaId: serviceArea.id,
+          },
+        },
+        specializations: {
+          some: {
+            subServiceId: query.subServiceId,
+          },
+        },
+      },
+      select: { id: true },
+    });
+
+    if (eligibleTechnicians.length === 0) {
       return [];
     }
 
+    const techIds = eligibleTechnicians.map((t) => t.id);
     const scheduledDate = new Date(`${query.date}T00:00:00.000Z`);
     const slots = ['09:00-11:00', '11:00-13:00', '13:00-15:00', '15:00-17:00', '17:00-19:00'];
 
-    const availableSlots: string[] = [];
+    // 2. Fetch all conflicting bookings on this date for these technicians or in this area
+    const bookedJobs = await this.prisma.booking.findMany({
+      where: {
+        scheduledDate,
+        OR: [
+          {
+            technicianId: { in: techIds },
+            status: {
+              in: [
+                BookingStatus.PENDING_PAYMENT,
+                BookingStatus.CONFIRMED,
+                BookingStatus.ASSIGNED,
+                BookingStatus.ACCEPTED,
+                BookingStatus.EN_ROUTE,
+                BookingStatus.ARRIVED,
+                BookingStatus.IN_PROGRESS,
+              ],
+            },
+          },
+          {
+            subServiceId: query.subServiceId,
+            address: { pincode: query.pincode },
+            technicianId: null,
+            status: {
+              in: [BookingStatus.PENDING_PAYMENT, BookingStatus.CONFIRMED],
+            },
+          },
+        ],
+      },
+      select: { technicianId: true, scheduledSlot: true },
+    });
+
+    // 3. Fetch all active DRAFT bookings holding slots on this date and verify with Redis
     const draftCreatedAfter = new Date(Date.now() - DRAFT_TTL_SECONDS * 1000);
+    const candidateDrafts = await this.prisma.booking.findMany({
+      where: {
+        subServiceId: query.subServiceId,
+        scheduledDate,
+        status: BookingStatus.DRAFT,
+        createdAt: { gte: draftCreatedAfter },
+        address: { pincode: query.pincode },
+      },
+      select: { id: true, scheduledSlot: true },
+    });
+
+    const activeDrafts: typeof candidateDrafts = [];
+    for (const draft of candidateDrafts) {
+      const isAlive = await this.bookingLockService.isDraftActive(draft.id);
+      if (isAlive) {
+        activeDrafts.push(draft);
+      }
+    }
+
+    const availableSlots: string[] = [];
 
     for (const slot of slots) {
-      // Check if the slot is in the past
       const [startHour, startMinute] = slot.split('-')[0].split(':').map(Number);
-
-      // The slots are in local time (IST, +05:30)
       const formattedHour = String(startHour).padStart(2, '0');
       const formattedMinute = String(startMinute).padStart(2, '0');
       const slotTime = new Date(`${query.date}T${formattedHour}:${formattedMinute}:00.000+05:30`);
 
-      // If it's today and the slot is in the past (adding 1 hour buffer for now), skip
+      // Skip past slots for today (with 1-hour buffer)
       if (slotTime.getTime() < Date.now() + 60 * 60 * 1000) {
         continue;
       }
 
-      const activeBookings = await this.bookingRepository.countSlotBookings(
-        serviceArea.id,
-        query.subServiceId,
-        scheduledDate,
-        slot,
-        draftCreatedAfter,
-      );
+      // Count technicians committed to this slot
+      const bookedCount = bookedJobs.filter((b) => b.scheduledSlot === slot).length;
+      // Count active unexpired drafts currently holding this slot
+      const heldDraftCount = activeDrafts.filter((d) => d.scheduledSlot === slot).length;
 
-      if (activeBookings < capacity) {
+      const remainingCapacity = techIds.length - (bookedCount + heldDraftCount);
+      if (remainingCapacity > 0) {
         availableSlots.push(slot);
       }
     }
 
     return availableSlots;
+  }
+
+  async cancelDraft(user: AuthenticatedUser, bookingId: string) {
+    const customer = await this.validateCustomer(user);
+    const draft = await this.prisma.booking.findFirst({
+      where: {
+        id: bookingId,
+        customerId: customer.id,
+        status: BookingStatus.DRAFT,
+      },
+    });
+
+    if (!draft) {
+      return { message: 'Draft booking not found or already inactive' };
+    }
+
+    await this.prisma.booking.update({
+      where: { id: draft.id },
+      data: {
+        status: BookingStatus.CANCELLED,
+        cancelledAt: new Date(),
+        cancelReason: 'User exited checkout / cancelled draft',
+        cancelledBy: 'CUSTOMER',
+      },
+    });
+
+    await this.bookingLockService.clearDraftExpiry(bookingId);
+    await this.bookingQueryCacheService.invalidate();
+
+    return { message: 'Draft booking cancelled and slot released successfully' };
   }
 
   private async ensureSlotAvailable(
@@ -699,36 +912,21 @@ export class BookingService {
       scheduledDate,
       scheduledSlot,
       new Date(Date.now() - DRAFT_TTL_SECONDS * 1000),
+      excludeBookingId,
     );
 
-    // activeBookings includes the current booking if it's a DRAFT and we're confirming,
-    // so we need to account for excludeBookingId if we were counting the same booking.
-    // Since countSlotBookings doesn't take excludeBookingId, we could have a false positive
-    // if a user is confirming their own draft and that draft brings activeBookings == capacity.
-    // Actually, countSlotBookings counts all bookings. If the user is confirming their draft,
-    // the draft is ALREADY in activeBookings.
-    // Thus activeBookings <= capacity is fine if we are confirming.
-    // If it's a new draft, we need activeBookings < capacity.
-    if (excludeBookingId) {
-      if (activeBookings > capacity) {
-        throw new ConflictException({
-          message: 'Selected slot is no longer available',
-          errorCode: ErrorCodes.BOOKING_SLOT_UNAVAILABLE,
-        });
-      }
-    } else {
-      if (activeBookings >= capacity) {
-        throw new ConflictException({
-          message: 'Selected slot is no longer available',
-          errorCode: ErrorCodes.BOOKING_SLOT_UNAVAILABLE,
-        });
-      }
+    if (activeBookings >= capacity) {
+      throw new ConflictException({
+        message: 'Selected slot is no longer available',
+        errorCode: ErrorCodes.BOOKING_SLOT_UNAVAILABLE,
+      });
     }
   }
 
   private parseScheduledDate(scheduledDate: string, scheduledSlot: string) {
     const [startTime] = scheduledSlot.split('-');
-    const date = new Date(`${scheduledDate}T${startTime}:00.000Z`);
+    // Parse in Indian Standard Time (+05:30)
+    const date = new Date(`${scheduledDate}T${startTime}:00.000+05:30`);
 
     if (Number.isNaN(date.getTime()) || date.getTime() <= Date.now()) {
       throw new BadRequestException({

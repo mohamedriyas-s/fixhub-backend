@@ -58,3 +58,14 @@ export class AvailableSlotsQueryDto {
   @IsDateString()
   date!: string;
 }
+
+export class CheckTechniciansQueryDto {
+  @ApiProperty({ example: 'sub-service-uuid' })
+  @IsUUID()
+  subServiceId!: string;
+
+  @ApiProperty({ example: '600099' })
+  @IsString()
+  @MaxLength(10)
+  pincode!: string;
+}

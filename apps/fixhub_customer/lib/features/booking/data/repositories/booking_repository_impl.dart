@@ -59,4 +59,14 @@ class BookingRepositoryImpl implements BookingRepository {
   Future<List<String>> getAvailableSlots(String subServiceId, String pincode, String date) async {
     return _remoteDataSource.getAvailableSlots(subServiceId, pincode, date);
   }
+
+  @override
+  Future<bool> checkTechniciansAvailable(String subServiceId, String pincode) async {
+    return _remoteDataSource.checkTechniciansAvailable(subServiceId, pincode);
+  }
+
+  @override
+  Future<void> cancelDraft(String bookingId) async {
+    return _remoteDataSource.cancelDraft(bookingId);
+  }
 }

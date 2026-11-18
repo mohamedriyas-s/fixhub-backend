@@ -10,4 +10,6 @@ abstract class BookingRepository {
   Future<Map<String, dynamic>> createPaymentOrder(String bookingId);
   Future<Map<String, dynamic>> verifyPayment(Map<String, dynamic> payload);
   Future<List<String>> getAvailableSlots(String subServiceId, String pincode, String date);
+  Future<bool> checkTechniciansAvailable(String subServiceId, String pincode);
+  Future<void> cancelDraft(String bookingId);
 }

@@ -1,24 +1,37 @@
-import { Body, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  ForbiddenException,
+  Get,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 
-import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { PrismaService } from '../../../common/database/prisma.service';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../../../common/interfaces/auth.interface';
 import {
+  AvailableSlotsQueryDto,
   BookingQueryDto,
   BookingSummaryDto,
-  CreateBookingMediaBatchDto,
+  CheckTechniciansQueryDto,
   ConfirmBookingDto,
   CreateBookingDto,
+  CreateBookingMediaBatchDto,
   CreateBookingMediaDto,
   CreateReviewDto,
   UpdateBookingStatusDto,
 } from '../dto';
+import { BookingService } from '../services/booking.service';
 import { BookingLifecycleService } from '../services/booking-lifecycle.service';
 import { BookingMediaService } from '../services/booking-media.service';
 import { BookingQueryService } from '../services/booking-query.service';
-import { BookingService } from '../services/booking.service';
 
 @ApiTags('Bookings')
 @ApiBearerAuth()
@@ -47,9 +60,20 @@ export class BookingController {
     return this.bookingQueryService.listHistoryForActor(user, query);
   }
 
+  @Get('check-technicians')
+  @ApiOperation({
+    summary: 'Pre-flight check if any technicians are available for a service in a given pincode',
+  })
+  @ApiResponse({ status: 200, description: 'Technician availability returned' })
+  async checkTechnicians(@Query() query: CheckTechniciansQueryDto) {
+    return this.bookingService.checkTechniciansAvailable(query);
+  }
+
   @Get('available-slots')
-  @ApiOperation({ summary: 'Get available time slots for a service in a given area on a specific date' })
-  async getAvailableSlots(@Query() query: import('../dto/create-booking.dto').AvailableSlotsQueryDto) {
+  @ApiOperation({
+    summary: 'Get available time slots for a service in a given area on a specific date',
+  })
+  async getAvailableSlots(@Query() query: AvailableSlotsQueryDto) {
     return this.bookingService.getAvailableSlots(query);
   }
 
@@ -61,7 +85,8 @@ export class BookingController {
 
   @Get(':id/technician-location')
   @ApiOperation({
-    summary: 'Get last-known technician location for an active booking (polling fallback for WebSocket)',
+    summary:
+      'Get last-known technician location for an active booking (polling fallback for WebSocket)',
   })
   @ApiParam({ name: 'id', description: 'Booking id' })
   async getTechnicianLocation(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
@@ -115,20 +140,14 @@ export class BookingController {
   @Post('summary')
   @ApiOperation({ summary: 'Validate booking request and return booking summary' })
   @ApiResponse({ status: 201, description: 'Booking summary returned' })
-  async getSummary(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: BookingSummaryDto,
-  ) {
+  async getSummary(@CurrentUser() user: AuthenticatedUser, @Body() dto: BookingSummaryDto) {
     return this.bookingService.getSummary(user, dto);
   }
 
   @Post('draft')
   @ApiOperation({ summary: 'Create draft booking with expiry' })
   @ApiResponse({ status: 201, description: 'Draft booking created' })
-  async createDraft(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: CreateBookingDto,
-  ) {
+  async createDraft(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateBookingDto) {
     return this.bookingService.createDraft(user, dto);
   }
 
@@ -142,6 +161,14 @@ export class BookingController {
     @Body() dto: ConfirmBookingDto,
   ) {
     return this.bookingService.confirmBooking(user, id, dto);
+  }
+
+  @Post(':id/cancel-draft')
+  @ApiOperation({ summary: 'Cancel a draft booking and release the reserved slot immediately' })
+  @ApiParam({ name: 'id', description: 'Draft booking id' })
+  @ApiResponse({ status: 200, description: 'Draft cancelled and slot released' })
+  async cancelDraft(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.bookingService.cancelDraft(user, id);
   }
 
   @Post(':id/media')
@@ -213,10 +240,7 @@ export class BookingController {
   @ApiOperation({ summary: 'Customer approves technician price revision' })
   @ApiParam({ name: 'id', description: 'Booking id' })
   @ApiResponse({ status: 200, description: 'Revised amount accepted, job continues' })
-  async approveRevision(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-  ) {
+  async approveRevision(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.bookingService.approveRevision(user, id);
   }
 
@@ -224,10 +248,7 @@ export class BookingController {
   @ApiOperation({ summary: 'Customer rejects technician price revision — booking is cancelled' })
   @ApiParam({ name: 'id', description: 'Booking id' })
   @ApiResponse({ status: 200, description: 'Revision rejected, booking cancelled' })
-  async rejectRevision(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-  ) {
+  async rejectRevision(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.bookingService.rejectRevision(user, id);
   }
 }

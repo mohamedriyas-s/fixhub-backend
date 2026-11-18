@@ -22,7 +22,16 @@ class PaymentScreen extends ConsumerStatefulWidget {
 class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   late Razorpay _razorpay;
   bool _isProcessing = false;
+  bool _isSuccess = false;
   String? _errorMessage;
+
+  void _releaseSlotHold() {
+    if (_isSuccess) return;
+    final bookingId = ref.read(bookingFlowProvider).draftBookingId;
+    if (bookingId != null) {
+      ref.read(bookingRepositoryProvider).cancelDraft(bookingId);
+    }
+  }
 
   @override
   void initState() {
@@ -104,10 +113,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       });
 
       if (mounted) {
+        _isSuccess = true;
         FixHubSnackbar.success(context, 'Payment Successful!');
         context.go(RouteNames.bookingSuccess);
       }
     } catch (e) {
+      _releaseSlotHold();
       setState(() {
         _isProcessing = false;
         _errorMessage = 'Payment verification failed. Please contact support.';
@@ -119,6 +130,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   }
 
   void _handlePaymentError(PaymentFailureResponse response) {
+    _releaseSlotHold();
     setState(() {
       _isProcessing = false;
       _errorMessage = response.message ?? 'Payment was cancelled or failed';
@@ -144,10 +156,23 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     const platformFee = 49.0;
     final total = (service?.basePrice ?? 0) + platformFee;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: const FixHubAppBar(title: 'Payment'),
-      body: SafeArea(
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          _releaseSlotHold();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: FixHubAppBar(
+          title: 'Payment',
+          onBackPressed: () {
+            _releaseSlotHold();
+            Navigator.of(context).pop();
+          },
+        ),
+        body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.screenPadding),
           child: Column(
@@ -274,6 +299,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
