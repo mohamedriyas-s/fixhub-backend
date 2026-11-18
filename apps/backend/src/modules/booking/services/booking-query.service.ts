@@ -4,7 +4,7 @@ import { Role } from '@prisma/client';
 
 import { AuthenticatedUser } from '../../../common/interfaces/auth.interface';
 import { BookingQueryDto } from '../dto';
-import { BookingRepository, BookingQueryScope } from '../repositories/booking.repository';
+import { BookingQueryScope, BookingRepository } from '../repositories/booking.repository';
 import { BookingQueryCacheService } from './booking-query-cache.service';
 
 @Injectable()
@@ -16,9 +16,21 @@ export class BookingQueryService {
 
   async listForActor(actor: AuthenticatedUser, query: BookingQueryDto) {
     const scope = this.scopeForActor(actor);
-    return this.cached(`list:${actor.role}:${actor.userId}:${this.queryKey(query)}`, () =>
-      this.bookingRepository.listBookings(query, scope),
+    const result = await this.cached(
+      `list:${actor.role}:${actor.userId}:${this.queryKey(query)}`,
+      () => this.bookingRepository.listBookings(query, scope),
     );
+
+    if (actor.role === Role.TECHNICIAN && result && Array.isArray((result as any).data)) {
+      return {
+        ...result,
+        data: (result as any).data.map(
+          ({ startOtp: _startOtp, startOtpAttempts: _startOtpAttempts, ...rest }: any) => rest,
+        ),
+      };
+    }
+
+    return result;
   }
 
   async listHistoryForActor(actor: AuthenticatedUser, query: BookingQueryDto) {
@@ -53,6 +65,16 @@ export class BookingQueryService {
     }
 
     this.ensureCanRead(actor, booking);
+
+    if (actor.role === Role.TECHNICIAN && booking) {
+      const {
+        startOtp: _startOtp,
+        startOtpAttempts: _startOtpAttempts,
+        ...sanitized
+      } = booking as any;
+      return sanitized;
+    }
+
     return booking;
   }
 

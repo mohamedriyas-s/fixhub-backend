@@ -475,9 +475,15 @@ model Booking {
   totalAmount       Decimal            @map("total_amount") @db.Decimal(10, 2)
   notes             String? // Internal notes (admin/technician)
   // Price revision — technician can propose a revised price after inspection
-  revisedAmount     Decimal?           @map("revised_amount") @db.Decimal(10, 2)
-  priceRevisionNote String?            @map("price_revision_note")
-  customerConsentAt DateTime?          @map("customer_consent_at")
+  revisedAmount            Decimal?           @map("revised_amount") @db.Decimal(10, 2)
+  additionalAmount         Decimal?           @map("additional_amount") @db.Decimal(10, 2)
+  priceRevisionDescription String?            @map("price_revision_description")
+  priceRevisionNote        String?            @map("price_revision_note")
+  customerConsentAt        DateTime?          @map("customer_consent_at")
+  // OTP Verification — Work Initiation
+  startOtp          String?            @map("start_otp") @db.VarChar(6)
+  startOtpAttempts  Int                @default(0) @map("start_otp_attempts")
+  workStartedAt     DateTime?          @map("work_started_at")
   // Completion
   completedAt       DateTime?          @map("completed_at")
   // Cancellation

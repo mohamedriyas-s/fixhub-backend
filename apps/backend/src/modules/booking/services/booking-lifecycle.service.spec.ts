@@ -2,6 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { BookingStatus, Role } from '@prisma/client';
 
+import { NotificationService } from '../../notification/services/notification.service';
 import { BookingStateMachineService } from '../lifecycle/booking-state-machine.service';
 import { BookingRepository } from '../repositories/booking.repository';
 import { BookingLifecycleService } from './booking-lifecycle.service';
@@ -45,6 +46,12 @@ describe('BookingLifecycleService', () => {
             invalidate: jest.fn(),
           },
         },
+        {
+          provide: NotificationService,
+          useValue: {
+            sendPushNotification: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
@@ -82,6 +89,7 @@ describe('BookingLifecycleService', () => {
       booking.id,
       expect.objectContaining({ status: BookingStatus.ACCEPTED }),
       'technician-user-uuid-1',
+      'TECHNICIAN',
     );
     expect(repository.createTimelineEntry).toHaveBeenCalledWith(
       {},

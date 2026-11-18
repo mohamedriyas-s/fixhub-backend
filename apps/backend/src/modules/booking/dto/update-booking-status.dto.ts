@@ -37,4 +37,13 @@ export class UpdateBookingStatusDto {
   @Type(() => Number)
   @IsLongitude()
   longitude?: number;
+
+  @ApiPropertyOptional({
+    example: '1234',
+    description: 'Customer OTP required to start service (ARRIVED -> IN_PROGRESS)',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(6)
+  otp?: string;
 }

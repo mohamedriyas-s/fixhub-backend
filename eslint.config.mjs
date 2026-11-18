@@ -58,6 +58,8 @@ export default [
         },
       ],
 
+      "@typescript-eslint/no-explicit-any": "warn",
+
       "simple-import-sort/imports": "error",
 
       "simple-import-sort/exports": "error",

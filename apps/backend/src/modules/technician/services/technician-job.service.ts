@@ -1,9 +1,18 @@
 import { ErrorCodes } from '@fixhub/shared';
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import { BookingStatus } from '@prisma/client';
 
 import { AuthenticatedUser } from '../../../common/interfaces/auth.interface';
-import { AdminNotificationService, AdminNotifType } from '../../admin/services/admin-notification.service';
+import {
+  AdminNotificationService,
+  AdminNotifType,
+} from '../../admin/services/admin-notification.service';
 import { BookingLifecycleService } from '../../booking/services/booking-lifecycle.service';
 import { JobQueryDto, RejectJobDto, UpdateJobStatusDto } from '../dto';
 import { TechnicianJobRepository } from '../repositories/technician-job.repository';
@@ -100,12 +109,16 @@ export class TechnicianJobService {
     });
 
     // Notify admin of job decline (fire-and-forget)
-    this.adminNotifService?.createAndBroadcast(
-      AdminNotifType.JOB_DECLINED,
-      '❌ Job Declined by Technician',
-      `Booking #${result.booking.bookingNumber} was declined. Reason: ${dto.reason}`,
-      { bookingId, bookingNumber: result.booking.bookingNumber, reason: dto.reason },
-    ).catch(() => { /* silent */ });
+    this.adminNotifService
+      ?.createAndBroadcast(
+        AdminNotifType.JOB_DECLINED,
+        '❌ Job Declined by Technician',
+        `Booking #${result.booking.bookingNumber} was declined. Reason: ${dto.reason}`,
+        { bookingId, bookingNumber: result.booking.bookingNumber, reason: dto.reason },
+      )
+      .catch(() => {
+        /* silent */
+      });
 
     return result;
   }
@@ -127,6 +140,7 @@ export class TechnicianJobService {
       latitude: dto.latitude,
       longitude: dto.longitude,
       failureReason: dto.failureReason,
+      otp: dto.otp,
     });
   }
 

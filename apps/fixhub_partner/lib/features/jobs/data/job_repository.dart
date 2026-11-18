@@ -75,6 +75,7 @@ class JobRepository {
     double? latitude,
     double? longitude,
     String? failureReason,
+    String? otp,
   }) async {
     final response = await _dio.patch(
       ApiEndpoints.technicianJobStatus(id),
@@ -84,6 +85,27 @@ class JobRepository {
         if (latitude != null) 'latitude': latitude,
         if (longitude != null) 'longitude': longitude,
         if (failureReason != null) 'failureReason': failureReason,
+        if (otp != null) 'otp': otp,
+      },
+    );
+    return Job.fromJson(_unwrapMap(response.data));
+  }
+
+  /// PATCH /technicians/jobs/:id/additional-charge
+  Future<Job> requestAdditionalCharge(
+    String id, {
+    required double amount,
+    String? description,
+    String? reason,
+  }) async {
+    final response = await _dio.patch(
+      ApiEndpoints.technicianJobAdditionalCharge(id),
+      data: {
+        'amount': amount,
+        if (description != null && description.trim().isNotEmpty)
+          'description': description.trim(),
+        if (reason != null && reason.trim().isNotEmpty)
+          'reason': reason.trim(),
       },
     );
     return Job.fromJson(_unwrapMap(response.data));
@@ -102,16 +124,37 @@ class JobRepository {
   }
 
   dynamic _unwrap(dynamic data) {
-    if (data is Map<String, dynamic> && data.containsKey('data')) {
-      return data['data'];
+    if (data is Map<String, dynamic>) {
+      if (data.containsKey('data')) {
+        final inner = data['data'];
+        if (inner is Map<String, dynamic> && inner.containsKey('booking')) {
+          return inner['booking'];
+        }
+        return inner;
+      }
+      if (data.containsKey('booking')) {
+        return data['booking'];
+      }
     }
     return data;
   }
 
   Map<String, dynamic> _unwrapMap(dynamic data) {
-    if (data is Map<String, dynamic> && data.containsKey('data')) {
-      return data['data'] as Map<String, dynamic>;
+    if (data is Map<String, dynamic>) {
+      if (data.containsKey('data')) {
+        final inner = data['data'];
+        if (inner is Map<String, dynamic>) {
+          if (inner.containsKey('booking') && inner['booking'] is Map<String, dynamic>) {
+            return inner['booking'] as Map<String, dynamic>;
+          }
+          return inner;
+        }
+      }
+      if (data.containsKey('booking') && data['booking'] is Map<String, dynamic>) {
+        return data['booking'] as Map<String, dynamic>;
+      }
+      return data;
     }
-    return data as Map<String, dynamic>;
+    return {};
   }
 }

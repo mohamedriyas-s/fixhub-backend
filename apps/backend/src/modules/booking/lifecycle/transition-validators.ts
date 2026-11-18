@@ -77,3 +77,38 @@ export class FailureReasonValidator implements BookingTransitionValidator {
     }
   }
 }
+
+export class StartWorkOtpValidator implements BookingTransitionValidator {
+  validate({ actor, booking, dto }: BookingTransitionContext): void {
+    // Only TECHNICIAN role is subject to customer OTP verification (ADMIN can override in emergencies)
+    if (actor.role !== Role.TECHNICIAN) {
+      return;
+    }
+
+    // Only enforce when the booking has a startOtp configured
+    if (!booking.startOtp) {
+      return;
+    }
+
+    if (!dto.otp || !dto.otp.trim()) {
+      throw new BadRequestException({
+        message: 'Customer OTP is required to start the service',
+        errorCode: ErrorCodes.BOOKING_OTP_REQUIRED,
+      });
+    }
+
+    if (booking.startOtpAttempts >= 5) {
+      throw new ForbiddenException({
+        message: 'Maximum OTP verification attempts exceeded. Please contact support.',
+        errorCode: ErrorCodes.BOOKING_OTP_MAX_ATTEMPTS,
+      });
+    }
+
+    if (dto.otp.trim() !== booking.startOtp) {
+      throw new BadRequestException({
+        message: 'Invalid OTP. Please check with the customer.',
+        errorCode: ErrorCodes.BOOKING_OTP_INVALID,
+      });
+    }
+  }
+}

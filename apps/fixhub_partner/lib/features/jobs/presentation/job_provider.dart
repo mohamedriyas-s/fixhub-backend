@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/job_repository.dart';
 import '../domain/job_models.dart';
@@ -82,6 +81,7 @@ class ActiveJobNotifier extends AsyncNotifier<Job?> {
     String? note,
     double? latitude,
     double? longitude,
+    String? otp,
   }) async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
@@ -91,11 +91,36 @@ class ActiveJobNotifier extends AsyncNotifier<Job?> {
         note: note,
         latitude: latitude,
         longitude: longitude,
+        otp: otp,
       );
       // Invalidate related providers so they pick up the new status
       _invalidateRelatedProviders();
       // Also invalidate the specific job details
       ref.invalidate(jobDetailsProvider(id));
+      return job;
+    });
+    if (state.hasError) {
+      throw state.error!;
+    }
+    return state.value;
+  }
+
+  Future<Job?> requestAdditionalCharge({
+    required String id,
+    required double amount,
+    String? description,
+    String? reason,
+  }) async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      final job = await _repository.requestAdditionalCharge(
+        id,
+        amount: amount,
+        description: description,
+        reason: reason,
+      );
+      ref.invalidate(jobDetailsProvider(id));
+      _invalidateRelatedProviders();
       return job;
     });
     return state.value;
@@ -112,6 +137,9 @@ class ActiveJobNotifier extends AsyncNotifier<Job?> {
       ref.invalidate(jobDetailsProvider(id));
       return job;
     });
+    if (state.hasError) {
+      throw state.error!;
+    }
     return state.value;
   }
 

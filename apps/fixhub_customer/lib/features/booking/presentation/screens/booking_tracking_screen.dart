@@ -8,6 +8,7 @@ import '../../../../core/widgets/fixhub_error_state.dart';
 import '../../../../core/widgets/fixhub_status_chip.dart';
 import '../providers/booking_provider.dart';
 import '../providers/tracking_provider.dart';
+import '../widgets/start_service_otp_card.dart';
 import '../widgets/technician_contact_card.dart';
 
 class BookingTrackingScreen extends ConsumerStatefulWidget {
@@ -188,6 +189,13 @@ class _BookingTrackingScreenState extends ConsumerState<BookingTrackingScreen> {
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     TechnicianContactCard(technicianData: booking.technician),
+                    if (booking.startOtp != null) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      StartServiceOtpCard(
+                        otp: booking.startOtp!,
+                        isTechnicianArrived: isArrived,
+                      ),
+                    ],
                   ],
                 ),
               ),

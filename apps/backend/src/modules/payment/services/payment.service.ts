@@ -22,7 +22,11 @@ import { Queue } from 'bullmq';
 
 import { QUEUE_NAMES } from '../../../common/queue/queue.constants';
 import { RedisService } from '../../../common/redis/redis.service';
-import { AdminNotificationService, AdminNotifType } from '../../admin/services/admin-notification.service';
+import { generateOtp } from '../../../common/utils/helpers.util';
+import {
+  AdminNotificationService,
+  AdminNotifType,
+} from '../../admin/services/admin-notification.service';
 import { BookingDispatchService } from '../../booking/services/booking-dispatch.service';
 import { NotificationService } from '../../notification/services/notification.service';
 import {
@@ -78,7 +82,10 @@ export class PaymentService {
       });
     }
 
-    const payableStatuses: BookingStatus[] = [BookingStatus.CONFIRMED, BookingStatus.PENDING_PAYMENT];
+    const payableStatuses: BookingStatus[] = [
+      BookingStatus.CONFIRMED,
+      BookingStatus.PENDING_PAYMENT,
+    ];
 
     if (!payableStatuses.includes(booking.status)) {
       throw new BadRequestException({
@@ -104,7 +111,11 @@ export class PaymentService {
         razorpayOrderId: razorpayOrder.id,
       });
 
-      await this.paymentRepository.updateBookingStatus(tx, bookingId, BookingStatus.PENDING_PAYMENT);
+      await this.paymentRepository.updateBookingStatus(
+        tx,
+        bookingId,
+        BookingStatus.PENDING_PAYMENT,
+      );
       await this.paymentRepository.createTransaction(tx, {
         paymentId: saved.id,
         type: PaymentTransactionType.AUTHORIZE,
@@ -173,7 +184,11 @@ export class PaymentService {
     const captured =
       gatewayPayment.status === 'captured'
         ? gatewayPayment
-        : await this.razorpayGateway.capturePayment(dto.razorpayPaymentId, amountInPaise, payment.currency);
+        : await this.razorpayGateway.capturePayment(
+            dto.razorpayPaymentId,
+            amountInPaise,
+            payment.currency,
+          );
 
     const updated = await this.capturePaymentInDb(payment.id, {
       bookingId: payment.bookingId,
@@ -328,10 +343,14 @@ export class PaymentService {
       });
     }
 
-    const refund = await this.razorpayGateway.refundPayment(payment.razorpayPaymentId, refundAmountInPaise, {
-      reason: dto.reason ?? 'Refund requested',
-      paymentId,
-    });
+    const refund = await this.razorpayGateway.refundPayment(
+      payment.razorpayPaymentId,
+      refundAmountInPaise,
+      {
+        reason: dto.reason ?? 'Refund requested',
+        paymentId,
+      },
+    );
     const refundStatus =
       refundAmountInPaise === fullAmountInPaise
         ? PaymentStatus.REFUNDED
@@ -358,12 +377,16 @@ export class PaymentService {
     }
 
     // Notify admin of refund (fire-and-forget)
-    this.adminNotifService?.createAndBroadcast(
-      AdminNotifType.REFUND_PROCESSED,
-      '💰 Refund Processed',
-      `A refund of ₹${refundAmountInPaise / 100} has been processed for payment ${paymentId}.`,
-      { paymentId, refundId: refund.id, amount: refundAmountInPaise / 100 },
-    ).catch(() => { /* silent */ });
+    this.adminNotifService
+      ?.createAndBroadcast(
+        AdminNotifType.REFUND_PROCESSED,
+        '💰 Refund Processed',
+        `A refund of ₹${refundAmountInPaise / 100} has been processed for payment ${paymentId}.`,
+        { paymentId, refundId: refund.id, amount: refundAmountInPaise / 100 },
+      )
+      .catch(() => {
+        /* silent */
+      });
 
     return result;
   }
@@ -422,7 +445,11 @@ export class PaymentService {
     }
 
     await this.paymentRepository.transaction(async (tx) => {
-      await this.paymentRepository.markFailed(tx, payment.id, entity.error_description ?? 'Payment failed');
+      await this.paymentRepository.markFailed(
+        tx,
+        payment.id,
+        entity.error_description ?? 'Payment failed',
+      );
       await this.paymentRepository.updateBookingStatus(tx, payment.bookingId, BookingStatus.FAILED);
       await this.paymentRepository.createTransaction(tx, {
         paymentId: payment.id,
@@ -433,6 +460,9 @@ export class PaymentService {
         gatewayResponse: this.toJson(payload),
       });
     });
+
+    // Release 10-minute slot lock hold immediately upon payment failure
+    await this.redisService.del(`booking:draft:${payment.bookingId}`);
 
     // Notify customer of payment failure (fire-and-forget)
     this.notifyPaymentEvent(payment.bookingId, 'failed').catch((err) =>
@@ -477,13 +507,15 @@ export class PaymentService {
         if (!payment.razorpayOrderId) continue;
 
         const order = await this.razorpayGateway.fetchOrder(payment.razorpayOrderId);
-        
+
         if (order.status === 'paid') {
           // If the order is paid but our DB is PENDING, we likely missed the webhook.
           // Fetch the payments for this order to capture it.
           const payments = await this.razorpayGateway.fetchPaymentsByOrder(payment.razorpayOrderId);
-          const successfulPayment = payments.items.find((p: any) => p.status === 'captured' || p.status === 'authorized');
-          
+          const successfulPayment = payments.items.find(
+            (p: any) => p.status === 'captured' || p.status === 'authorized',
+          );
+
           if (successfulPayment) {
             await this.capturePaymentInDb(payment.id, {
               bookingId: payment.bookingId,
@@ -494,7 +526,9 @@ export class PaymentService {
               gatewayResponse: successfulPayment,
             });
             processedCount++;
-            this.logger.log(`Recovered stuck payment ${payment.id} for booking ${payment.bookingId}`);
+            this.logger.log(
+              `Recovered stuck payment ${payment.id} for booking ${payment.bookingId}`,
+            );
           }
         }
       } catch (err) {
@@ -524,7 +558,13 @@ export class PaymentService {
         method: params.method,
       });
 
-      await this.paymentRepository.updateBookingStatus(tx, params.bookingId, BookingStatus.CONFIRMED);
+      const startOtp = generateOtp(4);
+      await this.paymentRepository.updateBookingStatus(
+        tx,
+        params.bookingId,
+        BookingStatus.CONFIRMED,
+        startOtp,
+      );
       await this.paymentRepository.createTransaction(tx, {
         paymentId,
         type: PaymentTransactionType.CAPTURE,
@@ -538,12 +578,14 @@ export class PaymentService {
     });
 
     // Auto-dispatch to eligible technicians after successful payment (fire-and-forget)
-    this.dispatchService.dispatch(params.bookingId).catch((err) =>
-      this.logger.error(
-        `Auto-dispatch failed for booking ${params.bookingId}: ${err.message}`,
-        err.stack,
-      ),
-    );
+    this.dispatchService
+      .dispatch(params.bookingId)
+      .catch((err) =>
+        this.logger.error(
+          `Auto-dispatch failed for booking ${params.bookingId}: ${err.message}`,
+          err.stack,
+        ),
+      );
 
     // Notify customer of successful payment (fire-and-forget)
     this.notifyPaymentEvent(params.bookingId, 'captured').catch((err) =>
@@ -551,12 +593,16 @@ export class PaymentService {
     );
 
     // Notify admin of payment capture (fire-and-forget)
-    this.adminNotifService?.createAndBroadcast(
-      AdminNotifType.PAYMENT_CAPTURED,
-      '💳 Payment Captured',
-      `Payment captured for booking (Amount: ₹${params.amount}).`,
-      { bookingId: params.bookingId, paymentId, amount: params.amount },
-    ).catch(() => { /* silent */ });
+    this.adminNotifService
+      ?.createAndBroadcast(
+        AdminNotifType.PAYMENT_CAPTURED,
+        '💳 Payment Captured',
+        `Payment captured for booking (Amount: ₹${params.amount}).`,
+        { bookingId: params.bookingId, paymentId, amount: params.amount },
+      )
+      .catch(() => {
+        /* silent */
+      });
 
     return updated;
   }

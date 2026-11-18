@@ -73,7 +73,11 @@ describe('TechnicianJobService', () => {
       jobRepository.findJobForAction.mockResolvedValue(assignedJob as any);
       lifecycleService.transition.mockResolvedValue({
         booking: { ...assignedJob, status: BookingStatus.ACCEPTED },
-        transition: { from: BookingStatus.ASSIGNED, to: BookingStatus.ACCEPTED, allowedNextStatuses: [] },
+        transition: {
+          from: BookingStatus.ASSIGNED,
+          to: BookingStatus.ACCEPTED,
+          allowedNextStatuses: [],
+        },
       } as any);
 
       const result = await service.acceptJob(user, bookingId);
@@ -107,14 +111,18 @@ describe('TechnicianJobService', () => {
       jobRepository.findJobForAction.mockResolvedValue(assignedJob as any);
       lifecycleService.transition.mockResolvedValue({
         booking: { ...assignedJob, status: BookingStatus.CONFIRMED },
-        transition: { from: BookingStatus.ASSIGNED, to: BookingStatus.CONFIRMED, allowedNextStatuses: [] },
+        transition: {
+          from: BookingStatus.ASSIGNED,
+          to: BookingStatus.CONFIRMED,
+          allowedNextStatuses: [],
+        },
       } as any);
 
       const result = await service.rejectJob(user, bookingId, { reason: 'Too far away' });
 
       expect(lifecycleService.transition).toHaveBeenCalledWith(
         bookingId,
-        expect.objectContaining({ role: 'ADMIN' }),
+        expect.objectContaining({ role: Role.TECHNICIAN }),
         expect.objectContaining({
           status: BookingStatus.CONFIRMED,
           note: expect.stringContaining('Too far away'),
@@ -129,9 +137,9 @@ describe('TechnicianJobService', () => {
         status: BookingStatus.IN_PROGRESS,
       } as any);
 
-      await expect(
-        service.rejectJob(user, bookingId, { reason: 'Too far' }),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.rejectJob(user, bookingId, { reason: 'Too far' })).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -143,7 +151,11 @@ describe('TechnicianJobService', () => {
       } as any);
       lifecycleService.transition.mockResolvedValue({
         booking: { ...assignedJob, status: BookingStatus.EN_ROUTE },
-        transition: { from: BookingStatus.ACCEPTED, to: BookingStatus.EN_ROUTE, allowedNextStatuses: [] },
+        transition: {
+          from: BookingStatus.ACCEPTED,
+          to: BookingStatus.EN_ROUTE,
+          allowedNextStatuses: [],
+        },
       } as any);
 
       const result = await service.updateJobStatus(user, bookingId, {
@@ -154,6 +166,36 @@ describe('TechnicianJobService', () => {
       });
 
       expect(result.booking.status).toBe(BookingStatus.EN_ROUTE);
+    });
+
+    it('transitions job to IN_PROGRESS with OTP verification', async () => {
+      jobRepository.findJobForAction.mockResolvedValue({
+        ...assignedJob,
+        status: BookingStatus.ARRIVED,
+      } as any);
+      lifecycleService.transition.mockResolvedValue({
+        booking: { ...assignedJob, status: BookingStatus.IN_PROGRESS },
+        transition: {
+          from: BookingStatus.ARRIVED,
+          to: BookingStatus.IN_PROGRESS,
+          allowedNextStatuses: [],
+        },
+      } as any);
+
+      const result = await service.updateJobStatus(user, bookingId, {
+        status: BookingStatus.IN_PROGRESS,
+        otp: '4829',
+      });
+
+      expect(lifecycleService.transition).toHaveBeenCalledWith(
+        bookingId,
+        user,
+        expect.objectContaining({
+          status: BookingStatus.IN_PROGRESS,
+          otp: '4829',
+        }),
+      );
+      expect(result.booking.status).toBe(BookingStatus.IN_PROGRESS);
     });
 
     it('rejects technician-disallowed status transitions', async () => {
@@ -171,7 +213,14 @@ describe('TechnicianJobService', () => {
     it('returns paginated jobs', async () => {
       const paginated = {
         items: [assignedJob],
-        meta: { page: 1, limit: 10, total: 1, totalPages: 1, hasNextPage: false, hasPreviousPage: false },
+        meta: {
+          page: 1,
+          limit: 10,
+          total: 1,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPreviousPage: false,
+        },
       };
       jobRepository.listJobs.mockResolvedValue(paginated as any);
 

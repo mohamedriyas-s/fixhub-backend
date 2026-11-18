@@ -16,6 +16,7 @@ import '../../../core/widgets/fp_status_chip.dart';
 import '../domain/job_models.dart';
 import 'job_provider.dart';
 import 'price_revision_sheet.dart';
+import 'verify_otp_sheet.dart';
 
 class JobDetailsScreen extends ConsumerWidget {
   final String jobId;
@@ -35,7 +36,10 @@ class JobDetailsScreen extends ConsumerWidget {
           message: 'Could not load job details',
           onRetry: () => ref.invalidate(jobDetailsProvider(jobId)),
         ),
-        data: (job) => _JobDetailsBody(job: job),
+        data: (job) => _JobDetailsBody(
+          key: ValueKey('${job.id}_${job.status}'),
+          job: job,
+        ),
       ),
     );
   }
@@ -44,7 +48,7 @@ class JobDetailsScreen extends ConsumerWidget {
 class _JobDetailsBody extends ConsumerStatefulWidget {
   final Job job;
 
-  const _JobDetailsBody({required this.job});
+  const _JobDetailsBody({super.key, required this.job});
 
   @override
   ConsumerState<_JobDetailsBody> createState() => _JobDetailsBodyState();
@@ -82,6 +86,17 @@ class _JobDetailsBodyState extends ConsumerState<_JobDetailsBody> {
   Future<void> _updateStatus() async {
     final nextStatus = _nextStatus;
     if (nextStatus.isEmpty) return;
+
+    if (nextStatus == 'IN_PROGRESS') {
+      final verified = await showVerifyOtpSheet(context, widget.job);
+      if (verified == true && mounted) {
+        ref.invalidate(jobDetailsProvider(widget.job.id));
+        try {
+          await ref.read(jobDetailsProvider(widget.job.id).future);
+        } catch (_) {}
+      }
+      return;
+    }
 
     if (nextStatus == 'COMPLETED') {
       final confirm = await showDialog<bool>(
@@ -258,11 +273,19 @@ class _JobDetailsBodyState extends ConsumerState<_JobDetailsBody> {
     return Column(
       children: [
         Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.screenPadding),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+          child: RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(jobDetailsProvider(widget.job.id));
+              try {
+                await ref.read(jobDetailsProvider(widget.job.id).future);
+              } catch (_) {}
+            },
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(AppSpacing.screenPadding),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                 // ── Header ───────────────────────────────────────
                 FpCard(
                   child: Column(
@@ -355,14 +378,14 @@ class _JobDetailsBodyState extends ConsumerState<_JobDetailsBody> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Price Revision Pending',
+                                    'Additional Charge Approval Pending',
                                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    'Waiting for customer to approve ₹${job.revisedAmount!.toStringAsFixed(0)}',
+                                    'Waiting for customer confirmation',
                                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                       color: AppColors.textSecondary,
                                     ),
@@ -372,12 +395,58 @@ class _JobDetailsBodyState extends ConsumerState<_JobDetailsBody> {
                             ),
                           ],
                         ),
-                        if (job.priceRevisionNote != null && job.priceRevisionNote!.isNotEmpty) ...[
-                          const SizedBox(height: AppSpacing.sm),
-                          const Divider(color: AppColors.divider, height: 1),
+                        const SizedBox(height: AppSpacing.md),
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('Base Service Price', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                                  Text('₹${job.totalAmount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('Additional Charges', style: TextStyle(color: AppColors.warning, fontSize: 13, fontWeight: FontWeight.w500)),
+                                  Text(
+                                    '+ ₹${(job.additionalAmount ?? (job.revisedAmount! - job.totalAmount)).clamp(0, double.infinity).toStringAsFixed(0)}',
+                                    style: const TextStyle(color: AppColors.warning, fontWeight: FontWeight.w700, fontSize: 13),
+                                  ),
+                                ],
+                              ),
+                              const Divider(height: 12, color: AppColors.divider),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('Final Payable Amount', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                                  Text('₹${job.revisedAmount!.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (job.priceRevisionDescription != null && job.priceRevisionDescription!.isNotEmpty) ...[
                           const SizedBox(height: AppSpacing.sm),
                           Text(
-                            'Your note: ${job.priceRevisionNote}',
+                            'Item/Work: ${job.priceRevisionDescription}',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                        if (job.priceRevisionNote != null && job.priceRevisionNote!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Reason: ${job.priceRevisionNote}',
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: AppColors.textSecondary,
                               fontStyle: FontStyle.italic,
@@ -556,6 +625,7 @@ class _JobDetailsBodyState extends ConsumerState<_JobDetailsBody> {
             ),
           ),
         ),
+      ),
 
         // ── Action Bar ──────────────────────────────────────────
         if (hasAction || canFail || isPendingRevision)
@@ -573,12 +643,12 @@ class _JobDetailsBodyState extends ConsumerState<_JobDetailsBody> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Price revision button (only when IN_PROGRESS)
+                // Additional charge button (only when IN_PROGRESS)
                 if (isInProgress) ...[
                   FpButton(
-                    label: '💰 Propose Price Revision',
+                    label: '💰 Request Additional Charge',
                     variant: FpButtonVariant.secondary,
-                    onPressed: () => showPriceRevisionSheet(context, job),
+                    onPressed: () => showAdditionalChargeSheet(context, job),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                 ],

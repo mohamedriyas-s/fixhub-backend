@@ -21,6 +21,8 @@ class BookingModel {
     required this.totalAmount,
     this.notes,
     this.revisedAmount,
+    this.additionalAmount,
+    this.priceRevisionDescription,
     this.priceRevisionNote,
     this.completedAt,
     this.cancelledAt,
@@ -28,6 +30,7 @@ class BookingModel {
     this.cancelReason,
     this.failedAt,
     this.failureReason,
+    this.startOtp,
     this.address,
     this.subService,
     this.technician,
@@ -51,6 +54,9 @@ class BookingModel {
   final String? notes;
   @JsonKey(fromJson: _parseNullableDouble)
   final double? revisedAmount;
+  @JsonKey(fromJson: _parseNullableDouble)
+  final double? additionalAmount;
+  final String? priceRevisionDescription;
   final String? priceRevisionNote;
   final DateTime? completedAt;
   final DateTime? cancelledAt;
@@ -58,6 +64,7 @@ class BookingModel {
   final String? cancelReason;
   final DateTime? failedAt;
   final String? failureReason;
+  final String? startOtp;
 
   // Relations
   final AddressModel? address;

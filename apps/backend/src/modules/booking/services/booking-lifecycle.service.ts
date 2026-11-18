@@ -1,9 +1,12 @@
 import { ErrorCodes } from '@fixhub/shared';
 import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
-import { BookingStatus, NotificationType } from '@prisma/client';
+import { BookingStatus, NotificationType, Role } from '@prisma/client';
 
 import { AuthenticatedUser } from '../../../common/interfaces/auth.interface';
-import { AdminNotificationService, AdminNotifType } from '../../admin/services/admin-notification.service';
+import {
+  AdminNotificationService,
+  AdminNotifType,
+} from '../../admin/services/admin-notification.service';
 import { NotificationService } from '../../notification/services/notification.service';
 import { TrackingGateway } from '../../tracking/tracking.gateway';
 import { UpdateBookingStatusDto } from '../dto';
@@ -44,11 +47,22 @@ export class BookingLifecycleService {
       });
     }
 
-    const transition = this.stateMachine.validate({
-      booking,
-      actor,
-      dto,
-    });
+    let transition;
+    try {
+      transition = this.stateMachine.validate({
+        booking,
+        actor,
+        dto,
+      });
+    } catch (err: any) {
+      if (
+        actor.role === Role.TECHNICIAN &&
+        err?.response?.errorCode === ErrorCodes.BOOKING_OTP_INVALID
+      ) {
+        await this.bookingRepository.incrementStartOtpAttempts(bookingId);
+      }
+      throw err;
+    }
 
     const updated = await this.bookingRepository.transaction(async (tx) => {
       const transitioned = await this.bookingRepository.updateLifecycleStatus(
@@ -102,12 +116,16 @@ export class BookingLifecycleService {
     // Notify admin when a booking is cancelled
     if (dto.status === BookingStatus.CANCELLED && this.adminNotifService) {
       const bookingRef = updated.bookingNumber ?? bookingId;
-      this.adminNotifService.createAndBroadcast(
-        AdminNotifType.BOOKING_CANCELLED,
-        '🚫 Booking Cancelled',
-        `Booking #${bookingRef} has been cancelled.`,
-        { bookingId, bookingNumber: updated.bookingNumber, cancelReason: dto.cancelReason },
-      ).catch(() => { /* silent */ });
+      this.adminNotifService
+        .createAndBroadcast(
+          AdminNotifType.BOOKING_CANCELLED,
+          '🚫 Booking Cancelled',
+          `Booking #${bookingRef} has been cancelled.`,
+          { bookingId, bookingNumber: updated.bookingNumber, cancelReason: dto.cancelReason },
+        )
+        .catch(() => {
+          /* silent */
+        });
     }
 
     // Fire notifications asynchronously — failures must never break the transition

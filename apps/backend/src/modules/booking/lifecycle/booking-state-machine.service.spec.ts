@@ -97,4 +97,75 @@ describe('BookingStateMachineService', () => {
       BookingStatus.FAILED,
     ]);
   });
+
+  describe('ARRIVED -> IN_PROGRESS OTP verification', () => {
+    const arrivedBooking = {
+      ...baseBooking,
+      status: BookingStatus.ARRIVED,
+      startOtp: '4829',
+      startOtpAttempts: 0,
+    };
+
+    const techActor = {
+      userId: 'technician-user-uuid-1',
+      phone: '+919876543210',
+      role: Role.TECHNICIAN,
+    };
+
+    it('allows transition when technician enters correct OTP', () => {
+      const transition = service.validate({
+        booking: arrivedBooking,
+        actor: techActor,
+        dto: { status: BookingStatus.IN_PROGRESS, otp: '4829' },
+      });
+
+      expect(transition.from).toBe(BookingStatus.ARRIVED);
+      expect(transition.to).toBe(BookingStatus.IN_PROGRESS);
+    });
+
+    it('rejects transition when technician provides incorrect OTP', () => {
+      expect(() =>
+        service.validate({
+          booking: arrivedBooking,
+          actor: techActor,
+          dto: { status: BookingStatus.IN_PROGRESS, otp: '0000' },
+        }),
+      ).toThrow(BadRequestException);
+    });
+
+    it('rejects transition when technician provides no OTP', () => {
+      expect(() =>
+        service.validate({
+          booking: arrivedBooking,
+          actor: techActor,
+          dto: { status: BookingStatus.IN_PROGRESS },
+        }),
+      ).toThrow(BadRequestException);
+    });
+
+    it('locks out transition after 5 failed attempts', () => {
+      expect(() =>
+        service.validate({
+          booking: { ...arrivedBooking, startOtpAttempts: 5 },
+          actor: techActor,
+          dto: { status: BookingStatus.IN_PROGRESS, otp: '4829' },
+        }),
+      ).toThrow(ForbiddenException);
+    });
+
+    it('allows ADMIN to transition without OTP', () => {
+      const transition = service.validate({
+        booking: arrivedBooking,
+        actor: {
+          userId: 'admin-user-uuid-1',
+          phone: '+919876543210',
+          role: Role.ADMIN,
+        },
+        dto: { status: BookingStatus.IN_PROGRESS },
+      });
+
+      expect(transition.from).toBe(BookingStatus.ARRIVED);
+      expect(transition.to).toBe(BookingStatus.IN_PROGRESS);
+    });
+  });
 });

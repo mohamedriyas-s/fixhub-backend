@@ -114,11 +114,7 @@ export class PaymentRepository {
     });
   }
 
-  markRefunded(
-    tx: PrismaTx,
-    paymentId: string,
-    status: PaymentStatus,
-  ) {
+  markRefunded(tx: PrismaTx, paymentId: string, status: PaymentStatus) {
     return tx.payment.update({
       where: { id: paymentId },
       data: {
@@ -128,10 +124,13 @@ export class PaymentRepository {
     });
   }
 
-  updateBookingStatus(tx: PrismaTx, bookingId: string, status: BookingStatus) {
+  updateBookingStatus(tx: PrismaTx, bookingId: string, status: BookingStatus, startOtp?: string) {
     return tx.booking.update({
       where: { id: bookingId },
-      data: { status },
+      data: {
+        status,
+        ...(startOtp ? { startOtp } : {}),
+      },
     });
   }
 

@@ -5,7 +5,6 @@ import '../../../../core/config/theme/app_colors.dart';
 import '../../../../core/config/theme/app_spacing.dart';
 import '../../../../core/config/theme/app_radius.dart';
 import '../../../../core/widgets/fixhub_status_chip.dart';
-import '../../../booking/data/models/booking_model.dart';
 import '../../../booking/presentation/providers/booking_provider.dart';
 
 class ActiveBookingBanner extends ConsumerWidget {
@@ -74,11 +73,41 @@ class ActiveBookingBanner extends ConsumerWidget {
                         activeBooking.subService?['name'] ?? 'Service',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
-                      Text(
-                        activeBooking.displayStatus,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.textSecondary,
+                      Row(
+                        children: [
+                          Text(
+                            activeBooking.displayStatus,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                          ),
+                          if (activeBooking.startOtp != null &&
+                              [
+                                BookingStatusType.confirmed,
+                                BookingStatusType.assigned,
+                                BookingStatusType.enRoute,
+                                BookingStatusType.arrived,
+                              ].contains(activeBooking.statusType)) ...[
+                            const SizedBox(width: AppSpacing.xs),
+                            const Text('•', style: TextStyle(color: AppColors.textSecondary)),
+                            const SizedBox(width: AppSpacing.xs),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: AppColors.elevatedSurface,
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: AppColors.border, width: 0.5),
+                              ),
+                              child: Text(
+                                'OTP: ${activeBooking.startOtp}',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textPrimary,
+                                    ),
+                              ),
                             ),
+                          ],
+                        ],
                       ),
                     ],
                   ),

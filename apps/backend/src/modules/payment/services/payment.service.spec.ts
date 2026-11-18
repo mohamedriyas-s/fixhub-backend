@@ -1,3 +1,4 @@
+import { getQueueToken } from '@nestjs/bullmq';
 import {
   BadRequestException,
   ForbiddenException,
@@ -5,11 +6,12 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getQueueToken } from '@nestjs/bullmq';
 import { BookingStatus, PaymentMethod, PaymentStatus } from '@prisma/client';
 
 import { QUEUE_NAMES } from '../../../common/queue/queue.constants';
 import { RedisService } from '../../../common/redis/redis.service';
+import { BookingDispatchService } from '../../booking/services/booking-dispatch.service';
+import { NotificationService } from '../../notification/services/notification.service';
 import { PaymentRepository } from '../repositories/payment.repository';
 import { PaymentService } from './payment.service';
 import { RazorpayGatewayService } from './razorpay-gateway.service';
@@ -84,6 +86,19 @@ describe('PaymentService', () => {
           useValue: {
             get: jest.fn(),
             set: jest.fn(),
+            del: jest.fn().mockResolvedValue(1),
+          },
+        },
+        {
+          provide: BookingDispatchService,
+          useValue: {
+            dispatch: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: NotificationService,
+          useValue: {
+            sendPushNotification: jest.fn().mockResolvedValue(undefined),
           },
         },
         {
@@ -144,9 +159,7 @@ describe('PaymentService', () => {
   it('rejects order creation for another customer booking', async () => {
     repository.findBookingForPayment.mockResolvedValue(booking as any);
 
-    await expect(service.createOrder(booking.id, 'other-user')).rejects.toThrow(
-      ForbiddenException,
-    );
+    await expect(service.createOrder(booking.id, 'other-user')).rejects.toThrow(ForbiddenException);
   });
 
   it('rejects order creation for non-payable booking status', async () => {
@@ -199,6 +212,7 @@ describe('PaymentService', () => {
       {},
       booking.id,
       BookingStatus.CONFIRMED,
+      expect.any(String),
     );
   });
 
