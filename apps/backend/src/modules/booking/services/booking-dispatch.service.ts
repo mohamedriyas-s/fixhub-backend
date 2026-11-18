@@ -5,9 +5,6 @@ import { PrismaService } from '../../../common/database/prisma.service';
 import { NotificationService } from '../../notification/services/notification.service';
 import { JobOfferRepository } from '../../technician/repositories/job-offer.repository';
 
-/** Maximum number of technicians to broadcast an offer to per booking. */
-const MAX_BROADCAST_SIZE = 5;
-
 @Injectable()
 export class BookingDispatchService {
   private readonly logger = new Logger(BookingDispatchService.name);
@@ -19,20 +16,25 @@ export class BookingDispatchService {
   ) {}
 
   /**
-   * Find eligible technicians for the booking and broadcast job offers.
-   * Called after payment is captured (booking status = CONFIRMED).
+   * Find eligible technicians for the booking and automatically assign the best match.
+   * Direct mandatory assignment (no accept/reject choice).
+   * Called after payment is captured (or instant confirmation).
    *
    * Eligibility criteria:
    *  - verificationStatus = VERIFIED
    *  - isAvailable = true
    *  - has a TechnicianServiceArea matching the booking's address pincode
    *  - has a TechnicianSpecialization matching the booking's subServiceId
-   *  - has no currently active job (ACCEPTED, EN_ROUTE, ARRIVED, IN_PROGRESS)
+   *  - has no conflicting job on that scheduledDate & scheduledSlot
    */
   async dispatch(bookingId: string): Promise<void> {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { address: true },
+      include: {
+        address: true,
+        subService: true,
+        customer: { include: { user: true } },
+      },
     });
 
     if (!booking) {
@@ -40,62 +42,147 @@ export class BookingDispatchService {
       return;
     }
 
-    if (booking.status !== BookingStatus.CONFIRMED) {
+    if (
+      booking.status !== BookingStatus.CONFIRMED &&
+      booking.status !== BookingStatus.PENDING_PAYMENT
+    ) {
       this.logger.warn(
-        `Dispatch skipped for booking ${bookingId} — status is ${booking.status}, expected CONFIRMED`,
+        `Dispatch skipped for booking ${bookingId} — status is ${booking.status}, expected CONFIRMED or PENDING_PAYMENT`,
       );
       return;
     }
 
-    const eligibleTechnicians = await this.findEligibleTechnicians(
+    if (booking.technicianId) {
+      this.logger.log(
+        `Booking ${booking.bookingNumber} is already assigned to technician ${booking.technicianId}`,
+      );
+      return;
+    }
+
+    const eligibleTechnicians = await this.findEligibleTechniciansForSlot(
       booking.address.pincode,
       booking.subServiceId,
+      booking.scheduledDate,
+      booking.scheduledSlot,
     );
 
     if (eligibleTechnicians.length === 0) {
       this.logger.warn(
-        `No eligible technicians found for booking ${bookingId} (pincode: ${booking.address.pincode}, subService: ${booking.subServiceId})`,
+        `No eligible technicians found for booking ${bookingId} (pincode: ${booking.address.pincode}, subService: ${booking.subServiceId}, slot: ${booking.scheduledSlot})`,
       );
       await this.alertAdminNoTechnicians(booking);
       return;
     }
 
-    const technicianIds = eligibleTechnicians
-      .slice(0, MAX_BROADCAST_SIZE)
-      .map((t) => t.id);
+    // Rank candidates: workload balancing (fewer daily jobs) then rating DESC
+    const scoredTechs = await Promise.all(
+      eligibleTechnicians.map(async (tech) => {
+        const dailyJobsCount = await this.prisma.booking.count({
+          where: {
+            technicianId: tech.id,
+            scheduledDate: booking.scheduledDate,
+            status: {
+              in: [
+                BookingStatus.ASSIGNED,
+                BookingStatus.ACCEPTED,
+                BookingStatus.EN_ROUTE,
+                BookingStatus.ARRIVED,
+                BookingStatus.IN_PROGRESS,
+              ],
+            },
+          },
+        });
+        return {
+          tech,
+          dailyJobsCount,
+          rating: Number(tech.rating ?? 0),
+        };
+      }),
+    );
+
+    scoredTechs.sort((a, b) => {
+      // 1. Prioritize technicians with fewer bookings on that date
+      if (a.dailyJobsCount !== b.dailyJobsCount) {
+        return a.dailyJobsCount - b.dailyJobsCount;
+      }
+      // 2. Tie-break: highest rating
+      return b.rating - a.rating;
+    });
+
+    const selected = scoredTechs[0].tech;
 
     this.logger.log(
-      `Dispatching booking ${booking.bookingNumber} to ${technicianIds.length} technician(s)`,
+      `Auto-assigning booking ${booking.bookingNumber} directly to technician ${selected.id} (${selected.user?.name ?? 'Unknown'})`,
     );
 
-    // Create job offers in DB (15-min TTL per offer)
-    await this.jobOfferRepository.createOffers(bookingId, technicianIds);
+    // Direct atomic assignment
+    await this.prisma.$transaction(async (tx) => {
+      await tx.booking.update({
+        where: { id: booking.id },
+        data: {
+          technicianId: selected.id,
+          status: BookingStatus.ASSIGNED,
+        },
+      });
 
-    // Push notification to each eligible technician (fire-and-forget per technician)
-    await Promise.allSettled(
-      eligibleTechnicians.slice(0, MAX_BROADCAST_SIZE).map((tech) =>
-        this.notificationService.sendPushNotification({
-          userId: tech.userId,
-          title: '🔔 New Job Available',
-          body: `A new ${booking.bookingNumber} job is available near you. Tap to view and accept within 15 minutes.`,
+      await tx.bookingTimeline.create({
+        data: {
+          bookingId: booking.id,
+          status: BookingStatus.ASSIGNED,
+          changedByUserId: selected.userId,
+          note: `Automated assignment by system to technician ${selected.user?.name ?? selected.id}`,
+        },
+      });
+    });
+
+    const scheduledDateStr = booking.scheduledDate.toISOString().slice(0, 10);
+
+    // Push notification to Technician (Full Job Details)
+    if (selected.user?.id) {
+      await this.notificationService
+        .sendPushNotification({
+          userId: selected.user.id,
+          title: '🔧 New Job Assigned',
+          body: `Booking #${booking.bookingNumber} for ${booking.subService.name} on ${scheduledDateStr} (${booking.scheduledSlot}) has been assigned to you. Address: ${booking.address.line1}, ${booking.address.city}.`,
           type: NotificationType.ASSIGNMENT,
-          payload: { bookingId, screen: 'job_offer' },
-        }).catch((err) =>
-          this.logger.warn(`Failed to notify technician ${tech.userId}: ${err.message}`),
-        ),
-      ),
-    );
+          payload: { bookingId: booking.id, screen: 'job_details' },
+        })
+        .catch((err) =>
+          this.logger.warn(`Failed to notify technician ${selected.user.id}: ${err.message}`),
+        );
+    }
+
+    // Push notification to Customer (Technician Credentials & Arrival Details)
+    if (booking.customer?.user?.id) {
+      const techName = selected.user?.name ?? 'Technician';
+      const techRating = Number(selected.rating ?? 0).toFixed(1);
+      const techPhone = selected.user?.phone ? ` Contact: ${selected.user.phone}` : '';
+
+      await this.notificationService
+        .sendPushNotification({
+          userId: booking.customer.user.id,
+          title: 'Booking Confirmed & Technician Assigned ✅',
+          body: `${techName} (★${techRating}) will arrive on ${scheduledDateStr} (${booking.scheduledSlot}) for your ${booking.subService.name}.${techPhone}`,
+          type: NotificationType.BOOKING_UPDATE,
+          payload: { bookingId: booking.id, screen: 'booking_detail' },
+        })
+        .catch((err) =>
+          this.logger.warn(`Failed to notify customer ${booking.customer.user.id}: ${err.message}`),
+        );
+    }
   }
 
   /**
-   * Core matching query.
-   * Returns technician records with their userId for notification purposes.
+   * Slot-aware matching query for automated assignment.
    */
-  private async findEligibleTechnicians(
+  private async findEligibleTechniciansForSlot(
     pincode: string,
     subServiceId: string,
-  ): Promise<Array<{ id: string; userId: string }>> {
+    scheduledDate: Date,
+    scheduledSlot: string,
+  ) {
     const activeJobStatuses: BookingStatus[] = [
+      BookingStatus.ASSIGNED,
       BookingStatus.ACCEPTED,
       BookingStatus.EN_ROUTE,
       BookingStatus.ARRIVED,
@@ -118,15 +205,20 @@ export class BookingDispatchService {
         specializations: {
           some: { subServiceId },
         },
-        // Must not have an active job right now
+        // Must not already be booked for this scheduledDate & scheduledSlot
         bookings: {
           none: {
+            scheduledDate,
+            scheduledSlot,
             status: { in: activeJobStatuses },
           },
         },
       },
-      select: { id: true, userId: true },
-      // Prefer highly-rated technicians; secondary sort by most recently active
+      include: {
+        user: {
+          select: { id: true, name: true, phone: true },
+        },
+      },
       orderBy: [{ rating: 'desc' }, { lastLocationAt: 'desc' }],
     });
   }
@@ -147,15 +239,15 @@ export class BookingDispatchService {
 
     await Promise.allSettled(
       admins.map((admin) =>
-        this.notificationService.sendPushNotification({
-          userId: admin.id,
-          title: '⚠️ No Technician Available',
-          body: `Booking ${booking.bookingNumber} (pincode: ${booking.address.pincode}) has no eligible technicians or all offers expired. Manual assignment required.`,
-          type: NotificationType.SYSTEM,
-          payload: { bookingId: booking.id, screen: 'admin_booking_detail' },
-        }).catch((err) =>
-          this.logger.warn(`Failed to alert admin ${admin.id}: ${err.message}`),
-        ),
+        this.notificationService
+          .sendPushNotification({
+            userId: admin.id,
+            title: '⚠️ No Technician Available',
+            body: `Booking ${booking.bookingNumber} (pincode: ${booking.address.pincode}) has no eligible technicians or all offers expired. Manual assignment required.`,
+            type: NotificationType.SYSTEM,
+            payload: { bookingId: booking.id, screen: 'admin_booking_detail' },
+          })
+          .catch((err) => this.logger.warn(`Failed to alert admin ${admin.id}: ${err.message}`)),
       ),
     );
   }
@@ -201,8 +293,7 @@ export class BookingDispatchService {
           data: {
             status: BookingStatus.FAILED,
             failedAt: new Date(),
-            failureReason:
-              'No available technician found in your area. Booking auto-cancelled.',
+            failureReason: 'No available technician found in your area. Booking auto-cancelled.',
           },
         });
 
