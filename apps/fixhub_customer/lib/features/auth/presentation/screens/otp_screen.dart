@@ -78,6 +78,10 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
             phone: phone,
             otp: otp,
           );
+    } catch (_) {
+      if (mounted) {
+        _otpController.clear();
+      }
     } finally {
       if (mounted) setState(() => _isVerifying = false);
     }
@@ -116,7 +120,8 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
         context.go(RouteNames.home);
       } else if (next.status == AuthStatus.error && next.errorMessage != null) {
         FixHubSnackbar.error(context, next.errorMessage!);
-        ref.read(authProvider.notifier).clearError();
+        _otpController.clear();
+        _hasAutoFilled = true; // prevent re-autofilling the failed devOtp
       }
     });
 

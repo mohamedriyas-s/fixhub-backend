@@ -47,7 +47,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     // Navigate to OTP screen when OTP is sent
     ref.listen<AuthState>(authProvider, (previous, next) {
-      if (next.status == AuthStatus.otpSent) {
+      if (previous?.status != AuthStatus.otpSent && next.status == AuthStatus.otpSent) {
         context.push(RouteNames.otp);
       } else if (next.status == AuthStatus.error && next.errorMessage != null) {
         FixHubSnackbar.error(context, next.errorMessage!);

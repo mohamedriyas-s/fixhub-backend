@@ -73,9 +73,9 @@ class AuthInterceptor extends QueuedInterceptor {
       return handler.next(err);
     }
 
-    // Don't try to refresh for auth endpoints themselves
+    // Don't try to refresh for public endpoints (send-otp, verify-otp, refresh) or logout
     final path = err.requestOptions.path;
-    if (path.contains('/auth/refresh') || path.contains('/auth/logout')) {
+    if (_isPublic(path) || path.contains('/auth/logout')) {
       return handler.next(err);
     }
 

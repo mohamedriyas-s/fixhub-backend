@@ -172,6 +172,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(
         status: AuthStatus.error,
         errorMessage: e.message,
+        clearDevOtp: true,
       );
     } on DioException catch (e) {
       String msg = 'Verification failed. Please try again.';
@@ -183,11 +184,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(
         status: AuthStatus.error,
         errorMessage: msg,
+        clearDevOtp: true,
       );
     } catch (e) {
       state = state.copyWith(
         status: AuthStatus.error,
         errorMessage: 'Verification failed: ${e.toString().replaceFirst('Exception: ', '')}',
+        clearDevOtp: true,
       );
     }
   }
@@ -226,7 +229,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Clear error state.
   void clearError() {
     state = state.copyWith(
-      status: state.phone != null ? AuthStatus.otpSent : AuthStatus.unauthenticated,
       errorMessage: null,
     );
   }

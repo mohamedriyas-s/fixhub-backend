@@ -143,6 +143,9 @@ export class AuthService {
       `User ${user.id} (${user.role}) authenticated via OTP${isNewUser ? ' [NEW]' : ''}`,
     );
 
+    // Cleanup OTP keys upon successful verification & user session creation
+    await this.otpService.cleanup(dto.phone);
+
     return {
       ...tokens,
       isNewUser,
