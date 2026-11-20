@@ -75,15 +75,25 @@ class LocalStorage {
   }
 
   // --- Location ---
-  Future<void> saveLocation({required String pincode, required String status}) async {
+  static const String _locationCityKey = 'city';
+
+  Future<void> saveLocation({required String pincode, required String status, String? city}) async {
     final box = await _getBox(_locationBox);
     await box.put(_locationPincodeKey, pincode);
     await box.put(_locationStatusKey, status);
+    if (city != null && city.isNotEmpty) {
+      await box.put(_locationCityKey, city);
+    }
   }
 
   Future<String?> getSavedPincode() async {
     final box = await _getBox(_locationBox);
     return box.get(_locationPincodeKey) as String?;
+  }
+
+  Future<String?> getSavedCity() async {
+    final box = await _getBox(_locationBox);
+    return box.get(_locationCityKey) as String?;
   }
 
   Future<String?> getSavedLocationStatus() async {

@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../data/repositories/location_repository_impl.dart';
 import '../../domain/repositories/location_repository.dart';
 import '../../data/datasources/location_remote_datasource.dart';
@@ -15,14 +17,6 @@ final locationRepositoryProvider = Provider<LocationRepository>((ref) {
 enum LocationStatus { initial, checking, valid, invalid, error }
 
 class LocationState {
-  final LocationStatus status;
-  final String? currentPincode;
-  final String? currentCity;
-  final ServiceAreaValidationModel? serviceAreaResult;
-  final String? errorMessage;
-  final bool hasPermission;
-  final bool isRestoring;
-
   const LocationState({
     this.status = LocationStatus.initial,
     this.currentPincode,
@@ -33,12 +27,21 @@ class LocationState {
     this.isRestoring = true,
   });
 
+  final LocationStatus status;
+  final String? currentPincode;
+  final String? currentCity;
+  final ServiceAreaValidationModel? serviceAreaResult;
+  final String? errorMessage;
+  final bool hasPermission;
+  final bool isRestoring;
+
   LocationState copyWith({
     LocationStatus? status,
     String? currentPincode,
     String? currentCity,
     ServiceAreaValidationModel? serviceAreaResult,
     String? errorMessage,
+    bool clearErrorMessage = false,
     bool? hasPermission,
     bool? isRestoring,
   }) {
@@ -47,7 +50,7 @@ class LocationState {
       currentPincode: currentPincode ?? this.currentPincode,
       currentCity: currentCity ?? this.currentCity,
       serviceAreaResult: serviceAreaResult ?? this.serviceAreaResult,
-      errorMessage: errorMessage ?? this.errorMessage,
+      errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
       hasPermission: hasPermission ?? this.hasPermission,
       isRestoring: isRestoring ?? this.isRestoring,
     );
@@ -62,12 +65,12 @@ final locationProvider = StateNotifierProvider<LocationNotifier, LocationState>(
 });
 
 class LocationNotifier extends StateNotifier<LocationState> {
-  final LocationRepository _repository;
-  final LocalStorage _localStorage;
-
   LocationNotifier(this._repository, this._localStorage) : super(const LocationState()) {
     _init();
   }
+
+  final LocationRepository _repository;
+  final LocalStorage _localStorage;
 
   Future<void> _init() async {
     final hasPermission = await _repository.checkPermission();
@@ -75,23 +78,48 @@ class LocationNotifier extends StateNotifier<LocationState> {
     // Restore previously validated location
     final savedStatus = await _localStorage.getSavedLocationStatus();
     final savedPincode = await _localStorage.getSavedPincode();
+    final savedCity = await _localStorage.getSavedCity();
 
     if (savedStatus == 'valid' && savedPincode != null) {
       state = state.copyWith(
         hasPermission: hasPermission,
         status: LocationStatus.valid,
         currentPincode: savedPincode,
+        currentCity: savedCity,
         isRestoring: false,
+        clearErrorMessage: true,
       );
     } else if (savedStatus == 'invalid' && savedPincode != null) {
       state = state.copyWith(
         hasPermission: hasPermission,
         status: LocationStatus.invalid,
         currentPincode: savedPincode,
+        currentCity: savedCity,
         isRestoring: false,
+        clearErrorMessage: true,
       );
     } else {
-      state = state.copyWith(hasPermission: hasPermission, isRestoring: false);
+      state = state.copyWith(
+        hasPermission: hasPermission,
+        isRestoring: false,
+        clearErrorMessage: true,
+      );
+    }
+  }
+
+  Future<void> refreshPermission() async {
+    final hasPermission = await _repository.checkPermission();
+    if (state.hasPermission != hasPermission) {
+      state = state.copyWith(hasPermission: hasPermission);
+    }
+  }
+
+  void clearError() {
+    if (state.status == LocationStatus.error || state.errorMessage != null) {
+      state = state.copyWith(
+        status: LocationStatus.initial,
+        clearErrorMessage: true,
+      );
     }
   }
 
@@ -102,25 +130,34 @@ class LocationNotifier extends StateNotifier<LocationState> {
   }
 
   Future<void> detectFromGPS() async {
-    state = state.copyWith(status: LocationStatus.checking);
+    state = state.copyWith(status: LocationStatus.checking, clearErrorMessage: true);
     try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        await Geolocator.openLocationSettings();
+        state = state.copyWith(
+          status: LocationStatus.error,
+          errorMessage: 'Location services are disabled. Please enable GPS.',
+        );
+        return;
+      }
+
       final hasPermission = await requestPermission();
       if (!hasPermission) {
         state = state.copyWith(
           status: LocationStatus.error,
-          errorMessage: 'Location permission denied.',
+          errorMessage: 'Location permission denied. Please grant permission in settings.',
         );
         return;
       }
 
       final position = await _repository.getCurrentLocation();
-
       final addressData = await _repository.getAddressFromPosition(position);
 
       if (addressData == null || addressData['pincode'] == null) {
         state = state.copyWith(
           status: LocationStatus.error,
-          errorMessage: 'Could not determine pincode from location.',
+          errorMessage: 'Could not determine pincode from location. Please enter manually.',
         );
         return;
       }
@@ -130,16 +167,44 @@ class LocationNotifier extends StateNotifier<LocationState> {
 
       await validateArea(pincode, lat: position.latitude, lng: position.longitude, city: city);
     } catch (e, stack) {
-      print('[LocationNotifier] detectFromGPS error: $e\n$stack');
+      debugPrint('[LocationNotifier] detectFromGPS error: $e\n$stack');
+      final errString = e.toString();
+      final String message;
+      if (errString.contains('Location permission denied')) {
+        message = 'Location permission denied. Please grant permission in settings.';
+      } else if (errString.contains('Location services are disabled')) {
+        message = 'Location services are disabled. Please enable GPS.';
+      } else {
+        message = 'Failed to detect location. Please check your connection or enter manually.';
+      }
       state = state.copyWith(
         status: LocationStatus.error,
-        errorMessage: 'Failed to detect location.',
+        errorMessage: message,
       );
     }
   }
 
+  Future<void> validateManualPincode(String pincode) async {
+    state = state.copyWith(status: LocationStatus.checking, clearErrorMessage: true);
+    
+    // 1. Retrieve address information for this pincode
+    Map<String, String>? addressData;
+    try {
+      addressData = await _repository.getAddressFromPincode(pincode);
+    } catch (e) {
+      debugPrint('[LocationNotifier] Address lookup for $pincode failed: $e');
+    }
+
+    final city = addressData?['city'];
+    final lat = addressData?['latitude'] != null ? double.tryParse(addressData!['latitude']!) : null;
+    final lng = addressData?['longitude'] != null ? double.tryParse(addressData!['longitude']!) : null;
+
+    // 2. Validate against FixHub service areas
+    await validateArea(pincode, lat: lat, lng: lng, city: city);
+  }
+
   Future<void> validateArea(String pincode, {double? lat, double? lng, String? city}) async {
-    state = state.copyWith(status: LocationStatus.checking);
+    state = state.copyWith(status: LocationStatus.checking, clearErrorMessage: true);
     try {
       final result = await _repository.validateServiceArea(pincode, lat: lat, lng: lng);
 
@@ -149,23 +214,25 @@ class LocationNotifier extends StateNotifier<LocationState> {
           currentPincode: pincode,
           currentCity: city,
           serviceAreaResult: result,
+          clearErrorMessage: true,
         );
         // Persist so we skip the screen next launch
-        await _localStorage.saveLocation(pincode: pincode, status: 'valid');
+        await _localStorage.saveLocation(pincode: pincode, status: 'valid', city: city);
       } else {
         state = state.copyWith(
           status: LocationStatus.invalid,
           currentPincode: pincode,
           currentCity: city,
           serviceAreaResult: result,
+          clearErrorMessage: true,
         );
-        await _localStorage.saveLocation(pincode: pincode, status: 'invalid');
+        await _localStorage.saveLocation(pincode: pincode, status: 'invalid', city: city);
       }
     } catch (e, stack) {
-      print('[LocationNotifier] validateArea error: $e\n$stack');
+      debugPrint('[LocationNotifier] validateArea error: $e\n$stack');
       state = state.copyWith(
         status: LocationStatus.error,
-        errorMessage: 'Failed to validate service area.',
+        errorMessage: 'Unable to connect to service. Please check your internet connection.',
       );
     }
   }

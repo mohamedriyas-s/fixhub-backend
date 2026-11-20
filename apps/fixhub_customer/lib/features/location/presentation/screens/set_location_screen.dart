@@ -26,8 +26,8 @@ class _SetLocationScreenState extends ConsumerState<SetLocationScreen> {
 
   void _validatePincode() {
     final pincode = _pincodeController.text.trim();
-    if (pincode.length == 6) {
-      ref.read(locationProvider.notifier).validateArea(pincode);
+    if (pincode.length == 6 && RegExp(r'^\d{6}$').hasMatch(pincode)) {
+      ref.read(locationProvider.notifier).validateManualPincode(pincode);
     } else {
       FixHubSnackbar.error(context, 'Please enter a valid 6-digit pincode');
     }
@@ -44,7 +44,7 @@ class _SetLocationScreenState extends ConsumerState<SetLocationScreen> {
         context.go('/location/not-covered');
       } else if (next.status == LocationStatus.error && next.errorMessage != null) {
         FixHubSnackbar.error(context, next.errorMessage!);
-        ref.read(locationProvider.notifier).reset();
+        ref.read(locationProvider.notifier).clearError();
       }
     });
 

@@ -8,11 +8,36 @@ import '../../../../core/widgets/fixhub_button.dart';
 import '../../../../core/widgets/fixhub_snackbar.dart';
 import '../providers/location_provider.dart';
 
-class LocationAccessScreen extends ConsumerWidget {
+class LocationAccessScreen extends ConsumerStatefulWidget {
   const LocationAccessScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LocationAccessScreen> createState() => _LocationAccessScreenState();
+}
+
+class _LocationAccessScreenState extends ConsumerState<LocationAccessScreen>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(locationProvider.notifier).refreshPermission();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final locationState = ref.watch(locationProvider);
 
     ref.listen<LocationState>(locationProvider, (previous, next) {
@@ -22,7 +47,7 @@ class LocationAccessScreen extends ConsumerWidget {
         context.go('/location/not-covered');
       } else if (next.status == LocationStatus.error && next.errorMessage != null) {
         FixHubSnackbar.error(context, next.errorMessage!);
-        ref.read(locationProvider.notifier).reset();
+        ref.read(locationProvider.notifier).clearError();
       }
     });
 
@@ -39,7 +64,7 @@ class LocationAccessScreen extends ConsumerWidget {
               Container(
                 width: 200,
                 height: 200,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: AppColors.surface,
                   shape: BoxShape.circle,
                 ),
