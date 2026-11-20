@@ -12,6 +12,7 @@ import '../../../../core/widgets/fixhub_error_state.dart';
 import '../../../../core/widgets/fixhub_status_chip.dart';
 import '../providers/booking_provider.dart';
 import '../providers/tracking_provider.dart';
+import '../widgets/additional_charge_confirmation_card.dart';
 import '../widgets/start_service_otp_card.dart';
 import 'rate_service_screen.dart';
 
@@ -352,149 +353,10 @@ class BookingDetailScreen extends ConsumerWidget {
                   ),
                 ),
               ],
-              // Price revision consent banner
+              // Additional charge approval confirmation card
               if (booking.status == 'PRICE_REVISION_PENDING') ...[ 
                 const SizedBox(height: AppSpacing.lg),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(AppSpacing.cardPadding),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFFBEB), // Amber tint
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppColors.warning.withOpacity(0.5)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.info_rounded, color: AppColors.warning, size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Price Revision Required',
-                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.warning,
-                                ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      if (booking.revisedAmount != null) ...[
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Base Service Price',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-                            ),
-                            Text(
-                              '₹${booking.totalAmount.toStringAsFixed(0)}',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppColors.textSecondary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Additional Charges',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.warning, fontWeight: FontWeight.w600),
-                            ),
-                            Text(
-                              '+ ₹${(booking.additionalAmount ?? (booking.revisedAmount! - booking.totalAmount)).clamp(0, double.infinity).toStringAsFixed(0)}',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppColors.warning,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                            ),
-                          ],
-                        ),
-                        const Divider(height: 12, color: AppColors.divider),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Total Amount',
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                            ),
-                            Text(
-                              '₹${booking.revisedAmount!.toStringAsFixed(0)}',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.textPrimary,
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ],
-                      if (booking.priceRevisionDescription?.isNotEmpty == true) ...[
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          'Work: ${booking.priceRevisionDescription}',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
-                              ),
-                        ),
-                      ],
-                      if (booking.priceRevisionNote?.isNotEmpty == true) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          'Reason: "${booking.priceRevisionNote}"',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary, fontStyle: FontStyle.italic),
-                        ),
-                      ],
-                      const SizedBox(height: AppSpacing.md),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () async {
-                                await ref.read(bookingActionProvider.notifier).rejectRevision(booking.id);
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Booking cancelled'), backgroundColor: AppColors.error),
-                                  );
-                                }
-                              },
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppColors.error,
-                                side: const BorderSide(color: AppColors.error),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                              child: const Text('Decline'),
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            flex: 2,
-                            child: ElevatedButton(
-                              onPressed: () async {
-                                await ref.read(bookingActionProvider.notifier).approveRevision(booking.id);
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Price approved. Job continuing!'), backgroundColor: AppColors.success),
-                                  );
-                                }
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.buttonPrimary,
-                                foregroundColor: AppColors.buttonPrimaryText,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                              child: const Text('Approve Price', style: TextStyle(fontWeight: FontWeight.w600)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+                AdditionalChargeConfirmationCard(booking: booking),
               ],
               // Action Buttons
               const SizedBox(height: AppSpacing.lg),

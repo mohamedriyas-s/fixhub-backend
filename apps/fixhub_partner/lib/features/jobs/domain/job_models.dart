@@ -154,6 +154,7 @@ class Job {
   final double? additionalAmount;
   final String? priceRevisionDescription;
   final String? priceRevisionNote;
+  final DateTime? customerConsentAt;
   // Cancellation/failure fields
   final DateTime? cancelledAt;
   final String? cancelReason;
@@ -180,6 +181,7 @@ class Job {
     this.additionalAmount,
     this.priceRevisionDescription,
     this.priceRevisionNote,
+    this.customerConsentAt,
     this.cancelledAt,
     this.cancelReason,
     this.failedAt,
@@ -210,6 +212,9 @@ class Job {
         : null,
     priceRevisionDescription: json['priceRevisionDescription'] as String?,
     priceRevisionNote: json['priceRevisionNote'] as String?,
+    customerConsentAt: json['customerConsentAt'] != null
+        ? DateTime.tryParse(json['customerConsentAt'] as String)
+        : null,
     cancelledAt: json['cancelledAt'] != null
         ? DateTime.tryParse(json['cancelledAt'] as String)
         : null,

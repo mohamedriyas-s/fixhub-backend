@@ -94,6 +94,7 @@ describe('BookingService creation', () => {
             createMedia: jest.fn(),
             setPriceRevision: jest.fn(),
             approveRevision: jest.fn(),
+            rejectRevision: jest.fn(),
             updateLifecycleStatus: jest.fn(),
             createTimelineEntry: jest.fn(),
             findTechnicianProfileByUserId: jest.fn(),
@@ -381,6 +382,8 @@ describe('BookingService creation', () => {
       status: BookingStatus.PRICE_REVISION_PENDING,
       totalAmount: 100,
       revisedAmount: 150,
+      additionalAmount: 50,
+      technician: { userId: 'tech-user-123' },
     } as never);
     repository.approveRevision.mockResolvedValue({
       id: booking.id,
@@ -398,6 +401,14 @@ describe('BookingService creation', () => {
       booking.id,
       user.userId,
     );
+    expect(repository.createTimelineEntry).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        bookingId: booking.id,
+        status: BookingStatus.IN_PROGRESS,
+        note: expect.stringContaining('approved by customer'),
+      }),
+    );
     expect(queryCacheService.invalidate).toHaveBeenCalled();
   });
 
@@ -412,30 +423,41 @@ describe('BookingService creation', () => {
     await expect(service.approveRevision(user, booking.id)).rejects.toThrow();
   });
 
-  it('allows customer to reject price revision and cancels booking', async () => {
+  it('allows customer to reject price revision and reverts to IN_PROGRESS with original scope', async () => {
     repository.findCustomerByUserId.mockResolvedValue(customer as never);
     repository.findById.mockResolvedValue({
       id: booking.id,
       customerId: customer.id,
       status: BookingStatus.PRICE_REVISION_PENDING,
+      totalAmount: 100,
+      revisedAmount: 150,
+      additionalAmount: 50,
+      technician: { userId: 'tech-user-123' },
     } as never);
-    repository.updateLifecycleStatus.mockResolvedValue({
+    repository.rejectRevision.mockResolvedValue({
       id: booking.id,
-      status: BookingStatus.CANCELLED,
-      cancelReason: 'Customer rejected technician price revision',
+      status: BookingStatus.IN_PROGRESS,
+      totalAmount: 100,
+      revisedAmount: null,
+      additionalAmount: null,
     } as never);
 
     const result = await service.rejectRevision(user, booking.id);
 
-    expect(result.status).toBe(BookingStatus.CANCELLED);
-    expect(repository.updateLifecycleStatus).toHaveBeenCalledWith(
+    expect(result.status).toBe(BookingStatus.IN_PROGRESS);
+    expect(result.totalAmount).toBe(100);
+    expect(repository.rejectRevision).toHaveBeenCalledWith(
       expect.anything(),
       booking.id,
-      expect.objectContaining({
-        status: BookingStatus.CANCELLED,
-        cancelReason: 'Customer rejected technician price revision',
-      }),
       user.userId,
+    );
+    expect(repository.createTimelineEntry).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        bookingId: booking.id,
+        status: BookingStatus.IN_PROGRESS,
+        note: expect.stringContaining('declined by customer'),
+      }),
     );
     expect(queryCacheService.invalidate).toHaveBeenCalled();
   });

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -56,6 +57,40 @@ class _JobDetailsBody extends ConsumerStatefulWidget {
 
 class _JobDetailsBodyState extends ConsumerState<_JobDetailsBody> {
   bool _isUpdating = false;
+  Timer? _statusPollTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkStatusPoll();
+  }
+
+  @override
+  void didUpdateWidget(covariant _JobDetailsBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.job.status != widget.job.status) {
+      _checkStatusPoll();
+    }
+  }
+
+  @override
+  void dispose() {
+    _statusPollTimer?.cancel();
+    super.dispose();
+  }
+
+  void _checkStatusPoll() {
+    if (widget.job.status == 'PRICE_REVISION_PENDING') {
+      _statusPollTimer ??= Timer.periodic(const Duration(seconds: 4), (_) {
+        if (!mounted) return;
+        ref.invalidate(jobDetailsProvider(widget.job.id));
+        ref.invalidate(activeJobProvider);
+      });
+    } else {
+      _statusPollTimer?.cancel();
+      _statusPollTimer = null;
+    }
+  }
 
   String get _nextStatus {
     return switch (widget.job.status) {
@@ -453,6 +488,60 @@ class _JobDetailsBodyState extends ConsumerState<_JobDetailsBody> {
                             ),
                           ),
                         ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.base),
+                ],
+
+                // ── Additional Charge Approved Banner ─────────────
+                if (job.status == 'IN_PROGRESS' && job.customerConsentAt != null) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: AppColors.successLight,
+                      borderRadius: AppRadius.card,
+                      border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
+                            color: AppColors.success,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.check_rounded,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Additional Charge Approved ✅',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                  color: AppColors.success,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Customer approved additional charges. Revised total is ₹${job.totalAmount.toStringAsFixed(0)}. You may proceed with the work.',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),

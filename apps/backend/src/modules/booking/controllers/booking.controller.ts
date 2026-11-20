@@ -245,9 +245,15 @@ export class BookingController {
   }
 
   @Patch(':id/reject-revision')
-  @ApiOperation({ summary: 'Customer rejects technician price revision — booking is cancelled' })
+  @ApiOperation({
+    summary:
+      'Customer rejects technician price revision — job continues with original service scope',
+  })
   @ApiParam({ name: 'id', description: 'Booking id' })
-  @ApiResponse({ status: 200, description: 'Revision rejected, booking cancelled' })
+  @ApiResponse({
+    status: 200,
+    description: 'Revision rejected, technician proceeds with original scope',
+  })
   async rejectRevision(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.bookingService.rejectRevision(user, id);
   }

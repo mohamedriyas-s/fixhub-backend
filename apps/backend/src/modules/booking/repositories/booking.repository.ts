@@ -604,6 +604,21 @@ export class BookingRepository {
     });
   }
 
+  async rejectRevision(tx: PrismaTx, bookingId: string, actorUserId: string) {
+    return tx.booking.update({
+      where: { id: bookingId },
+      data: {
+        status: 'IN_PROGRESS',
+        revisedAmount: null,
+        additionalAmount: null,
+        priceRevisionDescription: null,
+        priceRevisionNote: null,
+        updatedBy: actorUserId,
+      },
+      include: this.bookingInclude(),
+    });
+  }
+
   findTechnicianProfileByUserId(userId: string) {
     return this.prisma.technician.findUnique({
       where: { userId },

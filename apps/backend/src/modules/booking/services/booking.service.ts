@@ -8,7 +8,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
-import { BookingStatus, Role } from '@prisma/client';
+import { BookingStatus, NotificationType, Role } from '@prisma/client';
 
 import { PrismaService } from '../../../common/database/prisma.service';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
@@ -20,6 +20,7 @@ import {
   AdminNotifType,
 } from '../../admin/services/admin-notification.service';
 import { NotificationService } from '../../notification/services/notification.service';
+import { TrackingGateway } from '../../tracking/tracking.gateway';
 import {
   AvailableSlotsQueryDto,
   BookingSummaryDto,
@@ -49,6 +50,7 @@ export class BookingService {
     private readonly prisma: PrismaService,
     @Optional() private readonly adminNotifService?: AdminNotificationService,
     @Optional() private readonly notificationService?: NotificationService,
+    @Optional() private readonly trackingGateway?: TrackingGateway,
   ) {}
 
   async listByUser(userId: string, role: string, pagination: PaginationDto) {
@@ -539,14 +541,22 @@ export class BookingService {
             userId: cust.user.id,
             title: 'Additional Charge Requested 💰',
             body: pushBody,
-            type: 'PRICE_REVISION',
-            payload: { bookingId: booking.id, screen: 'booking_detail' },
+            type: NotificationType.BOOKING_UPDATE,
+            payload: { bookingId: booking.id, screen: 'booking_detail', subType: 'PRICE_REVISION' },
           });
         }
       } catch (err: unknown) {
         this.logger.error(
           `Failed to send additional charge notification to customer: ${(err as Error)?.message ?? String(err)}`,
         );
+      }
+    }
+
+    if (this.trackingGateway) {
+      try {
+        this.trackingGateway.broadcastStatusUpdate(bookingId, BookingStatus.PRICE_REVISION_PENDING);
+      } catch (err) {
+        this.logger.warn(`Failed to broadcast status update for booking ${bookingId}: ${err}`);
       }
     }
 
@@ -585,9 +595,50 @@ export class BookingService {
       });
     }
 
-    const updated = await this.bookingRepository.transaction((tx) =>
-      this.bookingRepository.approveRevision(tx, bookingId, user.userId),
+    const additionalAmount = Number(
+      booking.additionalAmount ?? Number(booking.revisedAmount) - Number(booking.totalAmount),
     );
+
+    const updated = await this.bookingRepository.transaction(async (tx) => {
+      const b = await this.bookingRepository.approveRevision(tx, bookingId, user.userId);
+      await this.bookingRepository.createTimelineEntry(tx, {
+        bookingId,
+        status: BookingStatus.IN_PROGRESS,
+        changedByUserId: user.userId,
+        note: `Additional charge of ₹${additionalAmount.toFixed(0)} approved by customer. Revised total: ₹${Number(b.totalAmount).toFixed(0)}.`,
+      });
+      return b;
+    });
+
+    // Notify technician about approval
+    const techUserId = booking.technician?.userId;
+    if (techUserId && this.notificationService) {
+      try {
+        await this.notificationService.sendPushNotification({
+          userId: techUserId,
+          title: 'Additional Charge Approved ✅',
+          body: `Customer approved the additional charge of ₹${additionalAmount.toFixed(0)} for booking #${booking.bookingNumber}. You can proceed with the work.`,
+          type: NotificationType.BOOKING_UPDATE,
+          payload: {
+            bookingId: booking.id,
+            screen: 'job_detail',
+            subType: 'PRICE_REVISION_APPROVED',
+          },
+        });
+      } catch (err: unknown) {
+        this.logger.error(
+          `Failed to send additional charge approval notification to technician: ${(err as Error)?.message ?? String(err)}`,
+        );
+      }
+    }
+
+    if (this.trackingGateway) {
+      try {
+        this.trackingGateway.broadcastStatusUpdate(bookingId, BookingStatus.IN_PROGRESS);
+      } catch (err) {
+        this.logger.warn(`Failed to broadcast status update for booking ${bookingId}: ${err}`);
+      }
+    }
 
     await this.bookingQueryCacheService.invalidate();
     return updated;
@@ -611,17 +662,50 @@ export class BookingService {
       });
     }
 
-    const updated = await this.bookingRepository.transaction((tx) =>
-      this.bookingRepository.updateLifecycleStatus(
-        tx,
-        bookingId,
-        {
-          status: BookingStatus.CANCELLED,
-          cancelReason: 'Customer rejected technician price revision',
-        },
-        user.userId,
-      ),
+    const additionalAmount = Number(
+      booking.additionalAmount ?? Number(booking.revisedAmount) - Number(booking.totalAmount),
     );
+
+    const updated = await this.bookingRepository.transaction(async (tx) => {
+      const b = await this.bookingRepository.rejectRevision(tx, bookingId, user.userId);
+      await this.bookingRepository.createTimelineEntry(tx, {
+        bookingId,
+        status: BookingStatus.IN_PROGRESS,
+        changedByUserId: user.userId,
+        note: `Additional charge of ₹${additionalAmount.toFixed(0)} declined by customer. Technician to proceed with original service scope at ₹${Number(booking.totalAmount).toFixed(0)}.`,
+      });
+      return b;
+    });
+
+    // Notify technician about rejection
+    const techUserId = booking.technician?.userId;
+    if (techUserId && this.notificationService) {
+      try {
+        await this.notificationService.sendPushNotification({
+          userId: techUserId,
+          title: 'Additional Charge Declined ⚠️',
+          body: `Customer declined the additional charge of ₹${additionalAmount.toFixed(0)} for booking #${booking.bookingNumber}. Please proceed with the original service scope.`,
+          type: NotificationType.BOOKING_UPDATE,
+          payload: {
+            bookingId: booking.id,
+            screen: 'job_detail',
+            subType: 'PRICE_REVISION_REJECTED',
+          },
+        });
+      } catch (err: unknown) {
+        this.logger.error(
+          `Failed to send additional charge rejection notification to technician: ${(err as Error)?.message ?? String(err)}`,
+        );
+      }
+    }
+
+    if (this.trackingGateway) {
+      try {
+        this.trackingGateway.broadcastStatusUpdate(bookingId, BookingStatus.IN_PROGRESS);
+      } catch (err) {
+        this.logger.warn(`Failed to broadcast status update for booking ${bookingId}: ${err}`);
+      }
+    }
 
     await this.bookingQueryCacheService.invalidate();
     return updated;
