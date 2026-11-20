@@ -37,20 +37,21 @@ class TechnicianProfile {
   });
 
   factory TechnicianProfile.fromJson(Map<String, dynamic> json) {
-    final user = json['user'] as Map<String, dynamic>?;
+    final rawUser = json['user'];
+    final user = rawUser is Map ? Map<String, dynamic>.from(rawUser) : null;
     return TechnicianProfile(
-      id: json['id'] as String,
+      id: json['id']?.toString() ?? '',
       isAvailable: json['isAvailable'] as bool? ?? false,
       verificationStatus: json['verificationStatus'] as String? ?? 'PENDING',
-      rating: double.tryParse(json['rating'].toString()) ?? 0.0,
-      totalJobs: json['totalJobs'] as int? ?? 0,
+      rating: double.tryParse(json['rating']?.toString() ?? '') ?? 0.0,
+      totalJobs: int.tryParse(json['totalJobs']?.toString() ?? '') ?? 0,
       profilePictureUrl: json['profilePictureUrl'] as String?,
       name: user?['name'] as String?,
       phone: user?['phone'] as String?,
       email: user?['email'] as String?,
-      serviceAreas: json['serviceAreas'] as List<dynamic>? ?? [],
-      specializations: json['specializations'] as List<dynamic>? ?? [],
-      documents: json['documents'] as List<dynamic>? ?? [],
+      serviceAreas: (json['serviceAreas'] as List<dynamic>?) ?? const [],
+      specializations: (json['specializations'] as List<dynamic>?) ?? const [],
+      documents: (json['documents'] as List<dynamic>?) ?? const [],
     );
   }
 
@@ -73,7 +74,7 @@ class ProfileRepository {
 
   Future<TechnicianProfile> getProfile() async {
     final response = await _dio.get(ApiEndpoints.technicianProfile);
-    return TechnicianProfile.fromJson(_unwrapMap(response.data));
+    return TechnicianProfile.fromJson(unwrapMap(response.data));
   }
 
   Future<TechnicianProfile> updateAvailability(
@@ -89,7 +90,7 @@ class ProfileRepository {
         if (lng != null) 'longitude': lng,
       },
     );
-    return TechnicianProfile.fromJson(_unwrapMap(response.data));
+    return TechnicianProfile.fromJson(unwrapMap(response.data));
   }
 
   Future<TechnicianProfile> updateProfile({
@@ -105,7 +106,7 @@ class ProfileRepository {
         if (profilePictureUrl != null) 'profilePictureUrl': profilePictureUrl,
       },
     );
-    return TechnicianProfile.fromJson(_unwrapMap(response.data));
+    return TechnicianProfile.fromJson(unwrapMap(response.data));
   }
 
   Future<void> updateLocation(double latitude, double longitude) async {
@@ -138,7 +139,7 @@ class ProfileRepository {
   /// GET /technicians/specializations
   Future<List<dynamic>> getSpecializations() async {
     final response = await _dio.get(ApiEndpoints.technicianSpecializations);
-    final data = _unwrap(response.data);
+    final data = unwrap(response.data);
     if (data is List) return data;
     return [];
   }
@@ -146,22 +147,30 @@ class ProfileRepository {
   /// GET /technicians/service-areas
   Future<List<dynamic>> getServiceAreas() async {
     final response = await _dio.get(ApiEndpoints.technicianServiceAreas);
-    final data = _unwrap(response.data);
+    final data = unwrap(response.data);
     if (data is List) return data;
     return [];
   }
 
-  dynamic _unwrap(dynamic data) {
-    if (data is Map<String, dynamic> && data.containsKey('data')) {
-      return data['data'];
+  dynamic unwrap(dynamic data) {
+    if (data is Map) {
+      final map = Map<String, dynamic>.from(data);
+      if (map.containsKey('data')) {
+        return map['data'];
+      }
+      return map;
     }
     return data;
   }
 
-  Map<String, dynamic> _unwrapMap(dynamic data) {
-    if (data is Map<String, dynamic> && data.containsKey('data')) {
-      return data['data'] as Map<String, dynamic>;
+  Map<String, dynamic> unwrapMap(dynamic data) {
+    if (data is Map) {
+      final map = Map<String, dynamic>.from(data);
+      if (map.containsKey('data') && map['data'] is Map) {
+        return Map<String, dynamic>.from(map['data'] as Map);
+      }
+      return map;
     }
-    return data as Map<String, dynamic>;
+    return <String, dynamic>{};
   }
 }

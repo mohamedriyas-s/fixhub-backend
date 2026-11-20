@@ -10,7 +10,6 @@ import '../../../core/widgets/fp_card.dart';
 import '../../../core/widgets/fp_status_chip.dart';
 import '../../../core/widgets/fp_availability_toggle.dart';
 import '../../../core/widgets/fp_skeleton.dart';
-import '../../../core/widgets/fp_offline_banner.dart';
 import '../../auth/presentation/auth_provider.dart';
 import '../../auth/domain/auth_state.dart';
 import '../../profile/presentation/profile_provider.dart';
@@ -90,6 +89,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     final user = authState is AuthAuthenticated ? authState.user : null;
     final profile = profileAsync.value;
+
+    final technicianName = (profile?.name != null && profile!.name!.trim().isNotEmpty)
+        ? profile.name!.trim()
+        : ((user?.name != null && user!.name!.trim().isNotEmpty)
+            ? user.name!.trim()
+            : 'Technician');
+
+    final technicianPhone = (profile?.phone != null && profile!.phone!.trim().isNotEmpty)
+        ? profile.phone!.trim()
+        : (user != null && user.phone.trim().isNotEmpty
+            ? user.phone.trim()
+            : '');
 
     // Listen for newly assigned jobs and notify the technician immediately with an in-app banner
     ref.listen<int>(assignedJobsCountProvider, (previous, current) {
@@ -188,22 +199,36 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
                   child: Row(
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _greeting(),
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            user?.displayName ?? 'Technician',
-                            style: Theme.of(context).textTheme.headlineMedium
-                                ?.copyWith(fontWeight: FontWeight.w700),
-                          ),
-                        ],
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              technicianName,
+                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                                letterSpacing: -0.3,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (technicianPhone.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                technicianPhone,
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w400,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
-                      const Spacer(),
+                      const SizedBox(width: AppSpacing.md),
                       // Notifications
                       Stack(
                         children: [
@@ -395,13 +420,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ),
       ),
     );
-  }
-
-  String _greeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
   }
 
   String _fmt(double val) {

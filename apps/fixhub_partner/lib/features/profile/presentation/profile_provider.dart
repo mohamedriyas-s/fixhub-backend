@@ -68,13 +68,19 @@ class ProfileNotifier extends AsyncNotifier<TechnicianProfile?> {
     }
   }
 
-  Future<void> updateProfile({String? name, String? email, String? profilePictureUrl}) async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _repository.updateProfile(
-      name: name,
-      email: email,
-      profilePictureUrl: profilePictureUrl,
-    ));
+  Future<TechnicianProfile> updateProfile({String? name, String? email, String? profilePictureUrl}) async {
+    try {
+      final updated = await _repository.updateProfile(
+        name: name,
+        email: email,
+        profilePictureUrl: profilePictureUrl,
+      );
+      state = AsyncValue.data(updated);
+      return updated;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
   }
 }
 

@@ -9,6 +9,7 @@ import '../../../core/widgets/fp_skeleton.dart';
 import '../../../core/widgets/fp_offline_banner.dart';
 import '../../../core/widgets/fp_button.dart';
 import '../../auth/presentation/auth_provider.dart';
+import '../../../core/error/failures.dart';
 import 'profile_provider.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -185,16 +186,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     onSave: () async {
                       setState(() => _isSaving = true);
                       try {
-                        await ref.read(profileProvider.notifier).updateProfile(
+                        final updated = await ref.read(profileProvider.notifier).updateProfile(
                           name: _nameController.text.trim().isNotEmpty
                               ? _nameController.text.trim()
                               : null,
-                              email: _emailController.text.trim().isNotEmpty
-                                  ? _emailController.text.trim()
-                                  : null,
-                            );
-                        await ref.read(profileProvider.notifier).load();
+                          email: _emailController.text.trim().isNotEmpty
+                              ? _emailController.text.trim()
+                              : null,
+                        );
+                        // Synchronize updated user info into authProvider
+                        ref.read(authProvider.notifier).updateUser(
+                          name: updated.name,
+                          email: updated.email,
+                        );
                         if (mounted) {
+                          _nameController.text = updated.name ?? '';
+                          _emailController.text = updated.email ?? '';
                           setState(() => _isEditing = false);
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
@@ -205,8 +212,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       } catch (e) {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Failed to update profile'),
+                            SnackBar(
+                              content: Text(
+                                e is Failure ? e.message : 'Failed to update profile',
+                              ),
                               backgroundColor: AppColors.error,
                             ),
                           );
@@ -611,9 +620,12 @@ class _SpecializationsCard extends StatelessWidget {
               spacing: AppSpacing.sm,
               runSpacing: AppSpacing.sm,
               children: specs.map((s) {
-                final name = (s is Map<String, dynamic>)
-                    ? (s['subService']?['name'] ?? s['name'] ?? '')
-                    : s.toString();
+                final Map<String, dynamic>? specMap =
+                    s is Map ? Map<String, dynamic>.from(s) : null;
+                final subService = specMap?['subService'] is Map
+                    ? Map<String, dynamic>.from(specMap!['subService'] as Map)
+                    : null;
+                final name = subService?['name'] ?? specMap?['name'] ?? s.toString();
                 return Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -709,9 +721,15 @@ class _ServiceAreasCard extends StatelessWidget {
               spacing: AppSpacing.sm,
               runSpacing: AppSpacing.sm,
               children: areas.map((a) {
-                final name = (a is Map<String, dynamic>)
-                    ? (a['city'] ?? a['name'] ?? '')
-                    : a.toString();
+                final Map<String, dynamic>? areaMap =
+                    a is Map ? Map<String, dynamic>.from(a) : null;
+                final serviceArea = areaMap?['serviceArea'] is Map
+                    ? Map<String, dynamic>.from(areaMap!['serviceArea'] as Map)
+                    : null;
+                final name = serviceArea?['name'] ??
+                    areaMap?['city'] ??
+                    areaMap?['name'] ??
+                    a.toString();
                 return Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
