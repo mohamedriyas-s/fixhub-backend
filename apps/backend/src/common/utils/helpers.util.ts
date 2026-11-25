@@ -3,13 +3,13 @@ import * as crypto from 'crypto';
 /**
  * Generate a random numeric OTP of specified length
  */
-export function generateOtp(length: number = 6): string {
-  const digits = '0123456789';
+export function generateOtp(length: number = 4): string {
   let otp = '';
-  const bytes = crypto.randomBytes(length);
+
   for (let i = 0; i < length; i++) {
-    otp += digits[bytes[i] % 10];
+    otp += crypto.randomInt(0, 10).toString();
   }
+
   return otp;
 }
 

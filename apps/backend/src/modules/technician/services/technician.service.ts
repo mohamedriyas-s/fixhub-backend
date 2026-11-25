@@ -1,13 +1,17 @@
 import { ErrorCodes } from '@fixhub/shared';
-import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
-
-import { UpdateAvailabilityDto, UpdateLocationDto, UpdateProfileDto } from '../dto';
-import { TechnicianRepository } from '../repositories/technician.repository';
-import { TrackingGateway } from '../../tracking/tracking.gateway';
-import { PrismaService } from '../../../common/database/prisma.service';
-
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
+import { PrismaService } from '../../../common/database/prisma.service';
+import { TrackingGateway } from '../../tracking/tracking.gateway';
+import { UpdateAvailabilityDto, UpdateLocationDto, UpdateProfileDto } from '../dto';
+import { TechnicianRepository } from '../repositories/technician.repository';
 import { TechnicianHeartbeatService } from './technician-heartbeat.service';
 
 @Injectable()
@@ -30,6 +34,12 @@ export class TechnicianService {
         errorCode: ErrorCodes.TECHNICIAN_NOT_FOUND,
       });
     }
+
+    // If technician is currently marked available, refresh heartbeat on active read
+    if (technician.isAvailable) {
+      await this.heartbeatService.ping(technician.id);
+    }
+
     return technician;
   }
 
@@ -82,7 +92,11 @@ export class TechnicianService {
 
   async updateLocation(userId: string, dto: UpdateLocationDto) {
     const technicianId = await this.resolveTechnicianId(userId);
-    const updated = await this.technicianRepository.updateLocation(userId, dto.latitude, dto.longitude);
+    const updated = await this.technicianRepository.updateLocation(
+      userId,
+      dto.latitude,
+      dto.longitude,
+    );
 
     // Update heartbeat TTL
     await this.heartbeatService.ping(technicianId);

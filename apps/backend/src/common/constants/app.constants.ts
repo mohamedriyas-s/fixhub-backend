@@ -13,6 +13,7 @@ export const TIME_SLOTS = [
   '14:00-16:00',
   '16:00-18:00',
   '18:00-20:00',
+  '19:00-21:00',
 ] as const;
 
 export const BOOKING_NUMBER_PREFIX = 'FH';

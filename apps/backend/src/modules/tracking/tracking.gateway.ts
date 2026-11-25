@@ -60,10 +60,9 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
       // Full signature verification is handled by the HTTP JWT guard.
       // For WS we decode without verify to avoid adding a full JWT dep here;
       // the client must already be authenticated via HTTP to know a valid booking ID.
-      const payload = JSON.parse(
-        Buffer.from(token.split('.')[1], 'base64url').toString('utf8'),
-      );
+      const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
       client.data.userId = payload.sub ?? payload.userId;
+      client.join(`user:${client.data.userId}`);
       this.logger.log(`WS connected: ${client.id} (user: ${client.data.userId})`);
     } catch {
       this.logger.warn(`WS rejected — invalid token (${client.id})`);
@@ -137,6 +136,16 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.server.to(this.roomName(bookingId)).emit('status:update', {
       bookingId,
       status,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * Broadcast a new notification to a specific user over WebSocket in real time.
+   */
+  broadcastNotification(userId: string, data: Record<string, unknown>): void {
+    this.server.to(`user:${userId}`).emit('notification:new', {
+      ...data,
       timestamp: new Date().toISOString(),
     });
   }

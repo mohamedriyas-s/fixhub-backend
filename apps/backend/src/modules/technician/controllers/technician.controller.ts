@@ -6,7 +6,11 @@ import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { AuthenticatedUser } from '../../../common/interfaces/auth.interface';
-import { ProposeAdditionalChargeDto, ProposeRevisionDto } from '../../booking/dto';
+import {
+  FinalizeAmountDto,
+  ProposeAdditionalChargeDto,
+  ProposeRevisionDto,
+} from '../../booking/dto';
 import { BookingService } from '../../booking/services/booking.service';
 import {
   AddSpecializationsDto,
@@ -81,7 +85,8 @@ export class TechnicianController {
   @Post('heartbeat')
   @ApiOperation({ summary: 'Ping the heartbeat to stay available' })
   async pingHeartbeat(@CurrentUser() user: AuthenticatedUser) {
-    await this.heartbeatService.ping(user.userId);
+    const technicianId = await this.technicianService.resolveTechnicianId(user.userId);
+    await this.heartbeatService.ping(technicianId);
     return { success: true };
   }
 
@@ -301,5 +306,27 @@ export class TechnicianController {
     @Body() dto: ProposeRevisionDto,
   ) {
     return this.bookingService.proposeRevision(user, id, dto);
+  }
+
+  @Post('jobs/:id/finalize-amount')
+  @ApiOperation({
+    summary: 'Technician finalizes final additional amount and payment method (Cash or Online)',
+  })
+  @ApiParam({ name: 'id', description: 'Booking ID' })
+  async finalizeAmount(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: FinalizeAmountDto,
+  ) {
+    return this.bookingService.finalizeAmount(user, id, dto);
+  }
+
+  @Post('jobs/:id/depart-next-slot')
+  @ApiOperation({
+    summary: 'Technician leaves for next scheduled slot before customer pays online',
+  })
+  @ApiParam({ name: 'id', description: 'Booking ID' })
+  async departNextSlot(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.bookingService.departNextSlot(user, id);
   }
 }
