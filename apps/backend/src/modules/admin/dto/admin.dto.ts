@@ -1,9 +1,21 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { CouponType, VerificationStatus, PaymentStatus } from '@prisma/client';
+import { CouponType, PaymentStatus, VerificationStatus } from '@prisma/client';
 import { Transform, Type } from 'class-transformer';
 import {
-  IsBoolean, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID,
-  MaxLength, Min, IsEmail, IsPhoneNumber, IsDateString, IsPositive,
+  IsBoolean,
+  IsDateString,
+  IsEmail,
+  IsEnum,
+  IsIn,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsPhoneNumber,
+  IsPositive,
+  IsString,
+  IsUUID,
+  MaxLength,
+  Min,
 } from 'class-validator';
 
 import { PaginationDto } from '../../../common/dto/pagination.dto';
@@ -11,7 +23,9 @@ import { PaginationDto } from '../../../common/dto/pagination.dto';
 export class CustomerQueryDto extends PaginationDto {
   @ApiPropertyOptional({ example: true })
   @IsOptional()
-  @Transform(({ obj, key }) => obj[key] === 'true' ? true : obj[key] === 'false' ? false : obj[key])
+  @Transform(({ obj, key }) =>
+    obj[key] === 'true' ? true : obj[key] === 'false' ? false : obj[key],
+  )
   @IsBoolean()
   isActive?: boolean;
 }
@@ -24,13 +38,17 @@ export class TechnicianQueryDto extends PaginationDto {
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
-  @Transform(({ obj, key }) => obj[key] === 'true' ? true : obj[key] === 'false' ? false : obj[key])
+  @Transform(({ obj, key }) =>
+    obj[key] === 'true' ? true : obj[key] === 'false' ? false : obj[key],
+  )
   @IsBoolean()
   isAvailable?: boolean;
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()
-  @Transform(({ obj, key }) => obj[key] === 'true' ? true : obj[key] === 'false' ? false : obj[key])
+  @Transform(({ obj, key }) =>
+    obj[key] === 'true' ? true : obj[key] === 'false' ? false : obj[key],
+  )
   @IsBoolean()
   isActive?: boolean;
 }
@@ -151,7 +169,9 @@ export class UpdateCustomerDetailsDto {
 }
 
 export class NotifyCustomerDto {
-  @ApiProperty({ example: 'Please complete your profile to get personalized service recommendations.' })
+  @ApiProperty({
+    example: 'Please complete your profile to get personalized service recommendations.',
+  })
   @IsString()
   @MaxLength(500)
   message!: string;
@@ -360,7 +380,9 @@ export class UpdateCouponDto {
 export class CouponQueryDto extends PaginationDto {
   @ApiPropertyOptional({ example: true })
   @IsOptional()
-  @Transform(({ obj, key }) => obj[key] === 'true' ? true : obj[key] === 'false' ? false : obj[key])
+  @Transform(({ obj, key }) =>
+    obj[key] === 'true' ? true : obj[key] === 'false' ? false : obj[key],
+  )
   @IsBoolean()
   isActive?: boolean;
 }

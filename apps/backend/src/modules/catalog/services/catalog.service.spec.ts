@@ -2,8 +2,8 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 
 import { CatalogRepository } from '../repositories/catalog.repository';
-import { CatalogCacheService } from './catalog-cache.service';
 import { CatalogService } from './catalog.service';
+import { CatalogCacheService } from './catalog-cache.service';
 
 describe('CatalogService', () => {
   let service: CatalogService;

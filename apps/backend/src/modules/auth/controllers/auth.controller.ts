@@ -11,17 +11,10 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
-import { Response } from 'express';
-import {
-  ApiBearerAuth,
-  ApiBody,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
-import { Request } from 'express';
-
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import { Request, Response } from 'express';
+
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Public } from '../../../common/decorators/public.decorator';
 import { AuthenticatedUser } from '../../../common/interfaces/auth.interface';
@@ -47,7 +40,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Send OTP to phone number',
-    description: 'Sends a 6-digit OTP to the provided phone number. Rate limited to 1 request per 60 seconds per phone.',
+    description:
+      'Sends a 6-digit OTP to the provided phone number. Rate limited to 1 request per 60 seconds per phone.',
   })
   @ApiResponse({ status: 200, description: 'OTP sent successfully' })
   @ApiResponse({ status: 400, description: 'Invalid phone number' })
@@ -64,7 +58,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Verify OTP and authenticate',
-    description: 'Verifies the OTP and returns access/refresh tokens. Creates a new user if first login.',
+    description:
+      'Verifies the OTP and returns access/refresh tokens. Creates a new user if first login.',
   })
   @ApiResponse({
     status: 200,
@@ -123,14 +118,15 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Refresh access token',
-    description: 'Exchanges a valid refresh token for a new access/refresh token pair. Old refresh token is invalidated (rotation).',
+    description:
+      'Exchanges a valid refresh token for a new access/refresh token pair. Old refresh token is invalidated (rotation).',
   })
   @ApiResponse({ status: 200, description: 'New token pair issued' })
   @ApiResponse({ status: 401, description: 'Invalid, expired, or reused refresh token' })
   async refreshTokens(
     @Body() dto: RefreshTokenDto,
     @Req() req: Request,
-    @Res({ passthrough: true }) res: Response
+    @Res({ passthrough: true }) res: Response,
   ) {
     let token = dto.refreshToken;
     if (!token && req.cookies?.refreshToken) {
@@ -142,7 +138,7 @@ export class AuthController {
     }
 
     const result = await this.authService.refreshTokens(token);
-    
+
     // Set HttpOnly cookies for web admin
     res.cookie('accessToken', result.accessToken, {
       httpOnly: true,
@@ -170,7 +166,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Logout',
-    description: 'Revokes all refresh tokens, blacklists the current access token, and deactivates device tokens.',
+    description:
+      'Revokes all refresh tokens, blacklists the current access token, and deactivates device tokens.',
   })
   @ApiResponse({ status: 200, description: 'Logged out successfully' })
   @ApiResponse({ status: 401, description: 'Not authenticated' })
@@ -189,7 +186,7 @@ export class AuthController {
     if (!accessToken && req.cookies?.accessToken) {
       accessToken = req.cookies.accessToken;
     }
-    
+
     return this.authService.logout(user.userId, accessToken);
   }
 
@@ -218,10 +215,7 @@ export class AuthController {
   })
   @ApiResponse({ status: 200, description: 'Device registered' })
   @ApiResponse({ status: 401, description: 'Not authenticated' })
-  async registerDevice(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: RegisterDeviceDto,
-  ) {
+  async registerDevice(@CurrentUser() user: AuthenticatedUser, @Body() dto: RegisterDeviceDto) {
     if (!dto.deviceToken || !dto.platform) {
       return { message: 'No device token provided — skipped' };
     }

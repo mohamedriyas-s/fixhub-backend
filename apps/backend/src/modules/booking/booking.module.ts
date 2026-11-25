@@ -10,18 +10,25 @@ import { TrackingModule } from '../tracking/tracking.module';
 import { AdminBookingController } from './controllers/admin-booking.controller';
 import { BookingController } from './controllers/booking.controller';
 import { BookingStateMachineService } from './lifecycle/booking-state-machine.service';
-import { BookingMediaRepository } from './repositories/booking-media.repository';
 import { BookingRepository } from './repositories/booking.repository';
+import { BookingMediaRepository } from './repositories/booking-media.repository';
+import { BookingService } from './services/booking.service';
 import { BookingDispatchService } from './services/booking-dispatch.service';
 import { BookingLifecycleService } from './services/booking-lifecycle.service';
 import { BookingLockService } from './services/booking-lock.service';
 import { BookingMediaService } from './services/booking-media.service';
-import { BookingQueryCacheService } from './services/booking-query-cache.service';
 import { BookingQueryService } from './services/booking-query.service';
-import { BookingService } from './services/booking.service';
+import { BookingQueryCacheService } from './services/booking-query-cache.service';
 
 @Module({
-  imports: [PrismaModule, RedisModule, StorageModule, NotificationModule, TrackingModule, AdminModule],
+  imports: [
+    PrismaModule,
+    RedisModule,
+    StorageModule,
+    NotificationModule,
+    TrackingModule,
+    AdminModule,
+  ],
   controllers: [BookingController, AdminBookingController],
   providers: [
     BookingService,
@@ -41,4 +48,3 @@ import { BookingService } from './services/booking.service';
   exports: [BookingService, BookingLifecycleService, BookingDispatchService],
 })
 export class BookingModule {}
-

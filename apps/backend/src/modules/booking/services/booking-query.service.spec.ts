@@ -3,8 +3,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BookingStatus, Role } from '@prisma/client';
 
 import { BookingRepository } from '../repositories/booking.repository';
-import { BookingQueryCacheService } from './booking-query-cache.service';
 import { BookingQueryService } from './booking-query.service';
+import { BookingQueryCacheService } from './booking-query-cache.service';
 
 describe('BookingQueryService', () => {
   let service: BookingQueryService;

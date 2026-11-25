@@ -33,6 +33,13 @@ export class OtpService {
     this.cooldownSeconds = 60;
   }
 
+  private isSimulationMode(): boolean {
+    const isProd = this.configService.get<string>('nodeEnv') === 'production';
+    const hasSmsKey = !!this.configService.get<string>('sms.apiKey');
+    const smsProvider = this.configService.get<string>('sms.provider') || 'DEV';
+    return !isProd || !hasSmsKey || smsProvider === 'DEV';
+  }
+
   /**
    * Generate and store a new OTP for the given phone number.
    *
@@ -85,21 +92,21 @@ export class OtpService {
     const otp = generateOtp(this.otpLength);
     const hashedOtp = hashString(otp);
 
-    // Atomic pipeline to set OTP, reset attempts, set cooldown, and store dev OTP if not prod
+    // Atomic pipeline to set OTP, reset attempts, set cooldown, and store dev OTP if in simulation
     const client = this.redisService.getClient();
     const pipeline = client.pipeline();
     pipeline.set(otpKey, hashedOtp, 'EX', this.otpExpiration);
     pipeline.del(attemptsKey);
     pipeline.set(cooldownKey, '1', 'EX', this.cooldownSeconds);
 
-    if (this.configService.get<string>('nodeEnv') !== 'production') {
+    if (this.isSimulationMode()) {
       pipeline.set(`dev_otp:${phone}`, otp, 'EX', this.otpExpiration);
     }
     await pipeline.exec();
 
-    // Dev-only logging — remove in production
-    if (this.configService.get<string>('nodeEnv') !== 'production') {
-      this.logger.debug(`[DEV] OTP for ${phone}: ${otp}`);
+    // Dev-only / Simulation logging
+    if (this.isSimulationMode()) {
+      this.logger.log(`[DEV/SIMULATION] OTP for ${phone}: ${otp}`);
     }
 
     return {
@@ -110,10 +117,10 @@ export class OtpService {
   }
 
   /**
-   * Get dev OTP if in non-production environment
+   * Get dev OTP if in non-production or simulation environment
    */
   async getDevOtp(phone: string): Promise<string | null> {
-    if (this.configService.get<string>('nodeEnv') === 'production') {
+    if (!this.isSimulationMode()) {
       return null;
     }
     return this.redisService.get(`dev_otp:${phone}`);

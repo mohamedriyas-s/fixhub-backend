@@ -115,85 +115,137 @@ function cleanPrivateKey(val?: string): string | undefined {
   return str.replace(/\\n/g, '\n');
 }
 
-export const appConfig = () => ({
-  port: parseInt(process.env.APP_PORT || '3000', 10),
-  nodeEnv: process.env.NODE_ENV || 'development',
-  apiPrefix: process.env.API_PREFIX || 'api',
-  apiVersion: process.env.API_VERSION || 'v1',
+function parseRedisConfig(
+  rawHost?: string,
+  rawPort?: string | number,
+  rawPassword?: string,
+  rawUrl?: string,
+) {
+  let host = (rawHost as string) || 'localhost';
+  let port = typeof rawPort === 'number' ? rawPort : parseInt((rawPort as string) || '6379', 10);
+  let password = (rawPassword as string) || undefined;
 
-  database: {
-    url: process.env.DATABASE_URL,
-  },
+  const candidateUrl = rawUrl || process.env.REDIS_URL || (host.includes('://') ? host : undefined);
+  if (candidateUrl) {
+    try {
+      const u = new URL(candidateUrl);
+      if (u.hostname) host = u.hostname;
+      if (u.port) port = parseInt(u.port, 10);
+      if (u.password) password = decodeURIComponent(u.password);
+    } catch {
+      // Invalid URL format — fallback to host/port as provided
+    }
+  }
 
-  redis: {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379', 10),
-    password: process.env.REDIS_PASSWORD || undefined,
-  },
+  // Guard against any leftover protocol or :port in host
+  if (host.includes('://')) {
+    host = host.split('://')[1];
+  }
+  if (host.includes(':')) {
+    const parts = host.split(':');
+    host = parts[0];
+    if (!isNaN(parseInt(parts[1], 10))) {
+      port = parseInt(parts[1], 10);
+    }
+  }
+  if (host.includes('/')) {
+    host = host.split('/')[0];
+  }
 
-  jwt: {
-    accessSecret: process.env.JWT_ACCESS_SECRET,
-    accessExpiration: process.env.JWT_ACCESS_EXPIRATION || '15m',
-    refreshSecret: process.env.JWT_REFRESH_SECRET,
-    refreshExpiration: process.env.JWT_REFRESH_EXPIRATION || '7d',
-  },
+  return { host, port, password };
+}
 
-  otp: {
-    expirationSeconds: parseInt(process.env.OTP_EXPIRATION_SECONDS || '300', 10),
-    length: parseInt(process.env.OTP_LENGTH || '6', 10),
-  },
+export const appConfig = () => {
+  const redis = parseRedisConfig(
+    process.env.REDIS_HOST,
+    process.env.REDIS_PORT,
+    process.env.REDIS_PASSWORD,
+    process.env.REDIS_URL,
+  );
 
-  aws: {
-    region: process.env.AWS_REGION || 'ap-south-1',
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    s3Bucket: process.env.AWS_S3_BUCKET || 'fixhub-uploads',
-    signedUrlExpiry: parseInt(process.env.AWS_S3_SIGNED_URL_EXPIRY || '3600', 10),
-  },
+  return {
+    port: parseInt(process.env.PORT || process.env.APP_PORT || '3000', 10),
+    nodeEnv: process.env.NODE_ENV || 'development',
+    apiPrefix: process.env.API_PREFIX || 'api',
+    apiVersion: process.env.API_VERSION || 'v1',
 
-  razorpay: {
-    keyId: process.env.RAZORPAY_KEY_ID,
-    keySecret: process.env.RAZORPAY_KEY_SECRET,
-    webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
-  },
+    database: {
+      url: process.env.DATABASE_URL,
+    },
 
-  firebase: {
-    projectId: cleanEnvString(process.env.FIREBASE_PROJECT_ID),
-    privateKey: cleanPrivateKey(process.env.FIREBASE_PRIVATE_KEY),
-    clientEmail: cleanEnvString(process.env.FIREBASE_CLIENT_EMAIL),
-  },
+    redis,
 
-  sms: {
-    provider: cleanEnvString(process.env.SMS_PROVIDER) || 'DEV',
-    apiKey: cleanEnvString(process.env.SMS_API_KEY),
-    senderId: cleanEnvString(process.env.SMS_SENDER_ID) || 'FIXHUB',
-  },
+    jwt: {
+      accessSecret: process.env.JWT_ACCESS_SECRET,
+      accessExpiration: process.env.JWT_ACCESS_EXPIRATION || '15m',
+      refreshSecret: process.env.JWT_REFRESH_SECRET,
+      refreshExpiration: process.env.JWT_REFRESH_EXPIRATION || '7d',
+    },
 
-  cors: {
-    origins: (
-      process.env.CORS_ORIGINS || 'http://localhost:3001,https://fixhub-admin-neon.vercel.app'
-    )
-      .split(',')
-      .map((origin) => origin.trim())
-      .filter(Boolean),
-  },
+    otp: {
+      expirationSeconds: parseInt(process.env.OTP_EXPIRATION_SECONDS || '300', 10),
+      length: parseInt(process.env.OTP_LENGTH || '6', 10),
+    },
 
-  throttle: {
-    ttl: parseInt(process.env.THROTTLE_TTL || '60', 10),
-    limit: parseInt(process.env.THROTTLE_LIMIT || '100', 10),
-  },
-});
+    aws: {
+      region: process.env.AWS_REGION || 'ap-south-1',
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      s3Bucket: process.env.AWS_S3_BUCKET || 'fixhub-uploads',
+      signedUrlExpiry: parseInt(process.env.AWS_S3_SIGNED_URL_EXPIRY || '3600', 10),
+    },
+
+    razorpay: {
+      keyId: process.env.RAZORPAY_KEY_ID,
+      keySecret: process.env.RAZORPAY_KEY_SECRET,
+      webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
+    },
+
+    firebase: {
+      projectId: cleanEnvString(process.env.FIREBASE_PROJECT_ID),
+      privateKey: cleanPrivateKey(process.env.FIREBASE_PRIVATE_KEY),
+      clientEmail: cleanEnvString(process.env.FIREBASE_CLIENT_EMAIL),
+    },
+
+    sms: {
+      provider: cleanEnvString(process.env.SMS_PROVIDER) || 'DEV',
+      apiKey: cleanEnvString(process.env.SMS_API_KEY),
+      senderId: cleanEnvString(process.env.SMS_SENDER_ID) || 'FIXHUB',
+    },
+
+    cors: {
+      origins: (
+        process.env.CORS_ORIGINS || 'http://localhost:3001,https://fixhub-admin-neon.vercel.app'
+      )
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean),
+    },
+
+    throttle: {
+      ttl: parseInt(process.env.THROTTLE_TTL || '60', 10),
+      limit: parseInt(process.env.THROTTLE_LIMIT || '100', 10),
+    },
+  };
+};
 
 export type AppConfigValues = ReturnType<typeof appConfig>;
 
 export function validateConfig(config: Record<string, unknown>): AppConfig {
+  const redis = parseRedisConfig(
+    config.REDIS_HOST as string,
+    config.REDIS_PORT as string | number,
+    config.REDIS_PASSWORD as string,
+    (config.REDIS_URL as string) || (process.env.REDIS_URL as string),
+  );
+
   const validatedConfig = plainToInstance(AppConfig, {
     NODE_ENV: config.NODE_ENV || 'development',
-    APP_PORT: config.APP_PORT || 3000,
+    APP_PORT: config.PORT ? parseInt(config.PORT as string, 10) : config.APP_PORT || 3000,
     DATABASE_URL: config.DATABASE_URL,
-    REDIS_HOST: config.REDIS_HOST || 'localhost',
-    REDIS_PORT: config.REDIS_PORT || 6379,
-    REDIS_PASSWORD: config.REDIS_PASSWORD,
+    REDIS_HOST: redis.host,
+    REDIS_PORT: redis.port,
+    REDIS_PASSWORD: redis.password,
     JWT_ACCESS_SECRET: config.JWT_ACCESS_SECRET,
     JWT_ACCESS_EXPIRATION: config.JWT_ACCESS_EXPIRATION || '15m',
     JWT_REFRESH_SECRET: config.JWT_REFRESH_SECRET,

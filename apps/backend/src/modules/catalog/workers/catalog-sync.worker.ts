@@ -1,6 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
+
 import { PrismaService } from '../../../common/database/prisma.service';
 import { QUEUE_NAMES } from '../../../common/queue/queue.constants';
 
@@ -32,8 +33,8 @@ export class CatalogSyncWorker extends WorkerHost {
 
     if (!technician) return;
 
-    const subServiceIds = technician.specializations.map(s => s.subServiceId);
-    const serviceAreaIds = technician.serviceAreas.map(a => a.serviceAreaId);
+    const subServiceIds = technician.specializations.map((s) => s.subServiceId);
+    const serviceAreaIds = technician.serviceAreas.map((a) => a.serviceAreaId);
 
     if (subServiceIds.length === 0 || serviceAreaIds.length === 0) {
       return;

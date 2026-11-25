@@ -6,8 +6,8 @@ import { AdminModule } from '../admin/admin.module';
 import { AdminServiceAreaController } from './controllers/admin-service-area.controller';
 import { ServiceAreaController } from './controllers/service-area.controller';
 import { ServiceAreaRepository } from './repositories/service-area.repository';
-import { ServiceAreaCacheService } from './services/service-area-cache.service';
 import { ServiceAreaService } from './services/service-area.service';
+import { ServiceAreaCacheService } from './services/service-area-cache.service';
 
 @Module({
   imports: [PrismaModule, RedisModule, AdminModule],
@@ -16,4 +16,3 @@ import { ServiceAreaService } from './services/service-area.service';
   exports: [ServiceAreaService],
 })
 export class ServiceAreaModule {}
-

@@ -64,11 +64,13 @@ export class AuthService {
       this.logger.error(`Failed to enqueue SMS to ${dto.phone}`, err);
     }
 
+    const devOtp = await this.otpService.getDevOtp(dto.phone);
+
     return {
       message: 'OTP sent successfully',
       expiresInSeconds,
       cooldownSeconds: 60,
-      devOtp: process.env.NODE_ENV !== 'production' ? otp : undefined,
+      devOtp: devOtp ?? undefined,
     };
   }
 

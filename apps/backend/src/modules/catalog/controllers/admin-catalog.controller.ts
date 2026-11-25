@@ -1,24 +1,18 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiParam,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { AuthenticatedUser } from '../../../common/interfaces/auth.interface';
 import {
+  CategoryQueryDto,
   CreateCategoryDto,
   CreateServiceDto,
+  ServiceQueryDto,
   UpdateCategoryDto,
   UpdatePricingDto,
   UpdateServiceDto,
-  CategoryQueryDto,
-  ServiceQueryDto,
 } from '../dto';
 import { CatalogService } from '../services/catalog.service';
 
@@ -47,10 +41,7 @@ export class AdminCatalogController {
   @Post('categories')
   @ApiOperation({ summary: 'Create service category' })
   @ApiResponse({ status: 201, description: 'Category created' })
-  createCategory(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: CreateCategoryDto,
-  ) {
+  createCategory(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateCategoryDto) {
     return this.catalogService.createCategory(dto, user.userId);
   }
 
@@ -92,10 +83,7 @@ export class AdminCatalogController {
   @Post('services')
   @ApiOperation({ summary: 'Create sub service' })
   @ApiResponse({ status: 201, description: 'Service created' })
-  createService(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: CreateServiceDto,
-  ) {
+  createService(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateServiceDto) {
     return this.catalogService.createService(dto, user.userId);
   }
 

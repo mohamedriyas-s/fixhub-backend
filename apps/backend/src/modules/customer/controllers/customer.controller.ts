@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Put, Post, Delete, Param } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation,ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
@@ -22,10 +22,7 @@ export class CustomerController {
 
   @Put('profile')
   @ApiOperation({ summary: 'Update customer profile' })
-  async updateProfile(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() body: any,
-  ) {
+  async updateProfile(@CurrentUser() user: AuthenticatedUser, @Body() body: any) {
     return this.customerService.updateProfile(user.userId, body);
   }
 
@@ -37,10 +34,7 @@ export class CustomerController {
 
   @Post('addresses')
   @ApiOperation({ summary: 'Add a new address' })
-  async addAddress(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() data: any,
-  ) {
+  async addAddress(@CurrentUser() user: AuthenticatedUser, @Body() data: any) {
     return this.customerService.addAddress(user.userId, data);
   }
 
@@ -56,10 +50,7 @@ export class CustomerController {
 
   @Delete('addresses/:id')
   @ApiOperation({ summary: 'Delete an address' })
-  async deleteAddress(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-  ) {
+  async deleteAddress(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.customerService.deleteAddress(user.userId, id);
   }
 }

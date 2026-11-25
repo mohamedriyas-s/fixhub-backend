@@ -1,18 +1,12 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiParam,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 
 import { Roles } from '../../../common/decorators/roles.decorator';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { CreateServiceAreaDto, ServiceAreaQueryDto, UpdateServiceAreaDto } from '../dto';
 import { ServiceAreaService } from '../services/service-area.service';
 import { ServiceAreaCacheService } from '../services/service-area-cache.service';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
 
 @ApiTags('Admin Service Areas')
 @ApiBearerAuth()

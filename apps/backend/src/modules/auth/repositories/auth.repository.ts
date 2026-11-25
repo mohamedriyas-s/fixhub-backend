@@ -1,6 +1,6 @@
+import { ErrorCodes } from '@fixhub/shared';
 import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { ErrorCodes } from '@fixhub/shared';
 import { DevicePlatform, Role } from '@prisma/client';
 
 import { PrismaService } from '../../../common/database/prisma.service';
@@ -74,11 +74,7 @@ export class AuthRepository {
 
   // ── Refresh Token Operations ──────────────────────────────
 
-  async createRefreshToken(data: {
-    token: string;
-    userId: string;
-    expiresAt: Date;
-  }) {
+  async createRefreshToken(data: { token: string; userId: string; expiresAt: Date }) {
     return this.prisma.refreshToken.create({ data });
   }
 
@@ -115,10 +111,7 @@ export class AuthRepository {
   async deleteExpiredTokens() {
     const result = await this.prisma.refreshToken.deleteMany({
       where: {
-        OR: [
-          { expiresAt: { lt: new Date() } },
-          { isRevoked: true },
-        ],
+        OR: [{ expiresAt: { lt: new Date() } }, { isRevoked: true }],
       },
     });
     return result.count;
@@ -126,11 +119,7 @@ export class AuthRepository {
 
   // ── Device Token Operations ───────────────────────────────
 
-  async upsertDeviceToken(
-    userId: string,
-    token: string,
-    platform: DevicePlatform,
-  ) {
+  async upsertDeviceToken(userId: string, token: string, platform: DevicePlatform) {
     // Deactivate this token on any other user (device transfers)
     await this.prisma.deviceToken.updateMany({
       where: { token, userId: { not: userId } },

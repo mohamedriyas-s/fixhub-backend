@@ -5,10 +5,15 @@ import { Role } from '@prisma/client';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { AuthenticatedUser } from '../../../common/interfaces/auth.interface';
-import { AssignTechnicianDto, BookingQueryDto, UpdateNotesDto, UpdateBookingStatusDto } from '../dto';
-import { BookingQueryService } from '../services/booking-query.service';
+import {
+  AssignTechnicianDto,
+  BookingQueryDto,
+  UpdateBookingStatusDto,
+  UpdateNotesDto,
+} from '../dto';
 import { BookingService } from '../services/booking.service';
 import { BookingLifecycleService } from '../services/booking-lifecycle.service';
+import { BookingQueryService } from '../services/booking-query.service';
 
 @ApiTags('Admin Bookings')
 @ApiBearerAuth()
@@ -19,7 +24,7 @@ export class AdminBookingController {
     private readonly bookingQueryService: BookingQueryService,
     private readonly bookingService: BookingService,
     private readonly bookingLifecycleService: BookingLifecycleService,
-  ) { }
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'List all bookings for admin' })

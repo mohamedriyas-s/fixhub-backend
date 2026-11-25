@@ -1,7 +1,8 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { RedisService } from '../../../common/redis/redis.service';
+
 import { PrismaService } from '../../../common/database/prisma.service';
+import { RedisService } from '../../../common/redis/redis.service';
 
 const HEARTBEAT_PREFIX = 'technician:heartbeat:';
 const HEARTBEAT_TTL_SECONDS = 300; // 5 minutes
@@ -20,7 +21,7 @@ export class TechnicianHeartbeatService implements OnModuleInit, OnModuleDestroy
   async onModuleInit() {
     this.subscriberClient = this.redisService.getClient().duplicate();
     await this.subscriberClient.subscribe('__keyevent@0__:expired');
-    
+
     this.subscriberClient.on('message', async (channel: string, message: string) => {
       if (channel === '__keyevent@0__:expired' && message.startsWith(HEARTBEAT_PREFIX)) {
         const technicianId = message.replace(HEARTBEAT_PREFIX, '');

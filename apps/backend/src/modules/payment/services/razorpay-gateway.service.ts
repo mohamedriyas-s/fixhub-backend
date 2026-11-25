@@ -1,7 +1,6 @@
-import { createHmac, timingSafeEqual } from 'crypto';
-
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { createHmac, timingSafeEqual } from 'crypto';
 
 @Injectable()
 export class RazorpayGatewayService {
@@ -60,11 +59,7 @@ export class RazorpayGatewayService {
     return this.request(`invoices?payment_id=${encodeURIComponent(paymentId)}`, 'GET');
   }
 
-  verifyCheckoutSignature(params: {
-    orderId: string;
-    paymentId: string;
-    signature: string;
-  }) {
+  verifyCheckoutSignature(params: { orderId: string; paymentId: string; signature: string }) {
     const payload = `${params.orderId}|${params.paymentId}`;
     return this.verifySignature(payload, params.signature, this.keySecret);
   }

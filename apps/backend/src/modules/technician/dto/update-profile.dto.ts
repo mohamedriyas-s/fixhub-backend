@@ -1,6 +1,14 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsLatitude, IsLongitude, IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
+import {
+  IsEmail,
+  IsLatitude,
+  IsLongitude,
+  IsOptional,
+  IsString,
+  IsUrl,
+  MaxLength,
+} from 'class-validator';
 
 export class UpdateProfileDto {
   @ApiPropertyOptional({ example: 'Ramesh Kumar' })

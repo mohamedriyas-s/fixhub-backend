@@ -1,5 +1,6 @@
 import { ErrorCodes } from '@fixhub/shared';
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { VerificationStatus } from '@prisma/client';
 
 import {
@@ -18,8 +19,6 @@ import {
 } from '../dto/admin.dto';
 import { AdminRepository } from '../repositories/admin.repository';
 import { AdminNotificationService, AdminNotifType } from './admin-notification.service';
-
-import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class AdminService {
@@ -61,7 +60,10 @@ export class AdminService {
   async updateCustomerDetails(id: string, dto: UpdateCustomerDetailsDto) {
     const result = await this.adminRepository.updateCustomerDetails(id, dto);
     if (!result) {
-      throw new NotFoundException({ message: 'Customer not found', errorCode: ErrorCodes.CUSTOMER_NOT_FOUND });
+      throw new NotFoundException({
+        message: 'Customer not found',
+        errorCode: ErrorCodes.CUSTOMER_NOT_FOUND,
+      });
     }
     return result;
   }
@@ -69,7 +71,10 @@ export class AdminService {
   async notifyCustomerCompleteProfile(customerId: string, message: string) {
     const customer = await this.adminRepository.getCustomerDetails(customerId);
     if (!customer) {
-      throw new NotFoundException({ message: 'Customer not found', errorCode: ErrorCodes.CUSTOMER_NOT_FOUND });
+      throw new NotFoundException({
+        message: 'Customer not found',
+        errorCode: ErrorCodes.CUSTOMER_NOT_FOUND,
+      });
     }
     // Notify admin of the action as well
     await this.adminNotifService.createAndBroadcast(
@@ -101,7 +106,10 @@ export class AdminService {
   async notifyTechnicianCompleteProfile(technicianId: string, message: string) {
     const technician = await this.adminRepository.getTechnicianDetails(technicianId);
     if (!technician) {
-      throw new NotFoundException({ message: 'Technician not found', errorCode: ErrorCodes.TECHNICIAN_NOT_FOUND });
+      throw new NotFoundException({
+        message: 'Technician not found',
+        errorCode: ErrorCodes.TECHNICIAN_NOT_FOUND,
+      });
     }
     await this.adminNotifService.createAndBroadcast(
       AdminNotifType.SYSTEM,
@@ -121,7 +129,10 @@ export class AdminService {
   async updateTechnicianDetails(id: string, dto: UpdateTechnicianDetailsDto) {
     const result = await this.adminRepository.updateTechnicianDetails(id, dto);
     if (!result) {
-      throw new NotFoundException({ message: 'Technician not found', errorCode: ErrorCodes.TECHNICIAN_NOT_FOUND });
+      throw new NotFoundException({
+        message: 'Technician not found',
+        errorCode: ErrorCodes.TECHNICIAN_NOT_FOUND,
+      });
     }
     this.eventEmitter.emit('technician.updated', id);
     return result;

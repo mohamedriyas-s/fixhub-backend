@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNumber, IsOptional, Matches } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsNumber, IsOptional, Matches } from 'class-validator';
 
 export class ValidateServiceAreaDto {
   @ApiProperty({ example: '600099' })

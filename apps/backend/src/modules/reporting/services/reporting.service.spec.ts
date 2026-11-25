@@ -4,8 +4,8 @@ import { Response } from 'express';
 import { ReportingQueryDto } from '../dto/reporting-query.dto';
 import { ReportingRepository } from '../repositories/reporting.repository';
 import { ExportService } from './export.service';
-import { ReportingCacheService } from './reporting-cache.service';
 import { ReportingService } from './reporting.service';
+import { ReportingCacheService } from './reporting-cache.service';
 
 describe('ReportingService', () => {
   let service: ReportingService;

@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import type { Request, Response } from 'express';
 
 import { AppModule } from './app.module';
 import { createValidationPipe } from './common/pipes/validation.pipe';
@@ -91,6 +92,16 @@ async function bootstrap() {
       persistAuthorization: true,
     },
   });
+
+  // Root and health endpoints for cloud hosting (Render, AWS, etc.)
+  const httpAdapter = app.getHttpAdapter();
+  httpAdapter.get('/', (_req: Request, res: Response) =>
+    res.status(200).json({ status: 'ok', service: 'fixhub-api' }),
+  );
+  httpAdapter.get('/health', (_req: Request, res: Response) =>
+    res.status(200).json({ status: 'ok', service: 'fixhub-api' }),
+  );
+  httpAdapter.head('/', (_req: Request, res: Response) => res.status(200).end());
 
   await app.listen(port);
 

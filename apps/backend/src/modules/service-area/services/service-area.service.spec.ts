@@ -2,8 +2,8 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 
 import { ServiceAreaRepository } from '../repositories/service-area.repository';
-import { ServiceAreaCacheService } from './service-area-cache.service';
 import { ServiceAreaService } from './service-area.service';
+import { ServiceAreaCacheService } from './service-area-cache.service';
 
 describe('ServiceAreaService', () => {
   let service: ServiceAreaService;
@@ -145,14 +145,16 @@ describe('ServiceAreaService', () => {
   it('throws when updating a missing service area', async () => {
     repository.findById.mockResolvedValue(null);
 
-    await expect(service.update('missing', { city: 'Chennai' })).rejects.toThrow(
-      NotFoundException,
-    );
+    await expect(service.update('missing', { city: 'Chennai' })).rejects.toThrow(NotFoundException);
   });
 
   it('soft deletes service area and invalidates cache', async () => {
     repository.findById.mockResolvedValue(area as any);
-    repository.softDelete.mockResolvedValue({ ...area, isActive: false, deletedAt: new Date() } as any);
+    repository.softDelete.mockResolvedValue({
+      ...area,
+      isActive: false,
+      deletedAt: new Date(),
+    } as any);
 
     const result = await service.delete(area.id);
 
