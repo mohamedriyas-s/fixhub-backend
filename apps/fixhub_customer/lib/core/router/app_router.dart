@@ -66,7 +66,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       if (authState.isAuthenticated && isAuthRoute) {
-        if (ref.read(locationProvider).status == LocationStatus.valid) {
+        final locationState = ref.read(locationProvider);
+        if (locationState.isRestoring) return null;
+        if (locationState.status == LocationStatus.valid) {
           return RouteNames.home;
         } else {
           return RouteNames.locationAccess;

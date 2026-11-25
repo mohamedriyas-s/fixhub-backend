@@ -9,6 +9,7 @@ import '../../../../core/widgets/fixhub_text_field.dart';
 import '../../../../core/widgets/fixhub_snackbar.dart';
 import '../../../booking/data/models/address_model.dart';
 import '../providers/address_provider.dart';
+import '../../../location/presentation/providers/location_provider.dart';
 import '../../../location/presentation/screens/pinpoint_location_screen.dart';
 
 class AddAddressScreen extends ConsumerStatefulWidget {
@@ -29,6 +30,7 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
   final _pincodeController = TextEditingController();
   
   bool _isDefault = false;
+  bool _isValidating = false;
   double? _latitude;
   double? _longitude;
 
@@ -77,7 +79,24 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
 
   void _saveAddress() async {
     if (_formKey.currentState?.validate() ?? false) {
+      final pincode = _pincodeController.text.trim();
+      setState(() => _isValidating = true);
+
       try {
+        final areaResult = await ref
+            .read(locationRepositoryProvider)
+            .validateServiceArea(pincode, lat: _latitude, lng: _longitude);
+
+        if (!areaResult.isServiceable) {
+          if (mounted) {
+            FixHubSnackbar.error(
+              context,
+              'FixHub does not serve pincode $pincode yet. Please enter an address within our active service areas.',
+            );
+          }
+          return;
+        }
+
         final addressModel = AddressModel(
           id: '',
           customerId: '',
@@ -86,21 +105,28 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
           line2: _addressLine2Controller.text.trim(),
           city: _cityController.text.trim(),
           state: _stateController.text.trim(),
-          pincode: _pincodeController.text.trim(),
+          pincode: pincode,
           latitude: _latitude,
           longitude: _longitude,
           isDefault: _isDefault,
         );
 
         await ref.read(addressesProvider.notifier).addAddress(addressModel);
-        
+
         if (mounted) {
           FixHubSnackbar.success(context, 'Address added successfully');
           context.pop();
         }
       } catch (e) {
         if (mounted) {
-          FixHubSnackbar.error(context, 'Failed to add address: $e');
+          final cleanErr = e
+              .toString()
+              .replaceAll(RegExp(r'^(Exception:\s*|DioException:\s*)'), '');
+          FixHubSnackbar.error(context, cleanErr);
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isValidating = false);
         }
       }
     }
@@ -265,8 +291,8 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.screenPadding),
           child: FixHubButton(
-            label: 'Save Address',
-            isLoading: isLoading,
+            label: _isValidating ? 'Validating Area...' : 'Save Address',
+            isLoading: isLoading || _isValidating,
             onPressed: _saveAddress,
           ),
         ),

@@ -18,7 +18,7 @@ export class CustomerRepository {
 
   async updateProfile(userId: string, data: any) {
     const { name, email, profilePictureUrl } = data;
-    
+
     return this.prisma.$transaction(async (tx) => {
       // Update User details
       const user = await tx.user.update({
@@ -53,6 +53,16 @@ export class CustomerRepository {
     });
   }
 
+  async findActiveServiceAreaByPincode(pincode: string) {
+    return this.prisma.serviceArea.findFirst({
+      where: {
+        pincode: pincode.trim(),
+        isActive: true,
+        deletedAt: null,
+      },
+    });
+  }
+
   async addAddress(userId: string, data: any) {
     const customer = await this.prisma.customer.findUnique({ where: { userId } });
     if (!customer) throw new Error('Customer not found');
@@ -77,15 +87,20 @@ export class CustomerRepository {
   async updateAddress(addressId: string, data: any) {
     const updateData: any = {};
     if (data.label !== undefined) updateData.label = data.label;
-    if (data.line1 !== undefined || data.line_1 !== undefined) updateData.line1 = data.line1 ?? data.line_1;
-    if (data.line2 !== undefined || data.line_2 !== undefined) updateData.line2 = data.line2 ?? data.line_2;
+    if (data.line1 !== undefined || data.line_1 !== undefined)
+      updateData.line1 = data.line1 ?? data.line_1;
+    if (data.line2 !== undefined || data.line_2 !== undefined)
+      updateData.line2 = data.line2 ?? data.line_2;
     if (data.landmark !== undefined) updateData.landmark = data.landmark;
     if (data.city !== undefined) updateData.city = data.city;
     if (data.state !== undefined) updateData.state = data.state;
-    if (data.pincode !== undefined || data.postalCode !== undefined) updateData.pincode = data.pincode ?? data.postalCode;
+    if (data.pincode !== undefined || data.postalCode !== undefined)
+      updateData.pincode = data.pincode ?? data.postalCode;
     if (data.latitude !== undefined && data.latitude !== null) updateData.latitude = data.latitude;
-    if (data.longitude !== undefined && data.longitude !== null) updateData.longitude = data.longitude;
-    if (data.isDefault !== undefined || data.is_default !== undefined) updateData.isDefault = data.isDefault ?? data.is_default;
+    if (data.longitude !== undefined && data.longitude !== null)
+      updateData.longitude = data.longitude;
+    if (data.isDefault !== undefined || data.is_default !== undefined)
+      updateData.isDefault = data.isDefault ?? data.is_default;
 
     return this.prisma.address.update({
       where: { id: addressId },

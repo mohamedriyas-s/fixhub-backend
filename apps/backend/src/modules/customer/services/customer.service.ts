@@ -1,5 +1,5 @@
 import { ErrorCodes } from '@fixhub/shared';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 
 import { CustomerRepository } from '../repositories/customer.repository';
 
@@ -29,10 +29,44 @@ export class CustomerService {
   }
 
   async addAddress(userId: string, data: any) {
+    const pincode = data.pincode ?? data.postalCode;
+    if (!pincode || typeof pincode !== 'string' || pincode.trim().length !== 6) {
+      throw new BadRequestException({
+        message: 'A valid 6-digit postal pincode is required',
+        errorCode: ErrorCodes.VALIDATION_ERROR,
+      });
+    }
+
+    const serviceArea = await this.customerRepository.findActiveServiceAreaByPincode(pincode);
+    if (!serviceArea) {
+      throw new BadRequestException({
+        message: `FixHub services are not currently available in pincode ${pincode.trim()}. Please enter an address in our active service area.`,
+        errorCode: ErrorCodes.SERVICE_AREA_NOT_FOUND,
+      });
+    }
+
     return this.customerRepository.addAddress(userId, data);
   }
 
   async updateAddress(userId: string, addressId: string, data: any) {
+    const pincode = data.pincode ?? data.postalCode;
+    if (pincode !== undefined) {
+      if (typeof pincode !== 'string' || pincode.trim().length !== 6) {
+        throw new BadRequestException({
+          message: 'A valid 6-digit postal pincode is required',
+          errorCode: ErrorCodes.VALIDATION_ERROR,
+        });
+      }
+
+      const serviceArea = await this.customerRepository.findActiveServiceAreaByPincode(pincode);
+      if (!serviceArea) {
+        throw new BadRequestException({
+          message: `FixHub services are not currently available in pincode ${pincode.trim()}. Please enter an address in our active service area.`,
+          errorCode: ErrorCodes.SERVICE_AREA_NOT_FOUND,
+        });
+      }
+    }
+
     return this.customerRepository.updateAddress(addressId, data);
   }
 

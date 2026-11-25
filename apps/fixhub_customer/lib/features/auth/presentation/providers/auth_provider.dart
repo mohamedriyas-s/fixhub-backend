@@ -13,6 +13,7 @@ import '../../../booking/presentation/providers/booking_flow_provider.dart';
 import '../../../booking/presentation/providers/booking_provider.dart';
 import '../../../notifications/presentation/providers/notification_provider.dart';
 import '../../../profile/presentation/providers/address_provider.dart';
+import '../../../location/presentation/providers/location_provider.dart';
 
 // ── Auth Status ───────────────────────────────────────────────
 
@@ -119,6 +120,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
         } catch (_) {
           // Keep cached user if profile refresh fails due to network/offline
         }
+
+        // Restore location from saved backend addresses if not already valid
+        if (_ref.read(locationProvider).status != LocationStatus.valid) {
+          try {
+            final addresses = await _ref.read(addressRepositoryProvider).getAddresses();
+            if (addresses.isNotEmpty) {
+              await _ref.read(locationProvider.notifier).restoreFromAddresses(addresses);
+            }
+          } catch (_) {}
+        }
       } else {
         state = state.copyWith(status: AuthStatus.unauthenticated);
       }
@@ -168,6 +179,25 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       _resetUserSession();
       final response = await _repository.verifyOtp(phone: phone, otp: otp);
+
+      // If location is not yet valid, restore from existing saved addresses in DB or GPS
+      final currentLocation = _ref.read(locationProvider);
+      if (currentLocation.status != LocationStatus.valid) {
+        _ref.read(locationProvider.notifier).setRestoring(true);
+        try {
+          final addresses = await _ref.read(addressRepositoryProvider).getAddresses();
+          if (addresses.isNotEmpty) {
+            await _ref.read(locationProvider.notifier).restoreFromAddresses(addresses);
+          } else if (currentLocation.hasPermission) {
+            await _ref.read(locationProvider.notifier).detectFromGPS();
+          }
+        } catch (_) {
+          // Ignore address restore errors and let normal location access flow continue
+        } finally {
+          _ref.read(locationProvider.notifier).setRestoring(false);
+        }
+      }
+
       state = state.copyWith(
         status: AuthStatus.authenticated,
         user: response.user,

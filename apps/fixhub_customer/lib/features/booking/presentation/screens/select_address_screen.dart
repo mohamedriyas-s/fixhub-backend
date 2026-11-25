@@ -11,9 +11,11 @@ import '../providers/booking_flow_provider.dart';
 import '../providers/booking_provider.dart';
 import '../../data/models/address_model.dart';
 import '../../../profile/presentation/providers/address_provider.dart';
+import '../../../location/presentation/providers/location_provider.dart';
 import '../../../../core/widgets/fixhub_empty_state.dart';
 import '../../../../core/widgets/fixhub_error_state.dart';
 import '../../../../core/widgets/fixhub_shimmer.dart';
+import '../../../../core/widgets/fixhub_snackbar.dart';
 
 class SelectAddressScreen extends ConsumerStatefulWidget {
   const SelectAddressScreen({super.key});
@@ -31,81 +33,156 @@ class _SelectAddressScreenState extends ConsumerState<SelectAddressScreen> {
 
     final subServiceId = ref.read(bookingFlowProvider).selectedService?.id;
     if (subServiceId == null) {
-      ref.read(bookingFlowProvider.notifier).setAddress(_selectedAddress!);
-      context.push(RouteNames.selectSlot);
+      FixHubSnackbar.error(context, 'Please select a service first.');
       return;
     }
 
     setState(() => _isChecking = true);
+    final pincode = _selectedAddress!.pincode.trim();
 
+    // 1. Validate if this address pincode is within an active FixHub service area
+    final serviceAreaCheck = await ref
+        .read(locationRepositoryProvider)
+        .validateServiceArea(pincode, lat: _selectedAddress!.latitude, lng: _selectedAddress!.longitude);
+
+    if (!serviceAreaCheck.isServiceable) {
+      if (!mounted) return;
+      setState(() => _isChecking = false);
+      _showUnserviceableAreaSheet(pincode);
+      return;
+    }
+
+    // 2. Check if verified, active technicians are available for this service
     final isAvailable = await ref
         .read(bookingRepositoryProvider)
-        .checkTechniciansAvailable(subServiceId, _selectedAddress!.pincode);
+        .checkTechniciansAvailable(subServiceId, pincode);
 
     if (!mounted) return;
     setState(() => _isChecking = false);
 
     if (!isAvailable) {
-      showModalBottomSheet(
-        context: context,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        backgroundColor: AppColors.elevatedSurface,
-        builder: (ctx) => Padding(
-          padding: const EdgeInsets.all(AppSpacing.screenPadding),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 48,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: AppSpacing.lg),
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Container(
-                width: 64,
-                height: 64,
-                decoration: const BoxDecoration(
-                  color: AppColors.surface,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.engineering_outlined,
-                  size: 32,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                'No Technicians Available',
-                style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'Currently, there are no active technicians available for this service in your area (${_selectedAddress!.pincode}). Please try selecting a different address or check back later.',
-                style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              FixHubButton(
-                label: 'Select Different Address',
-                onPressed: () => Navigator.pop(ctx),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-            ],
-          ),
-        ),
-      );
+      _showNoTechniciansSheet(pincode);
       return;
     }
 
     ref.read(bookingFlowProvider.notifier).setAddress(_selectedAddress!);
     context.push(RouteNames.selectSlot);
+  }
+
+  void _showUnserviceableAreaSheet(String pincode) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      backgroundColor: AppColors.elevatedSurface,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(AppSpacing.screenPadding),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 48,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: AppSpacing.lg),
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Container(
+              width: 64,
+              height: 64,
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.location_off_outlined,
+                size: 32,
+                color: AppColors.error,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              'Area Not Serviceable',
+              style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'FixHub does not currently serve pincode $pincode. Please select an address within our serviceable areas or add a new address.',
+              style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            FixHubButton(
+              label: 'Select Different Address',
+              onPressed: () => Navigator.pop(ctx),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showNoTechniciansSheet(String pincode) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      backgroundColor: AppColors.elevatedSurface,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(AppSpacing.screenPadding),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 48,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: AppSpacing.lg),
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Container(
+              width: 64,
+              height: 64,
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.engineering_outlined,
+                size: 32,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              'No Technicians Available',
+              style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Currently, there are no active technicians available for this service in your area ($pincode). Please try selecting a different address or check back later.',
+              style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            FixHubButton(
+              label: 'Select Different Address',
+              onPressed: () => Navigator.pop(ctx),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+        ),
+      ),
+    );
   }
 
   @override

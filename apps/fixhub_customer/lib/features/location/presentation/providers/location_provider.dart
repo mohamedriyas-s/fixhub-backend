@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:geolocator/geolocator.dart';
+import '../../../booking/data/models/address_model.dart';
 import '../../data/repositories/location_repository_impl.dart';
 import '../../domain/repositories/location_repository.dart';
 import '../../data/datasources/location_remote_datasource.dart';
@@ -136,6 +137,69 @@ class LocationNotifier extends StateNotifier<LocationState> {
     final granted = await _repository.requestPermission();
     state = state.copyWith(hasPermission: granted);
     return granted;
+  }
+
+  void setRestoring(bool value) {
+    if (state.isRestoring != value) {
+      state = state.copyWith(isRestoring: value);
+    }
+  }
+
+  /// Restore and validate active location using an existing saved customer address.
+  Future<bool> restoreFromSavedAddress(AddressModel address) async {
+    final pincode = address.pincode.trim();
+    if (pincode.isEmpty) return false;
+
+    try {
+      final result = await _repository.validateServiceArea(
+        pincode,
+        lat: address.latitude,
+        lng: address.longitude,
+      );
+
+      final displayLocation = (address.city.trim().isNotEmpty)
+          ? address.city.trim()
+          : pincode;
+
+      if (result.isServiceable) {
+        state = state.copyWith(
+          status: LocationStatus.valid,
+          currentPincode: pincode,
+          currentCity: displayLocation,
+          lastValidPincode: pincode,
+          lastValidCity: displayLocation,
+          serviceAreaResult: result,
+          clearErrorMessage: true,
+          isRestoring: false,
+        );
+        await _localStorage.saveLocation(
+          pincode: pincode,
+          status: 'valid',
+          city: displayLocation,
+        );
+        return true;
+      }
+    } catch (e) {
+      debugPrint('[LocationNotifier] restoreFromSavedAddress error: $e');
+    }
+    return false;
+  }
+
+  /// Restore active location from a list of user addresses (prefers default address).
+  Future<bool> restoreFromAddresses(List<AddressModel> addresses) async {
+    if (addresses.isEmpty) return false;
+    final defaultAddr = addresses.firstWhere(
+      (a) => a.isDefault,
+      orElse: () => addresses.first,
+    );
+    final restored = await restoreFromSavedAddress(defaultAddr);
+    if (!restored && addresses.length > 1) {
+      for (final addr in addresses) {
+        if (addr == defaultAddr) continue;
+        if (await restoreFromSavedAddress(addr)) return true;
+      }
+    }
+    return restored;
   }
 
   Future<void> detectFromGPS() async {

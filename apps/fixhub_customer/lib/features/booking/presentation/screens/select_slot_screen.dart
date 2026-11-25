@@ -386,7 +386,10 @@ class _SelectSlotScreenState extends ConsumerState<SelectSlotScreen> {
                   ],
                   FixHubButton(
                     label: 'Confirm & Continue',
-                    onPressed: (_selectedSlot != null && _selectedSlot!.isAvailable)
+                    onPressed: (_selectedSlot != null &&
+                            _selectedSlot!.isAvailable &&
+                            bookingFlowState.selectedService != null &&
+                            bookingFlowState.selectedAddress != null)
                         ? () {
                             ref
                                 .read(bookingFlowProvider.notifier)
