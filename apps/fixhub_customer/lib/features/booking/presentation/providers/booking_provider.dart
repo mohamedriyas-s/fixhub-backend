@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import '../../data/datasources/booking_remote_datasource.dart';
@@ -11,10 +12,42 @@ final bookingRepositoryProvider = Provider<BookingRepository>((ref) {
   return BookingRepositoryImpl(BookingRemoteDataSource(dio));
 });
 
-final bookingsProvider = FutureProvider<List<BookingModel>>((ref) async {
-  final repo = ref.watch(bookingRepositoryProvider);
-  return repo.getBookings();
-});
+final bookingsProvider =
+    AsyncNotifierProvider<BookingsListNotifier, List<BookingModel>>(
+  BookingsListNotifier.new,
+);
+
+class BookingsListNotifier extends AsyncNotifier<List<BookingModel>> {
+  late BookingRepository _repository;
+  Timer? _pollTimer;
+
+  @override
+  FutureOr<List<BookingModel>> build() async {
+    _repository = ref.watch(bookingRepositoryProvider);
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      refreshSilent();
+    });
+    ref.onDispose(() {
+      _pollTimer?.cancel();
+    });
+    try {
+      return await _repository.getBookings();
+    } catch (_) {
+      if (state.hasValue && state.value != null) {
+        return state.value!;
+      }
+      return const [];
+    }
+  }
+
+  Future<void> refreshSilent() async {
+    try {
+      final items = await _repository.getBookings();
+      state = AsyncValue.data(items);
+    } catch (_) {}
+  }
+}
 
 final bookingDetailProvider = FutureProvider.family<BookingModel, String>((ref, id) async {
   final repo = ref.watch(bookingRepositoryProvider);
@@ -83,6 +116,19 @@ class BookingActionNotifier extends StateNotifier<AsyncValue<void>> {
     try {
       state = const AsyncValue.loading();
       await _dataSource.rejectRevision(bookingId);
+      state = const AsyncValue.data(null);
+      _ref.invalidate(bookingDetailProvider(bookingId));
+      _ref.invalidate(bookingsProvider);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+
+  Future<void> payExtraCharge(String bookingId) async {
+    try {
+      state = const AsyncValue.loading();
+      await _dataSource.payExtraCharge(bookingId);
       state = const AsyncValue.data(null);
       _ref.invalidate(bookingDetailProvider(bookingId));
       _ref.invalidate(bookingsProvider);

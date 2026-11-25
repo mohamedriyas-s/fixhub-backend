@@ -26,13 +26,14 @@ class _SelectSlotScreenState extends ConsumerState<SelectSlotScreen> {
   TimeSlotModel? _selectedSlot;
   late List<DateTime> _availableDates;
 
-  // All possible slots (2-hour windows, 9am-7pm)
+  // All possible slots (2-hour windows, 9am-9pm)
   static const List<_RawSlot> _allSlots = [
     _RawSlot(startHour: 9,  startMinute: 0,  label: '9:00 AM – 11:00 AM'),
     _RawSlot(startHour: 11, startMinute: 0,  label: '11:00 AM – 1:00 PM'),
     _RawSlot(startHour: 13, startMinute: 0,  label: '1:00 PM – 3:00 PM'),
     _RawSlot(startHour: 15, startMinute: 0,  label: '3:00 PM – 5:00 PM'),
     _RawSlot(startHour: 17, startMinute: 0,  label: '5:00 PM – 7:00 PM'),
+    _RawSlot(startHour: 19, startMinute: 0,  label: '7:00 PM – 9:00 PM'),
   ];
 
   @override

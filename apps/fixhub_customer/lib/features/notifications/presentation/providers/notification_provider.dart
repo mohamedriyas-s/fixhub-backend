@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/datasources/notification_remote_datasource.dart';
 import '../../data/models/notification_model.dart';
@@ -8,11 +9,75 @@ final notificationRemoteDataSourceProvider = Provider<NotificationRemoteDataSour
   return NotificationRemoteDataSource(dio);
 });
 
-final notificationsProvider = FutureProvider<List<NotificationModel>>((ref) async {
-  final dataSource = ref.watch(notificationRemoteDataSourceProvider);
-  final data = await dataSource.getNotifications();
-  return data.map((json) => NotificationModel.fromJson(json)).toList();
-});
+final notificationsProvider =
+    AsyncNotifierProvider<NotificationsListNotifier, List<NotificationModel>>(
+  NotificationsListNotifier.new,
+);
+
+class NotificationsListNotifier extends AsyncNotifier<List<NotificationModel>> {
+  late NotificationRemoteDataSource _dataSource;
+  Timer? _pollTimer;
+
+  @override
+  FutureOr<List<NotificationModel>> build() async {
+    _dataSource = ref.watch(notificationRemoteDataSourceProvider);
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      refreshSilent();
+    });
+    ref.onDispose(() {
+      _pollTimer?.cancel();
+    });
+    try {
+      return await _dataSource.getNotifications();
+    } catch (_) {
+      if (state.hasValue && state.value != null) {
+        return state.value!;
+      }
+      return const [];
+    }
+  }
+
+  Future<void> refreshSilent() async {
+    try {
+      final items = await _dataSource.getNotifications();
+      state = AsyncValue.data(items);
+    } catch (_) {}
+  }
+
+  Future<void> load({bool silent = false}) async {
+    if (!silent && !state.hasValue) {
+      state = const AsyncValue.loading();
+    }
+    try {
+      final items = await _dataSource.getNotifications();
+      state = AsyncValue.data(items);
+    } catch (e, st) {
+      if (!state.hasValue) {
+        state = AsyncValue.error(e, st);
+      }
+    }
+  }
+
+  Future<void> markAsRead(String id) async {
+    try {
+      await _dataSource.markAsRead(id);
+      state = state.whenData((list) => list.map((n) {
+            if (n.id == id) {
+              return n.copyWith(isRead: true);
+            }
+            return n;
+          }).toList());
+    } catch (_) {}
+  }
+
+  Future<void> markAllAsRead() async {
+    try {
+      await _dataSource.markAllAsRead();
+      state = state.whenData((list) => list.map((n) => n.copyWith(isRead: true)).toList());
+    } catch (_) {}
+  }
+}
 
 class NotificationNotifier extends Notifier<AsyncValue<void>> {
   @override
@@ -21,27 +86,11 @@ class NotificationNotifier extends Notifier<AsyncValue<void>> {
   }
 
   Future<void> markAsRead(String id) async {
-    state = const AsyncValue.loading();
-    try {
-      final dataSource = ref.read(notificationRemoteDataSourceProvider);
-      await dataSource.markAsRead(id);
-      ref.invalidate(notificationsProvider);
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    await ref.read(notificationsProvider.notifier).markAsRead(id);
   }
 
   Future<void> markAllAsRead() async {
-    state = const AsyncValue.loading();
-    try {
-      final dataSource = ref.read(notificationRemoteDataSourceProvider);
-      await dataSource.markAllAsRead();
-      ref.invalidate(notificationsProvider);
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+    await ref.read(notificationsProvider.notifier).markAllAsRead();
   }
 }
 

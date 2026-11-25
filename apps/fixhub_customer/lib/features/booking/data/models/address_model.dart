@@ -43,6 +43,36 @@ class AddressModel {
     final parts = [line1, if (line2 != null) line2, city, state, pincode];
     return parts.join(', ');
   }
+
+  AddressModel copyWith({
+    String? id,
+    String? customerId,
+    String? label,
+    String? line1,
+    String? line2,
+    String? landmark,
+    String? city,
+    String? state,
+    String? pincode,
+    double? latitude,
+    double? longitude,
+    bool? isDefault,
+  }) {
+    return AddressModel(
+      id: id ?? this.id,
+      customerId: customerId ?? this.customerId,
+      label: label ?? this.label,
+      line1: line1 ?? this.line1,
+      line2: line2 ?? this.line2,
+      landmark: landmark ?? this.landmark,
+      city: city ?? this.city,
+      state: state ?? this.state,
+      pincode: pincode ?? this.pincode,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      isDefault: isDefault ?? this.isDefault,
+    );
+  }
 }
 
 double? _parseDouble(dynamic value) {

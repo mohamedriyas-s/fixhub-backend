@@ -1,14 +1,19 @@
 import 'package:dio/dio.dart';
 import '../../../../core/network/api_endpoints.dart';
+import '../models/notification_model.dart';
 
 class NotificationRemoteDataSource {
   final Dio _dio;
 
   NotificationRemoteDataSource(this._dio);
 
-  Future<List<dynamic>> getNotifications() async {
+  Future<List<NotificationModel>> getNotifications() async {
     final response = await _dio.get(ApiEndpoints.notifications);
-    return _extractList(response.data);
+    final rawList = _extractList(response.data);
+    return rawList
+        .whereType<Map>()
+        .map((i) => NotificationModel.fromJson(Map<String, dynamic>.from(i)))
+        .toList();
   }
 
   Future<Map<String, dynamic>> markAsRead(String id) async {

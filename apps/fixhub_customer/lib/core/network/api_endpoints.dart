@@ -27,6 +27,7 @@ class ApiEndpoints {
   static String bookingConfirm(String id) => '/bookings/$id/confirm';
   static String bookingCancelDraft(String id) => '/bookings/$id/cancel-draft';
   static String bookingDetail(String id) => '/bookings/$id';
+  static String bookingIssue(String id) => '/bookings/$id/issue';
   static String bookingMedia(String id) => '/bookings/$id/media';
   static String bookingMediaBatch(String id) => '/bookings/$id/media/batch';
   static String bookingStatus(String id) => '/bookings/$id/status';
@@ -34,6 +35,7 @@ class ApiEndpoints {
   static String bookingReview(String id) => '/bookings/$id/review';
   static String bookingApproveRevision(String id) => '/bookings/$id/approve-revision';
   static String bookingRejectRevision(String id) => '/bookings/$id/reject-revision';
+  static String bookingPayExtraCharge(String id) => '/bookings/$id/pay-extra-charge';
 
   // ── Service Catalog ─────────────────────────────────────────
   // Backend CatalogController is registered under @Controller('catalog')
@@ -48,6 +50,9 @@ class ApiEndpoints {
   static String createOrder(String bookingId) =>
       '/payments/create-order/$bookingId';
   static const String verifyPayment = '/payments/verify';
+  static String createExtraChargeOrder(String bookingId) =>
+      '/payments/extra-charge-order/$bookingId';
+  static const String verifyExtraCharge = '/payments/verify-extra-charge';
 
   // ── Notifications ───────────────────────────────────────────
   static const String notifications = '/notifications';

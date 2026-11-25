@@ -25,6 +25,8 @@ class AddressRepositoryImpl implements AddressRepository {
       'state': address.state,
       'pincode': address.pincode,
       'isDefault': address.isDefault,
+      if (address.latitude != null) 'latitude': address.latitude,
+      if (address.longitude != null) 'longitude': address.longitude,
     };
     final data = await _remoteDataSource.addAddress(payload);
     return AddressModel.fromJson(Map<String, dynamic>.from(data));

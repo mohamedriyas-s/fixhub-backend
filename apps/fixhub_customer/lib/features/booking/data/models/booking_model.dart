@@ -31,12 +31,20 @@ class BookingModel {
     this.failedAt,
     this.failureReason,
     this.startOtp,
+    this.appealedAmount,
+    this.finalAdditionalAmount,
+    this.extraChargePaymentMethod,
+    this.extraChargePaidAt,
+    this.completionOtp,
+    this.slotDepartureAt,
+    this.isPendingDelay,
     this.address,
     this.subService,
     this.technician,
     this.review,
     this.payment,
     this.timeline = const [],
+    this.media = const [],
   });
 
   final String id;
@@ -65,6 +73,15 @@ class BookingModel {
   final DateTime? failedAt;
   final String? failureReason;
   final String? startOtp;
+  @JsonKey(fromJson: _parseNullableDouble)
+  final double? appealedAmount;
+  @JsonKey(fromJson: _parseNullableDouble)
+  final double? finalAdditionalAmount;
+  final String? extraChargePaymentMethod;
+  final DateTime? extraChargePaidAt;
+  final String? completionOtp;
+  final DateTime? slotDepartureAt;
+  final bool? isPendingDelay;
 
   // Relations
   final AddressModel? address;
@@ -73,6 +90,10 @@ class BookingModel {
   final Map<String, dynamic>? review;
   final Map<String, dynamic>? payment;
   final List<BookingTimelineModel> timeline;
+  final List<Map<String, dynamic>> media;
+
+  List<Map<String, dynamic>> get beforeServiceMedia =>
+      media.where((m) => m['uploadPhase'] == 'BEFORE_SERVICE').toList();
 
   factory BookingModel.fromJson(Map<String, dynamic> json) =>
       _$BookingModelFromJson(json);
@@ -111,6 +132,10 @@ class BookingModel {
         return BookingStatusType.inProgress;
       case 'PRICE_REVISION_PENDING':
         return BookingStatusType.inProgress; // Show as in-progress visually
+      case 'AWAITING_COMPLETION_VERIFICATION':
+        return BookingStatusType.inProgress;
+      case 'PENDING_COLLECTION':
+        return BookingStatusType.inProgress;
       case 'COMPLETED':
         return BookingStatusType.completed;
       case 'CANCELLED':
@@ -135,6 +160,13 @@ class BookingModel {
       case BookingStatusType.failed: return 'Failed';
     }
   }
+
+  bool get isAwaitingVerification => status == 'AWAITING_COMPLETION_VERIFICATION';
+  bool get isPendingCollection => status == 'PENDING_COLLECTION';
+  bool get isExtraChargePaid =>
+      extraChargePaidAt != null ||
+      extraChargePaymentMethod == 'CASH' ||
+      (finalAdditionalAmount ?? 0) <= 0;
 }
 
 double _parseDouble(dynamic value) {

@@ -123,9 +123,12 @@ class _BookingsListScreenState extends ConsumerState<BookingsListScreen>
           padding: const EdgeInsets.all(AppSpacing.screenPadding),
           child: FixHubShimmer.listPlaceholder(itemCount: 5),
         ),
-        error: (error, _) => FixHubErrorState(
-          onRetry: () => ref.invalidate(bookingsProvider),
-        ),
+        error: (error, stackTrace) {
+          debugPrint('[BookingsListScreen] Error: $error\n$stackTrace');
+          return FixHubErrorState(
+            onRetry: () => ref.invalidate(bookingsProvider),
+          );
+        },
       ),
     );
   }

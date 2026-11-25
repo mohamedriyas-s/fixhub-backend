@@ -12,4 +12,5 @@ abstract class BookingRepository {
   Future<List<String>> getAvailableSlots(String subServiceId, String pincode, String date);
   Future<bool> checkTechniciansAvailable(String subServiceId, String pincode);
   Future<void> cancelDraft(String bookingId);
+  Future<BookingModel> updateIssueDetails(String bookingId, {String? description});
 }

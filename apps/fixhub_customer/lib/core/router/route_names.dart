@@ -24,6 +24,9 @@ class RouteNames {
   static const bookingSummary = '/booking/summary';
   static const payment = '/booking/payment';
   static const bookingSuccess = '/booking/success';
+  static const addIssueDetails = '/booking-issue-details/:id';
+  static String addIssueDetailsPath(String id) => '/booking-issue-details/$id';
+  static String bookingDetail(String id) => '/booking-detail/$id';
 
   // Location Routes
   static const locationAccess = '/location/access';

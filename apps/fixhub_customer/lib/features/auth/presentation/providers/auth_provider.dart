@@ -104,12 +104,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
           await _ref.read(fcmServiceProvider).registerAfterLogin();
         } catch (_) {}
 
-        // Refresh profile in background
+        // Refresh profile in background — if token is expired/invalid, force clean logout
         try {
           final user = await _repository.getProfile();
           state = state.copyWith(user: user);
+        } on Failure catch (e) {
+          if (e is AuthFailure) {
+            forceLogout();
+          }
+        } on DioException catch (e) {
+          if (e.response?.statusCode == 401 || e.error is AuthFailure) {
+            forceLogout();
+          }
         } catch (_) {
-          // Keep cached user if profile refresh fails
+          // Keep cached user if profile refresh fails due to network/offline
         }
       } else {
         state = state.copyWith(status: AuthStatus.unauthenticated);
@@ -215,6 +223,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Logout and clear session.
   Future<void> logout() async {
     await _repository.logout();
+    _resetUserSession();
+    state = const AuthState(status: AuthStatus.unauthenticated);
+  }
+
+  /// Force logout immediately without network call (token is already invalid on server).
+  /// Synchronously notifies GoRouter via _RouterNotifier to redirect to Welcome/Login.
+  void forceLogout() {
+    _ref.read(localStorageProvider).clearAll();
     _resetUserSession();
     state = const AuthState(status: AuthStatus.unauthenticated);
   }

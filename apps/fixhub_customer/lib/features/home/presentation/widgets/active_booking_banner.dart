@@ -63,9 +63,16 @@ class ActiveBookingBanner extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Active Booking',
+                        (activeBooking.isAwaitingVerification || activeBooking.isPendingCollection)
+                            ? 'Action Required: Final Bill Ready'
+                            : (activeBooking.status == 'PRICE_REVISION_PENDING'
+                                ? 'Price Revision Requested'
+                                : 'Active Booking'),
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              color: AppColors.buttonPrimary,
+                              color: (activeBooking.isAwaitingVerification && !activeBooking.isExtraChargePaid)
+                                  ? AppColors.warning
+                                  : AppColors.buttonPrimary,
+                              fontWeight: FontWeight.bold,
                             ),
                       ),
                       const SizedBox(height: 2),
@@ -82,28 +89,88 @@ class ActiveBookingBanner extends ConsumerWidget {
                                 ),
                           ),
                           if (activeBooking.startOtp != null &&
-                              [
-                                BookingStatusType.confirmed,
-                                BookingStatusType.assigned,
-                                BookingStatusType.enRoute,
-                                BookingStatusType.arrived,
-                              ].contains(activeBooking.statusType)) ...[
+                              activeBooking.statusType == BookingStatusType.arrived) ...[
                             const SizedBox(width: AppSpacing.xs),
                             const Text('•', style: TextStyle(color: AppColors.textSecondary)),
                             const SizedBox(width: AppSpacing.xs),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
                                 color: AppColors.elevatedSurface,
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: AppColors.border, width: 0.5),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: AppColors.buttonPrimary, width: 1),
                               ),
-                              child: Text(
-                                'OTP: ${activeBooking.startOtp}',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.textPrimary,
-                                    ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.key_rounded, size: 12, color: AppColors.buttonPrimary),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Start OTP: ${activeBooking.startOtp}',
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.buttonPrimary,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          if ((activeBooking.isAwaitingVerification || activeBooking.isPendingCollection) &&
+                              !activeBooking.isExtraChargePaid &&
+                              (activeBooking.finalAdditionalAmount ?? 0) > 0) ...[
+                            const SizedBox(width: AppSpacing.xs),
+                            const Text('•', style: TextStyle(color: AppColors.textSecondary)),
+                            const SizedBox(width: AppSpacing.xs),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.warning.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: AppColors.warning, width: 1),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.payment_rounded, size: 12, color: AppColors.warning),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Pay ₹${activeBooking.finalAdditionalAmount!.toStringAsFixed(0)}',
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.warning,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          if (activeBooking.completionOtp != null &&
+                              (activeBooking.isAwaitingVerification || activeBooking.isPendingCollection) &&
+                              activeBooking.isExtraChargePaid) ...[
+                            const SizedBox(width: AppSpacing.xs),
+                            const Text('•', style: TextStyle(color: AppColors.textSecondary)),
+                            const SizedBox(width: AppSpacing.xs),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.elevatedSurface,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: AppColors.buttonPrimary, width: 1),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.verified_user_rounded, size: 12, color: AppColors.buttonPrimary),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Completion OTP: ${activeBooking.completionOtp}',
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.buttonPrimary,
+                                        ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],

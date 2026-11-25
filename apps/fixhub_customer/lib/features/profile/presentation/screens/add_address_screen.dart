@@ -9,6 +9,7 @@ import '../../../../core/widgets/fixhub_text_field.dart';
 import '../../../../core/widgets/fixhub_snackbar.dart';
 import '../../../booking/data/models/address_model.dart';
 import '../providers/address_provider.dart';
+import '../../../location/presentation/screens/pinpoint_location_screen.dart';
 
 class AddAddressScreen extends ConsumerStatefulWidget {
   const AddAddressScreen({super.key});
@@ -28,6 +29,8 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
   final _pincodeController = TextEditingController();
   
   bool _isDefault = false;
+  double? _latitude;
+  double? _longitude;
 
   @override
   void dispose() {
@@ -38,6 +41,38 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
     _stateController.dispose();
     _pincodeController.dispose();
     super.dispose();
+  }
+
+  Future<void> _chooseOnMap() async {
+    await PinpointLocationScreen.ensureGpsEnabled(context);
+    if (!mounted) return;
+
+    final selected = await Navigator.push<AddressModel>(
+      context,
+      MaterialPageRoute(
+        builder: (ctx) => const PinpointLocationScreen(),
+      ),
+    );
+
+    if (selected != null && mounted) {
+      setState(() {
+        _latitude = selected.latitude;
+        _longitude = selected.longitude;
+        if (selected.line1.isNotEmpty && _addressLine1Controller.text.isEmpty) {
+          _addressLine1Controller.text = selected.line1;
+        }
+        if (selected.city.isNotEmpty) {
+          _cityController.text = selected.city;
+        }
+        if (selected.state.isNotEmpty) {
+          _stateController.text = selected.state;
+        }
+        if (selected.pincode.isNotEmpty) {
+          _pincodeController.text = selected.pincode;
+        }
+      });
+      FixHubSnackbar.success(context, 'Doorstep location pinned');
+    }
   }
 
   void _saveAddress() async {
@@ -52,6 +87,8 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
           city: _cityController.text.trim(),
           state: _stateController.text.trim(),
           pincode: _pincodeController.text.trim(),
+          latitude: _latitude,
+          longitude: _longitude,
           isDefault: _isDefault,
         );
 
@@ -81,6 +118,76 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
         child: ListView(
           padding: const EdgeInsets.all(AppSpacing.screenPadding),
           children: [
+            InkWell(
+              onTap: _chooseOnMap,
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: _latitude != null ? AppColors.success : AppColors.border,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _latitude != null
+                            ? AppColors.success.withValues(alpha: 0.12)
+                            : AppColors.elevatedSurface,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        _latitude != null
+                            ? Icons.check_circle_rounded
+                            : Icons.map_rounded,
+                        color: _latitude != null
+                            ? AppColors.success
+                            : AppColors.textPrimary,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _latitude != null
+                                ? 'Doorstep Location Pinned'
+                                : 'Pinpoint on Map',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _latitude != null
+                                ? 'Coordinates: ${_latitude!.toStringAsFixed(4)}, ${_longitude!.toStringAsFixed(4)}'
+                                : 'Tap to select exact location with pin',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
             FixHubTextField(
               controller: _labelController,
               label: 'Label (e.g., Home, Work)',
@@ -148,7 +255,7 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
                 });
               },
               contentPadding: EdgeInsets.zero,
-              activeColor: AppColors.buttonPrimary,
+              activeThumbColor: AppColors.buttonPrimary,
             ),
             const SizedBox(height: AppSpacing.xl),
           ],

@@ -51,6 +51,16 @@ class BookingRemoteDataSource {
     return _extractData(response.data);
   }
 
+  Future<Map<String, dynamic>> updateIssueDetails(String id, {String? description}) async {
+    final response = await _dio.patch(
+      ApiEndpoints.bookingIssue(id),
+      data: {
+        if (description != null) 'description': description,
+      },
+    );
+    return _extractData(response.data);
+  }
+
   Future<Map<String, dynamic>> cancelBooking(String id, String reason) async {
     final response = await _dio.patch(
       ApiEndpoints.bookingStatus(id), 
@@ -94,6 +104,11 @@ class BookingRemoteDataSource {
 
   Future<Map<String, dynamic>> rejectRevision(String bookingId) async {
     final response = await _dio.patch(ApiEndpoints.bookingRejectRevision(bookingId));
+    return _extractData(response.data);
+  }
+
+  Future<Map<String, dynamic>> payExtraCharge(String bookingId) async {
+    final response = await _dio.post(ApiEndpoints.bookingPayExtraCharge(bookingId));
     return _extractData(response.data);
   }
 
@@ -144,6 +159,16 @@ class BookingRemoteDataSource {
     try {
       await _dio.post(ApiEndpoints.bookingCancelDraft(bookingId));
     } catch (_) {}
+  }
+
+  Future<Map<String, dynamic>> createExtraChargeOrder(String bookingId) async {
+    final response = await _dio.post(ApiEndpoints.createExtraChargeOrder(bookingId));
+    return _extractData(response.data);
+  }
+
+  Future<Map<String, dynamic>> verifyExtraChargePayment(Map<String, dynamic> data) async {
+    final response = await _dio.post(ApiEndpoints.verifyExtraCharge, data: data);
+    return _extractData(response.data);
   }
 
   List<dynamic> _extractList(dynamic data) {

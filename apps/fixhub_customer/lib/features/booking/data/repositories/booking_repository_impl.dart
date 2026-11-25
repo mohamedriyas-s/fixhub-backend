@@ -69,4 +69,10 @@ class BookingRepositoryImpl implements BookingRepository {
   Future<void> cancelDraft(String bookingId) async {
     return _remoteDataSource.cancelDraft(bookingId);
   }
+
+  @override
+  Future<BookingModel> updateIssueDetails(String bookingId, {String? description}) async {
+    final data = await _remoteDataSource.updateIssueDetails(bookingId, description: description);
+    return BookingModel.fromJson(data);
+  }
 }

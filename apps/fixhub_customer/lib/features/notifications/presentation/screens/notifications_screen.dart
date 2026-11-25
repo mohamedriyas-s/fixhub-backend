@@ -96,9 +96,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             padding: const EdgeInsets.all(AppSpacing.screenPadding),
             child: FixHubShimmer.listPlaceholder(itemCount: 8),
           ),
-          error: (error, _) => FixHubErrorState(
-            onRetry: () => ref.invalidate(notificationsProvider),
-          ),
+          error: (error, stackTrace) {
+            debugPrint('[NotificationsScreen] Error: $error\n$stackTrace');
+            return FixHubErrorState(
+              onRetry: () => ref.invalidate(notificationsProvider),
+            );
+          },
         ),
       ),
     );
@@ -161,9 +164,11 @@ class _NotificationCard extends ConsumerWidget {
       ref.read(notificationNotifierProvider.notifier).markAsRead(notification.id);
     }
 
-    // Deep link handling
-    if (notification.data != null && notification.data!['bookingId'] != null) {
-      final bookingId = notification.data!['bookingId'] as String;
+    // Deep link handling (supports root bookingId or nested inside payload)
+    final data = notification.data;
+    final payload = data?['payload'] is Map ? (data!['payload'] as Map) : data;
+    final bookingId = payload?['bookingId'] as String?;
+    if (bookingId != null && bookingId.isNotEmpty) {
       context.push('/booking-detail/$bookingId');
     }
   }

@@ -26,9 +26,9 @@ class BookingMediaUploadService {
 
   final Dio _dio;
 
-  // S3 bucket public base URL (matches backend StorageService config)
+  // S3 bucket public base URL fallback
   static const _s3Base =
-      'https://fixhub-uploads.s3.ap-south-1.amazonaws.com';
+      'https://spotfluencerbucket2.s3.ap-south-1.amazonaws.com';
 
   /// Upload [file] for booking [bookingId].
   ///
@@ -81,8 +81,10 @@ class BookingMediaUploadService {
     );
 
     // ── Step 3: Persist the public URL via the backend ─────────────────
-    // Derive the public S3 URL from the generated key.
-    final String publicUrl = '$_s3Base/$s3Key';
+    // Derive the public S3 URL directly from the presigned upload URL (without query params)
+    final String publicUrl = uploadUrl.contains('?')
+        ? uploadUrl.split('?').first
+        : '$_s3Base/$s3Key';
 
     final attachResp = await _dio.post(
       ApiEndpoints.bookingMedia(bookingId),

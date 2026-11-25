@@ -4,7 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/config/theme/app_colors.dart';
+import '../../../../core/config/theme/app_radius.dart';
 import '../../../../core/config/theme/app_spacing.dart';
+import '../../../../core/router/route_names.dart';
+import '../../data/models/booking_model.dart';
 import '../../../../core/widgets/fixhub_app_bar.dart';
 import '../../../../core/widgets/fixhub_card.dart';
 import '../../../../core/widgets/fixhub_shimmer.dart';
@@ -13,8 +16,10 @@ import '../../../../core/widgets/fixhub_status_chip.dart';
 import '../providers/booking_provider.dart';
 import '../providers/tracking_provider.dart';
 import '../widgets/additional_charge_confirmation_card.dart';
+import '../widgets/final_quotation_otp_card.dart';
 import '../widgets/start_service_otp_card.dart';
 import 'rate_service_screen.dart';
+import '../../../location/presentation/screens/pinpoint_location_screen.dart';
 
 class BookingDetailScreen extends ConsumerWidget {
   const BookingDetailScreen({super.key, required this.bookingId});
@@ -104,15 +109,66 @@ class BookingDetailScreen extends ConsumerWidget {
               ),
               const SizedBox(height: AppSpacing.md),
 
+              // ── Issue Details ──────────────────────────────────
+              _BookingIssueDetailsCard(
+                booking: booking,
+                canEdit: [
+                  BookingStatusType.pending,
+                  BookingStatusType.confirmed,
+                  BookingStatusType.assigned,
+                  BookingStatusType.enRoute,
+                  BookingStatusType.arrived,
+                ].contains(booking.statusType),
+              ),
+              const SizedBox(height: AppSpacing.md),
+
               // Address
               if (booking.address != null) ...[
                 FixHubCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Address',
-                        style: Theme.of(context).textTheme.titleLarge,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Address',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.location_on_rounded,
+                              color: AppColors.buttonPrimary,
+                            ),
+                            tooltip: 'Pinpoint Exact Doorstep on Map',
+                            onPressed: () async {
+                              final address = booking.address;
+                              if (address == null) return;
+                              await PinpointLocationScreen.ensureGpsEnabled(context);
+                              if (!context.mounted) return;
+                              final updated = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (ctx) => PinpointLocationScreen(
+                                    initialAddress: address,
+                                    bookingId: booking.id,
+                                  ),
+                                ),
+                              );
+                              if (updated != null) {
+                                ref.invalidate(bookingDetailProvider(bookingId));
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Doorstep location updated successfully!'),
+                                      backgroundColor: AppColors.success,
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                          ),
+                        ],
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       Text(
@@ -126,6 +182,47 @@ class BookingDetailScreen extends ConsumerWidget {
                               color: AppColors.textSecondary,
                             ),
                       ),
+                      const SizedBox(height: AppSpacing.xs),
+                      if (booking.address!.latitude != null &&
+                          booking.address!.latitude != 0 &&
+                          booking.address!.longitude != null &&
+                          booking.address!.longitude != 0) ...[
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.check_circle_rounded,
+                              size: 14,
+                              color: AppColors.success,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Doorstep location pinned',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppColors.success,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ] else ...[
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.info_outline_rounded,
+                              size: 14,
+                              color: AppColors.warning,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Tap the location icon to pin your exact doorstep',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppColors.warning,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -188,7 +285,7 @@ class BookingDetailScreen extends ConsumerWidget {
                           Container(
                             width: 48,
                             height: 48,
-                            decoration: BoxDecoration(
+                            decoration: const BoxDecoration(
                               color: AppColors.surface,
                               shape: BoxShape.circle,
                             ),
@@ -357,6 +454,11 @@ class BookingDetailScreen extends ConsumerWidget {
               if (booking.status == 'PRICE_REVISION_PENDING') ...[ 
                 const SizedBox(height: AppSpacing.lg),
                 AdditionalChargeConfirmationCard(booking: booking),
+              ],
+              // Final Quotation & Completion OTP Card
+              if (booking.isAwaitingVerification || booking.isPendingCollection) ...[
+                const SizedBox(height: AppSpacing.lg),
+                FinalQuotationOtpCard(booking: booking),
               ],
               // Action Buttons
               const SizedBox(height: AppSpacing.lg),
@@ -665,3 +767,245 @@ class _NoTechnicianFoundBanner extends StatelessWidget {
     );
   }
 }
+
+class _BookingIssueDetailsCard extends StatelessWidget {
+  const _BookingIssueDetailsCard({
+    required this.booking,
+    required this.canEdit,
+  });
+
+  final BookingModel booking;
+  final bool canEdit;
+
+  void _showImagePreview(BuildContext context, String url) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.network(
+                url,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.all(24),
+                  child: const Text('Could not load image'),
+                ),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.white, size: 28),
+              onPressed: () => Navigator.pop(ctx),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openVideo(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final media = booking.beforeServiceMedia;
+    final hasDesc = booking.description != null && booking.description!.trim().isNotEmpty;
+    final hasMedia = media.isNotEmpty;
+
+    if (!hasDesc && !hasMedia) {
+      if (!canEdit) return const SizedBox.shrink();
+
+      return FixHubCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: AppRadius.smallRadius,
+                  ),
+                  child: const Icon(
+                    Icons.add_photo_alternate_outlined,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Describe your issue', style: textTheme.titleMedium),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Add photos or video to help technician prepare',
+                        style: textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () {
+                  context.push(RouteNames.addIssueDetailsPath(booking.id));
+                },
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.border),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.small),
+                  ),
+                ),
+                child: const Text('Add Issue Photos & Notes'),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return FixHubCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Issue Details', style: textTheme.titleLarge),
+              if (canEdit)
+                GestureDetector(
+                  onTap: () {
+                    context.push(
+                      RouteNames.addIssueDetailsPath(booking.id),
+                      extra: booking.description,
+                    );
+                  },
+                  child: Text(
+                    'Edit',
+                    style: textTheme.labelMedium?.copyWith(
+                      color: AppColors.buttonPrimary,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          if (hasDesc) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              booking.description!,
+              style: textTheme.bodyMedium?.copyWith(
+                color: AppColors.textPrimary,
+                height: 1.4,
+              ),
+            ),
+          ],
+          if (hasMedia) ...[
+            const SizedBox(height: AppSpacing.md),
+            SizedBox(
+              height: 84,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: media.length,
+                separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
+                itemBuilder: (ctx, index) {
+                  final item = media[index];
+                  final rawUrl = item['url'] as String? ?? '';
+                  final url = rawUrl.replaceAll(
+                    'fixhub-uploads.s3.ap-south-1.amazonaws.com',
+                    'spotfluencerbucket2.s3.ap-south-1.amazonaws.com',
+                  );
+                  final isVideo = item['type'] == 'VIDEO';
+
+                  return GestureDetector(
+                    onTap: () {
+                      if (isVideo) {
+                        _openVideo(url);
+                      } else {
+                        _showImagePreview(context, url);
+                      }
+                    },
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: 84,
+                          height: 84,
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(AppRadius.small),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(AppRadius.small),
+                            child: isVideo
+                                ? const Center(
+                                    child: Icon(
+                                      Icons.play_circle_fill_rounded,
+                                      size: 32,
+                                      color: AppColors.buttonPrimary,
+                                    ),
+                                  )
+                                : Image.network(
+                                    url,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      color: AppColors.surface,
+                                      child: const Center(
+                                        child: Icon(
+                                          Icons.broken_image_outlined,
+                                          size: 28,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        if (isVideo)
+                          Positioned(
+                            bottom: 4,
+                            left: 4,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.7),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'VIDEO',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+

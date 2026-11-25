@@ -25,11 +25,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   bool _isSuccess = false;
   String? _errorMessage;
 
-  void _releaseSlotHold() {
+  Future<void> _releaseSlotHold() async {
     if (_isSuccess) return;
     final bookingId = ref.read(bookingFlowProvider).draftBookingId;
-    if (bookingId != null) {
-      ref.read(bookingRepositoryProvider).cancelDraft(bookingId);
+    if (bookingId != null && bookingId.isNotEmpty) {
+      try {
+        await ref.read(bookingRepositoryProvider).cancelDraft(bookingId);
+      } catch (_) {
+        // Silently ignore if already cancelled or expired
+      }
+      ref.read(bookingFlowProvider.notifier).setDraftBookingId('');
     }
   }
 
@@ -118,7 +123,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         context.go(RouteNames.bookingSuccess);
       }
     } catch (e) {
-      _releaseSlotHold();
+      await _releaseSlotHold();
       setState(() {
         _isProcessing = false;
         _errorMessage = 'Payment verification failed. Please contact support.';
@@ -130,7 +135,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   }
 
   void _handlePaymentError(PaymentFailureResponse response) {
-    _releaseSlotHold();
     setState(() {
       _isProcessing = false;
       _errorMessage = response.message ?? 'Payment was cancelled or failed';
@@ -167,9 +171,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         backgroundColor: AppColors.background,
         appBar: FixHubAppBar(
           title: 'Payment',
-          onBackPressed: () {
-            _releaseSlotHold();
-            Navigator.of(context).pop();
+          onBackPressed: () async {
+            await _releaseSlotHold();
+            if (context.mounted) {
+              Navigator.of(context).pop();
+            }
           },
         ),
         body: SafeArea(
@@ -293,7 +299,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               const SizedBox(height: AppSpacing.md),
               FixHubButton.secondary(
                 label: 'Cancel',
-                onPressed: _isProcessing ? null : () => context.pop(),
+                onPressed: _isProcessing
+                    ? null
+                    : () async {
+                        await _releaseSlotHold();
+                        if (context.mounted) {
+                          context.pop();
+                        }
+                      },
               ),
             ],
           ),

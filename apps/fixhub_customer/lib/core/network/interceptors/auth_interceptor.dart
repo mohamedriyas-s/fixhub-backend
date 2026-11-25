@@ -210,7 +210,7 @@ class AuthInterceptor extends QueuedInterceptor {
     try {
       final localStorage = _ref.read(localStorageProvider);
       await localStorage.clearAll();
-      _ref.read(authProvider.notifier).logout();
+      _ref.read(authProvider.notifier).forceLogout();
     } catch (e) {
       debugPrint('[AuthInterceptor] Force logout error: $e');
     }
