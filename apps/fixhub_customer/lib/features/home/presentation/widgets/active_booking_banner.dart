@@ -6,6 +6,8 @@ import '../../../../core/config/theme/app_spacing.dart';
 import '../../../../core/config/theme/app_radius.dart';
 import '../../../../core/widgets/fixhub_status_chip.dart';
 import '../../../booking/presentation/providers/booking_provider.dart';
+import '../../../booking/presentation/widgets/additional_charge_confirmation_card.dart';
+import '../../../booking/presentation/widgets/final_quotation_otp_card.dart';
 
 class ActiveBookingBanner extends ConsumerWidget {
   const ActiveBookingBanner({super.key});
@@ -24,6 +26,86 @@ class ActiveBookingBanner extends ConsumerWidget {
         ).firstOrNull;
 
         if (activeBooking == null) return const SizedBox.shrink();
+
+        if (activeBooking.status == 'PRICE_REVISION_PENDING') {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                GestureDetector(
+                  onTap: () => context.push('/booking-detail/${activeBooking.id}'),
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '${activeBooking.subService?['name'] ?? 'Active Service'} • #${activeBooking.bookingNumber}',
+                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                        Text(
+                          'View Job >',
+                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                color: AppColors.buttonPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                AdditionalChargeConfirmationCard(
+                  booking: activeBooking,
+                  onActionCompleted: () {
+                    ref.invalidate(bookingsProvider);
+                    ref.invalidate(bookingDetailProvider(activeBooking.id));
+                  },
+                ),
+              ],
+            ),
+          );
+        }
+
+        if (activeBooking.isAwaitingVerification || activeBooking.isPendingCollection) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                GestureDetector(
+                  onTap: () => context.push('/booking-detail/${activeBooking.id}'),
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '${activeBooking.subService?['name'] ?? 'Active Service'} • #${activeBooking.bookingNumber}',
+                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                        Text(
+                          'View Job >',
+                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                color: AppColors.buttonPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                FinalQuotationOtpCard(booking: activeBooking),
+              ],
+            ),
+          );
+        }
 
         return GestureDetector(
           onTap: () {

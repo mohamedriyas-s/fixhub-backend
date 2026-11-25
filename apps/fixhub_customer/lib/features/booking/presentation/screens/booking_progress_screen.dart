@@ -8,6 +8,8 @@ import '../../../../core/widgets/fixhub_app_bar.dart';
 import '../../../../core/widgets/fixhub_error_state.dart';
 import '../../../../core/widgets/fixhub_status_chip.dart';
 import '../providers/booking_provider.dart';
+import '../widgets/additional_charge_confirmation_card.dart';
+import '../widgets/final_quotation_otp_card.dart';
 import '../widgets/job_progress_timeline.dart';
 import 'rate_service_screen.dart';
 
@@ -78,10 +80,29 @@ class BookingProgressScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: AppSpacing.xxl),
 
-                // Timeline
+                // Timeline & Action Cards
                 Expanded(
                   child: SingleChildScrollView(
-                    child: JobProgressTimeline(booking: booking),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (booking.status == 'PRICE_REVISION_PENDING') ...[
+                          AdditionalChargeConfirmationCard(
+                            booking: booking,
+                            onActionCompleted: () {
+                              ref.invalidate(bookingDetailProvider(bookingId));
+                              ref.invalidate(bookingsProvider);
+                            },
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                        ],
+                        if (booking.isAwaitingVerification || booking.isPendingCollection) ...[
+                          FinalQuotationOtpCard(booking: booking),
+                          const SizedBox(height: AppSpacing.lg),
+                        ],
+                        JobProgressTimeline(booking: booking),
+                      ],
+                    ),
                   ),
                 ),
 

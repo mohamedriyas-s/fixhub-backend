@@ -146,7 +146,7 @@ class _FinalQuotationOtpCardState extends ConsumerState<FinalQuotationOtpCard> {
       // Graceful cancellation / navigation back: no error popup, OTP remains safely locked
       FixHubSnackbar.show(
         context: context,
-        message: 'Payment cancelled.',
+        message: 'Payment not completed. You can retry whenever ready.',
         type: SnackbarType.info,
       );
     }
