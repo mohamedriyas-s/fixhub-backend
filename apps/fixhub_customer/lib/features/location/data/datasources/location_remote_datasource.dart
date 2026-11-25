@@ -46,18 +46,37 @@ class LocationRemoteDataSource {
         if (first['Status'] == 'Success' &&
             first['PostOffice'] is List &&
             (first['PostOffice'] as List).isNotEmpty) {
-          final po = first['PostOffice'][0] as Map<String, dynamic>;
-          final district = po['District']?.toString() ?? '';
-          final block = po['Block']?.toString() ?? po['Name']?.toString() ?? '';
-          final state = po['State']?.toString() ?? '';
-          final cityParts = [block, district]
+          final postOffices = (first['PostOffice'] as List)
+              .whereType<Map<String, dynamic>>()
+              .toList();
+          if (postOffices.isEmpty) return null;
+
+          // Prefer a Delivery post office if available, otherwise take the first
+          final po = postOffices.firstWhere(
+            (p) => p['DeliveryStatus']?.toString().toLowerCase() == 'delivery',
+            orElse: () => postOffices.first,
+          );
+
+          final name = po['Name']?.toString().trim() ?? '';
+          final district = po['District']?.toString().trim() ?? '';
+          final state = po['State']?.toString().trim() ?? '';
+          final pin = (po['Pincode']?.toString().trim().isNotEmpty ?? false)
+              ? po['Pincode']!.toString().trim()
+              : pincode;
+
+          // Format: name, district, state, pincode
+          final locationParts = [name, district, state, pin]
               .where((s) => s.isNotEmpty && s.toUpperCase() != 'NA')
-              .toSet();
-          final city = cityParts.isNotEmpty ? cityParts.join(', ') : district;
+              .toList();
+          final formattedLocation =
+              locationParts.isNotEmpty ? locationParts.join(', ') : pin;
+
           return {
-            'pincode': pincode,
-            'city': city.isNotEmpty ? city : 'Unknown Location',
+            'name': name,
+            'district': district,
             'state': state,
+            'pincode': pin,
+            'city': formattedLocation,
           };
         }
       }

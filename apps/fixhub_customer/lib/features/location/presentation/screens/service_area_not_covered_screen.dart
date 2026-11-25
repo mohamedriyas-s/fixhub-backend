@@ -5,6 +5,7 @@ import '../../../../core/config/theme/app_colors.dart';
 import '../../../../core/config/theme/app_spacing.dart';
 import '../../../../core/router/route_names.dart';
 import '../../../../core/widgets/fixhub_button.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/location_provider.dart';
 
 class ServiceAreaNotCoveredScreen extends ConsumerStatefulWidget {
@@ -15,126 +16,302 @@ class ServiceAreaNotCoveredScreen extends ConsumerStatefulWidget {
       _ServiceAreaNotCoveredScreenState();
 }
 
-class _ServiceAreaNotCoveredScreenState extends ConsumerState<ServiceAreaNotCoveredScreen> {
+class _ServiceAreaNotCoveredScreenState
+    extends ConsumerState<ServiceAreaNotCoveredScreen> {
+  final Set<String> _notifiedPincodes = {};
+  bool _isSubmitting = false;
+
+  void _handleBack() {
+    final locationNotifier = ref.read(locationProvider.notifier);
+    final locationState = ref.read(locationProvider);
+    locationNotifier.revertToLastValidLocation();
+
+    if (locationState.hasValidLocation) {
+      context.go(RouteNames.home);
+    } else {
+      context.go(RouteNames.locationAccess);
+    }
+  }
+
   void _showNotifyMeSheet(BuildContext context, String currentPincode) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _NotifyMeSheet(pincode: currentPincode),
+      builder: (ctx) => _NotifyMeSheet(
+        pincode: currentPincode,
+        onSuccess: () {
+          setState(() {
+            _notifiedPincodes.add(currentPincode);
+          });
+        },
+      ),
     );
+  }
+
+  Future<void> _handleNotifyMe(String currentPincode) async {
+    final authState = ref.read(authProvider);
+    final user = authState.user;
+    final phone = (user?.phone ?? authState.phone ?? '').trim();
+
+    // If phone number is not available, open the sheet so the user can enter details
+    if (phone.isEmpty) {
+      _showNotifyMeSheet(context, currentPincode);
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final repository = ref.read(locationRepositoryProvider);
+      final name = user?.name?.trim() ?? '';
+      final email = user?.email?.trim() ?? '';
+
+      await repository.requestCoverage(
+        currentPincode,
+        name,
+        phone,
+        email,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _notifiedPincodes.add(currentPincode);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to submit request. Please try again.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final locationState = ref.watch(locationProvider);
     final currentPincode = locationState.currentPincode ?? '';
+    final isNotified = _notifiedPincodes.contains(currentPincode);
+    final authState = ref.watch(authProvider);
+    final phone = authState.user?.phone ?? authState.phone;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _handleBack();
+      },
+      child: Scaffold(
         backgroundColor: AppColors.background,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go(RouteNames.locationAccess),
+        appBar: AppBar(
+          backgroundColor: AppColors.background,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+            onPressed: _handleBack,
+          ),
         ),
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.screenPadding),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Spacer(),
-              Container(
-                width: 160,
-                height: 160,
-                decoration: const BoxDecoration(
-                  color: AppColors.surface,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.sentiment_dissatisfied_rounded,
-                  size: 80,
-                  color: AppColors.textSecondary,
-                ),
+        body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.screenPadding,
+                vertical: AppSpacing.md,
               ),
-              const SizedBox(height: AppSpacing.xxl),
-              Text(
-                'We\'re not here yet',
-                style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                      color: AppColors.textPrimary,
-                    ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              if (locationState.currentCity != null || currentPincode.isNotEmpty)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(AppSpacing.md),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight - (AppSpacing.md * 2),
+                ),
+                child: IntrinsicHeight(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.location_on, color: AppColors.textPrimary, size: 18),
-                      const SizedBox(width: AppSpacing.xs),
-                      RichText(
-                        text: TextSpan(
-                          style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-                          children: [
-                            if (locationState.currentCity != null && locationState.currentCity!.isNotEmpty)
-                              TextSpan(text: '${locationState.currentCity} - '),
-                            TextSpan(
-                              text: currentPincode,
-                              style: const TextStyle(color: AppColors.info, fontWeight: FontWeight.bold),
-                            ),
-                          ],
+                      const Spacer(),
+                      Container(
+                        width: 140,
+                        height: 140,
+                        decoration: const BoxDecoration(
+                          color: AppColors.surface,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          isNotified
+                              ? Icons.notifications_active_rounded
+                              : Icons.sentiment_dissatisfied_rounded,
+                          size: 64,
+                          color: isNotified ? AppColors.textPrimary : AppColors.textSecondary,
                         ),
                       ),
+                      const SizedBox(height: AppSpacing.xl),
+                      Text(
+                        isNotified ? "We'll notify you!" : "We're not here yet",
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      if (locationState.currentCity != null || currentPincode.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.lg,
+                            vertical: AppSpacing.sm,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(AppSpacing.md),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.location_on,
+                                color: AppColors.textPrimary,
+                                size: 18,
+                              ),
+                              const SizedBox(width: AppSpacing.xs),
+                              Flexible(
+                                child: Text.rich(
+                                  TextSpan(
+                                    style: const TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    children: [
+                                      if (locationState.currentCity != null &&
+                                          locationState.currentCity!.isNotEmpty) ...[
+                                        if (locationState.currentCity!.contains(currentPincode))
+                                          TextSpan(text: locationState.currentCity!)
+                                        else ...[
+                                          TextSpan(text: '${locationState.currentCity} - '),
+                                          TextSpan(
+                                            text: currentPincode,
+                                            style: const TextStyle(
+                                              color: AppColors.info,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ] else
+                                        TextSpan(
+                                          text: currentPincode,
+                                          style: const TextStyle(
+                                            color: AppColors.info,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        isNotified
+                            ? (phone != null && phone.isNotEmpty
+                                ? "You're on the waitlist! We will notify you at $phone as soon as FixHub launches in your area."
+                                : "You're on the waitlist! We will notify you as soon as FixHub launches in your area.")
+                            : "Sorry, we don't provide services in your area right now.",
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              color: AppColors.textSecondary,
+                              height: 1.4,
+                            ),
+                      ),
+                      if (isNotified) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: AppSpacing.xs,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(AppSpacing.sm),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.check_circle_rounded,
+                                size: 16,
+                                color: AppColors.success,
+                              ),
+                              SizedBox(width: AppSpacing.xs),
+                              Text(
+                                'Waitlist confirmed',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const Spacer(),
+                      if (!isNotified) ...[
+                        FixHubButton(
+                          label: 'Notify me when live',
+                          isLoading: _isSubmitting,
+                          onPressed: currentPincode.isNotEmpty
+                              ? () => _handleNotifyMe(currentPincode)
+                              : null,
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        TextButton(
+                          onPressed: () {
+                            context.go(RouteNames.setLocation);
+                          },
+                          child: Text(
+                            'Change Location',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ),
+                      ] else ...[
+                        FixHubButton(
+                          label: 'Change Location',
+                          onPressed: () {
+                            context.go(RouteNames.setLocation);
+                          },
+                        ),
+                      ],
+                      const SizedBox(height: AppSpacing.bottomSafePadding),
                     ],
                   ),
                 ),
-              if (locationState.currentCity != null || currentPincode.isNotEmpty)
-                const SizedBox(height: AppSpacing.md),
-              Text(
-                'Sorry, we don\'t provide services in your area right now.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
               ),
-              const Spacer(),
-              FixHubButton(
-                label: 'Notify me when live',
-                onPressed: () => _showNotifyMeSheet(context, currentPincode),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              TextButton(
-                onPressed: () {
-                  context.go(RouteNames.setLocation);
-                },
-                child: Text(
-                  'Change Location',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.bottomSafePadding),
-            ],
-          ),
+            );
+          },
         ),
       ),
+    ),
     );
   }
 }
 
 class _NotifyMeSheet extends ConsumerStatefulWidget {
+  const _NotifyMeSheet({
+    required this.pincode,
+    required this.onSuccess,
+  });
+
   final String pincode;
-  const _NotifyMeSheet({required this.pincode});
+  final VoidCallback onSuccess;
 
   @override
   ConsumerState<_NotifyMeSheet> createState() => _NotifyMeSheetState();
@@ -142,10 +319,20 @@ class _NotifyMeSheet extends ConsumerStatefulWidget {
 
 class _NotifyMeSheetState extends ConsumerState<_NotifyMeSheet> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _emailController = TextEditingController();
+  late final TextEditingController _nameController;
+  late final TextEditingController _phoneController;
+  late final TextEditingController _emailController;
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final authState = ref.read(authProvider);
+    final user = authState.user;
+    _nameController = TextEditingController(text: user?.name ?? '');
+    _phoneController = TextEditingController(text: user?.phone ?? authState.phone ?? '');
+    _emailController = TextEditingController(text: user?.email ?? '');
+  }
 
   @override
   void dispose() {
@@ -171,18 +358,11 @@ class _NotifyMeSheetState extends ConsumerState<_NotifyMeSheet> {
 
       if (!mounted) return;
       Navigator.pop(context); // Close sheet
-      
+      widget.onSuccess();
+    } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Thanks! We will notify you when we launch in your area.'),
-          backgroundColor: AppColors.success,
-        ),
-      );
-      
-      context.go(RouteNames.locationAccess); // Go back home or locations
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
           content: Text('Failed to submit request. Please try again.'),
           backgroundColor: AppColors.error,
         ),
@@ -301,4 +481,5 @@ class _NotifyMeSheetState extends ConsumerState<_NotifyMeSheet> {
     );
   }
 }
+
 

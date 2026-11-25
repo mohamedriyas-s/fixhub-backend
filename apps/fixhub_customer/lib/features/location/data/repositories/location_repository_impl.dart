@@ -145,14 +145,21 @@ class LocationRepositoryImpl implements LocationRepository {
             .timeout(const Duration(seconds: 4));
         if (placemarks.isNotEmpty) {
           final p = placemarks.first;
-          final localityParts = [
-            p.subLocality,
-            p.locality,
-            p.subAdministrativeArea,
-            p.administrativeArea,
-          ].where((e) => e != null && e.trim().isNotEmpty).map((e) => e!.trim()).toSet();
-          final city = localityParts.isNotEmpty ? localityParts.take(2).join(', ') : 'Unknown Location';
+          final name = p.subLocality?.trim().isNotEmpty == true
+              ? p.subLocality!.trim()
+              : (p.locality?.trim() ?? '');
+          final district = p.subAdministrativeArea?.trim().isNotEmpty == true
+              ? p.subAdministrativeArea!.trim()
+              : (p.locality?.trim() ?? '');
+          final state = p.administrativeArea?.trim() ?? '';
+          final localityParts = [name, district, state, pincode]
+              .where((e) => e.isNotEmpty && e.toUpperCase() != 'NA')
+              .toList();
+          final city = localityParts.isNotEmpty ? localityParts.join(', ') : 'Unknown Location';
           return {
+            'name': name,
+            'district': district,
+            'state': state,
             'pincode': pincode,
             'city': city,
             'latitude': loc.latitude.toString(),

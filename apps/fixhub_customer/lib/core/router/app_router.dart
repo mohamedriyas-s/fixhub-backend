@@ -27,6 +27,7 @@ import '../../features/booking/presentation/screens/booking_summary_screen.dart'
 import '../../features/booking/presentation/screens/payment_screen.dart';
 import '../../features/booking/presentation/screens/booking_success_screen.dart';
 import '../../features/booking/presentation/screens/booking_detail_screen.dart';
+import '../../features/booking/presentation/screens/add_issue_details_screen.dart';
 import '../../features/booking/presentation/screens/booking_tracking_screen.dart';
 import '../../features/booking/presentation/screens/booking_progress_screen.dart';
 import 'route_names.dart';
@@ -81,7 +82,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             state.matchedLocation == RouteNames.setLocation ||
             state.matchedLocation == RouteNames.serviceAreaNotCovered;
             
-        if (locationStatus == LocationStatus.initial && !isLocationRoute) {
+        if ((locationStatus == LocationStatus.initial ||
+                (!locationState.hasValidLocation &&
+                    locationStatus != LocationStatus.valid)) &&
+            !isLocationRoute) {
           return RouteNames.locationAccess;
         }
       }
@@ -232,6 +236,18 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           return BookingDetailScreen(bookingId: id);
+        },
+      ),
+      GoRoute(
+        path: '/booking-issue-details/:id',
+        name: 'addIssueDetails',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          final description = state.extra as String?;
+          return AddIssueDetailsScreen(
+            bookingId: id,
+            initialDescription: description,
+          );
         },
       ),
       GoRoute(

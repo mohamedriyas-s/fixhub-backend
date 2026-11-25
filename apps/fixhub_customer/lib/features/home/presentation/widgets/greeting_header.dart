@@ -19,9 +19,21 @@ class GreetingHeader extends ConsumerWidget {
     final locationState = ref.watch(locationProvider);
     final userName = authState.user?.displayName ?? 'there';
     final firstLetter = userName.isNotEmpty ? userName[0].toUpperCase() : 'C';
-    final locationDisplay = locationState.currentPincode != null
-        ? '${locationState.currentCity ?? 'Chennai'}, ${locationState.currentPincode}'
-        : 'Set Location';
+    final locationDisplay = () {
+      if (locationState.status != LocationStatus.valid ||
+          locationState.currentPincode == null ||
+          locationState.currentPincode!.isEmpty) {
+        return 'Set Location';
+      }
+      final city = locationState.currentCity;
+      if (city != null && city.trim().isNotEmpty) {
+        if (city.contains(locationState.currentPincode!)) {
+          return city;
+        }
+        return '$city, ${locationState.currentPincode}';
+      }
+      return 'Chennai, ${locationState.currentPincode}';
+    }();
 
     // Time-based greeting
     final hour = DateTime.now().hour;

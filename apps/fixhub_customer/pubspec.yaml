@@ -1,5 +1,5 @@
 name: fixhub_customer
-description: "FixHub Customer App"
+description: 'FixHub Customer App'
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -35,6 +35,8 @@ dependencies:
   flutter_dotenv: ^6.0.1
   google_fonts: ^6.2.1
   path: ^1.9.1
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
 
 dev_dependencies:
   flutter_test:

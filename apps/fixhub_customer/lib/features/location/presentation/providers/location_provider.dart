@@ -21,6 +21,8 @@ class LocationState {
     this.status = LocationStatus.initial,
     this.currentPincode,
     this.currentCity,
+    this.lastValidPincode,
+    this.lastValidCity,
     this.serviceAreaResult,
     this.errorMessage,
     this.hasPermission = false,
@@ -30,15 +32,22 @@ class LocationState {
   final LocationStatus status;
   final String? currentPincode;
   final String? currentCity;
+  final String? lastValidPincode;
+  final String? lastValidCity;
   final ServiceAreaValidationModel? serviceAreaResult;
   final String? errorMessage;
   final bool hasPermission;
   final bool isRestoring;
 
+  bool get hasValidLocation =>
+      lastValidPincode != null && lastValidPincode!.isNotEmpty;
+
   LocationState copyWith({
     LocationStatus? status,
     String? currentPincode,
     String? currentCity,
+    String? lastValidPincode,
+    String? lastValidCity,
     ServiceAreaValidationModel? serviceAreaResult,
     String? errorMessage,
     bool clearErrorMessage = false,
@@ -49,6 +58,8 @@ class LocationState {
       status: status ?? this.status,
       currentPincode: currentPincode ?? this.currentPincode,
       currentCity: currentCity ?? this.currentCity,
+      lastValidPincode: lastValidPincode ?? this.lastValidPincode,
+      lastValidCity: lastValidCity ?? this.lastValidCity,
       serviceAreaResult: serviceAreaResult ?? this.serviceAreaResult,
       errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
       hasPermission: hasPermission ?? this.hasPermission,
@@ -86,21 +97,19 @@ class LocationNotifier extends StateNotifier<LocationState> {
         status: LocationStatus.valid,
         currentPincode: savedPincode,
         currentCity: savedCity,
-        isRestoring: false,
-        clearErrorMessage: true,
-      );
-    } else if (savedStatus == 'invalid' && savedPincode != null) {
-      state = state.copyWith(
-        hasPermission: hasPermission,
-        status: LocationStatus.invalid,
-        currentPincode: savedPincode,
-        currentCity: savedCity,
+        lastValidPincode: savedPincode,
+        lastValidCity: savedCity,
         isRestoring: false,
         clearErrorMessage: true,
       );
     } else {
+      // Clear any legacy invalid location saved in local storage
+      if (savedStatus == 'invalid') {
+        await _localStorage.clearLocation();
+      }
       state = state.copyWith(
         hasPermission: hasPermission,
+        status: LocationStatus.initial,
         isRestoring: false,
         clearErrorMessage: true,
       );
@@ -208,31 +217,56 @@ class LocationNotifier extends StateNotifier<LocationState> {
     try {
       final result = await _repository.validateServiceArea(pincode, lat: lat, lng: lng);
 
+      final displayLocation =
+          (city != null && city.trim().isNotEmpty) ? city.trim() : pincode;
+
       if (result.isServiceable) {
         state = state.copyWith(
           status: LocationStatus.valid,
           currentPincode: pincode,
-          currentCity: city,
+          currentCity: displayLocation,
+          lastValidPincode: pincode,
+          lastValidCity: displayLocation,
           serviceAreaResult: result,
           clearErrorMessage: true,
         );
         // Persist so we skip the screen next launch
-        await _localStorage.saveLocation(pincode: pincode, status: 'valid', city: city);
+        await _localStorage.saveLocation(pincode: pincode, status: 'valid', city: displayLocation);
       } else {
         state = state.copyWith(
           status: LocationStatus.invalid,
           currentPincode: pincode,
-          currentCity: city,
+          currentCity: displayLocation,
           serviceAreaResult: result,
           clearErrorMessage: true,
         );
-        await _localStorage.saveLocation(pincode: pincode, status: 'invalid', city: city);
+        // Do NOT save invalid pincode to _localStorage so it never persists as active location
       }
     } catch (e, stack) {
       debugPrint('[LocationNotifier] validateArea error: $e\n$stack');
       state = state.copyWith(
         status: LocationStatus.error,
         errorMessage: 'Unable to connect to service. Please check your internet connection.',
+      );
+    }
+  }
+
+  void revertToLastValidLocation() {
+    if (state.lastValidPincode != null) {
+      state = LocationState(
+        status: LocationStatus.valid,
+        currentPincode: state.lastValidPincode,
+        currentCity: state.lastValidCity,
+        lastValidPincode: state.lastValidPincode,
+        lastValidCity: state.lastValidCity,
+        hasPermission: state.hasPermission,
+        isRestoring: false,
+      );
+    } else {
+      state = LocationState(
+        status: LocationStatus.initial,
+        hasPermission: state.hasPermission,
+        isRestoring: false,
       );
     }
   }

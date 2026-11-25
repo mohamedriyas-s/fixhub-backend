@@ -29,7 +29,10 @@ final subServicesProvider =
         (ref, categoryId) async {
   final repo = ref.watch(homeRepositoryProvider);
   final locationState = ref.watch(locationProvider);
-  return repo.getSubServices(categoryId, pincode: locationState.currentPincode);
+  final pincode = locationState.status == LocationStatus.valid
+      ? locationState.currentPincode
+      : null;
+  return repo.getSubServices(categoryId, pincode: pincode);
 });
 
 // ── Popular Services (all active services for the home screen) ─
@@ -43,13 +46,16 @@ final popularServicesProvider =
 
   final repo = ref.read(homeRepositoryProvider);
   final locationState = ref.watch(locationProvider);
+  final pincode = locationState.status == LocationStatus.valid
+      ? locationState.currentPincode
+      : null;
   final allServices = <SubServiceModel>[];
 
   for (final category in activeCategories) {
     try {
       final services = await repo.getSubServices(
         category.id,
-        pincode: locationState.currentPincode,
+        pincode: pincode,
       );
       allServices.addAll(services);
     } catch (_) {
