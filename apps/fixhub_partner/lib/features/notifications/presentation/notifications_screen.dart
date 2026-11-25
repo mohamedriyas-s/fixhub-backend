@@ -18,9 +18,37 @@ class NotificationsScreen extends ConsumerStatefulWidget {
 }
 
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
+  Future<void> _confirmDeleteAll() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Delete all notifications?'),
+        content: const Text('This will permanently remove all your notifications.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Delete all'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await ref.read(notificationsProvider.notifier).deleteAll();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final notificationsAsync = ref.watch(notificationsProvider);
+    final notifications = notificationsAsync.value ?? const <AppNotification>[];
+    final hasUnread = notifications.any((n) => !n.isRead);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -38,11 +66,18 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () =>
-                ref.read(notificationsProvider.notifier).markAllAsRead(),
-            child: const Text('Mark all read'),
-          ),
+          if (hasUnread)
+            TextButton(
+              onPressed: () =>
+                  ref.read(notificationsProvider.notifier).markAllAsRead(),
+              child: const Text('Mark all read'),
+            ),
+          if (notifications.isNotEmpty)
+            TextButton(
+              onPressed: _confirmDeleteAll,
+              style: TextButton.styleFrom(foregroundColor: AppColors.error),
+              child: const Text('Delete all'),
+            ),
         ],
       ),
       body: RefreshIndicator(
@@ -175,12 +210,27 @@ class _NotificationTile extends ConsumerWidget {
               Container(
                 width: 8,
                 height: 8,
-                margin: const EdgeInsets.only(top: 4, left: 8),
+                margin: const EdgeInsets.only(top: 6, left: 6),
                 decoration: const BoxDecoration(
                   color: AppColors.primary,
                   shape: BoxShape.circle,
                 ),
               ),
+            const SizedBox(width: 2),
+            InkWell(
+              onTap: () => ref
+                  .read(notificationsProvider.notifier)
+                  .deleteNotification(notification.id),
+              borderRadius: BorderRadius.circular(16),
+              child: const Padding(
+                padding: EdgeInsets.all(4),
+                child: Icon(
+                  Icons.close_rounded,
+                  size: 16,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
           ],
         ),
       ),

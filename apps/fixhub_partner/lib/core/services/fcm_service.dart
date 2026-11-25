@@ -16,10 +16,22 @@ final fcmServiceProvider = Provider<FcmService>((ref) {
 class FcmService {
   final Ref _ref;
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  bool _isInitialized = false;
 
   FcmService(this._ref);
 
+  void _invalidateNotificationAndJobProviders() {
+    _ref.invalidate(unreadCountProvider);
+    _ref.invalidate(notificationsProvider);
+    _ref.invalidate(activeJobProvider);
+    _ref.invalidate(myJobsProvider(null));
+    _ref.invalidate(assignedJobsCountProvider);
+  }
+
   Future<void> initialize() async {
+    if (_isInitialized) return;
+    _isInitialized = true;
+
     // Request permission
     final settings = await _messaging.requestPermission(
       alert: true,
@@ -48,11 +60,7 @@ class FcmService {
       // Foreground messages — show a SnackBar and invalidate caches
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         debugPrint('FCM: Foreground message: ${message.messageId}');
-        _ref.invalidate(unreadCountProvider);
-        _ref.invalidate(notificationsProvider);
-        _ref.invalidate(activeJobProvider);
-        _ref.invalidate(myJobsProvider(null));
-        _ref.invalidate(assignedJobsCountProvider);
+        _invalidateNotificationAndJobProviders();
 
         final notification = message.notification;
         final bookingId = message.data['bookingId']?.toString();
@@ -64,6 +72,7 @@ class FcmService {
       });
 
       void handleMessageNavigation(RemoteMessage message) {
+        _invalidateNotificationAndJobProviders();
         final bookingId = message.data['bookingId']?.toString();
         if (bookingId != null && bookingId.isNotEmpty) {
           _ref.read(routerProvider).push('/job-details/$bookingId');

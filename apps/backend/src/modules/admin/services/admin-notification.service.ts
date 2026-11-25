@@ -105,4 +105,26 @@ export class AdminNotificationService {
 
     return { success: true };
   }
+
+  /** Delete a single admin notification and broadcast the update. */
+  async deleteOne(id: string) {
+    await this.prisma.adminNotification.deleteMany({ where: { id } });
+
+    if (this.gateway) {
+      this.gateway.broadcastToAdmin('notification:deleted', { id });
+    }
+
+    return { success: true, id };
+  }
+
+  /** Delete all admin notifications and broadcast the update. */
+  async deleteAll() {
+    await this.prisma.adminNotification.deleteMany({});
+
+    if (this.gateway) {
+      this.gateway.broadcastToAdmin('notification:all_deleted', {});
+    }
+
+    return { success: true };
+  }
 }

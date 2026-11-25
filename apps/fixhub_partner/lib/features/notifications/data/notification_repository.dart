@@ -70,6 +70,14 @@ class NotificationRepository {
     await _dio.patch(ApiEndpoints.notificationReadAll);
   }
 
+  Future<void> deleteNotification(String id) async {
+    await _dio.delete(ApiEndpoints.notificationDelete(id));
+  }
+
+  Future<void> deleteAllNotifications() async {
+    await _dio.delete(ApiEndpoints.notifications);
+  }
+
   List<dynamic> _extractList(dynamic data) {
     if (data is Map) {
       final inner = data['data'] ?? data['items'];

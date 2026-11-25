@@ -26,9 +26,11 @@ export const endpoints = {
     technicianVerify: (id: string) => `/admin/technicians/${id}/verify`,
     technicianDetails: (id: string) => `/admin/technicians/${id}/details`,
     technicianSpecializations: (id: string) => `/admin/technicians/${id}/specializations`,
-    technicianSpecialization: (id: string, subServiceId: string) => `/admin/technicians/${id}/specializations/${subServiceId}`,
+    technicianSpecialization: (id: string, subServiceId: string) =>
+      `/admin/technicians/${id}/specializations/${subServiceId}`,
     technicianAreas: (id: string) => `/admin/technicians/${id}/areas`,
-    technicianArea: (id: string, serviceAreaId: string) => `/admin/technicians/${id}/areas/${serviceAreaId}`,
+    technicianArea: (id: string, serviceAreaId: string) =>
+      `/admin/technicians/${id}/areas/${serviceAreaId}`,
 
     // System
     auditLogs: '/admin/audit-logs',
@@ -114,6 +116,7 @@ export const endpoints = {
     unreadCount: '/admin/notifications/unread-count',
     markRead: (id: string) => `/admin/notifications/${id}/read`,
     markAllRead: '/admin/notifications/read-all',
+    delete: (id: string) => `/admin/notifications/${id}`,
+    deleteAll: '/admin/notifications',
   },
 } as const;
-

@@ -26,6 +26,14 @@ class NotificationRemoteDataSource {
     return _extractData(response.data);
   }
 
+  Future<void> deleteNotification(String id) async {
+    await _dio.delete(ApiEndpoints.notificationDelete(id));
+  }
+
+  Future<void> deleteAllNotifications() async {
+    await _dio.delete(ApiEndpoints.notifications);
+  }
+
   List<dynamic> _extractList(dynamic data) {
     if (data is Map && data.containsKey('data')) {
       final innerData = data['data'];

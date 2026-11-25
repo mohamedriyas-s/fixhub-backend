@@ -89,6 +89,28 @@ class NotificationsNotifier extends AsyncNotifier<List<AppNotification>> {
             ))
         .toList());
   }
+
+  Future<void> deleteNotification(String id) async {
+    final previous = state;
+    state = state.whenData((list) => list.where((n) => n.id != id).toList());
+    try {
+      await _repository.deleteNotification(id);
+    } catch (e) {
+      debugPrint('[NotificationsNotifier] deleteNotification error: $e');
+      state = previous;
+    }
+  }
+
+  Future<void> deleteAll() async {
+    final previous = state;
+    state = const AsyncValue.data([]);
+    try {
+      await _repository.deleteAllNotifications();
+    } catch (e) {
+      debugPrint('[NotificationsNotifier] deleteAll error: $e');
+      state = previous;
+    }
+  }
 }
 
 final unreadCountProvider = Provider<int>((ref) {

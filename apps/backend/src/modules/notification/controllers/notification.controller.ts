@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 
@@ -6,11 +6,7 @@ import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { AuthenticatedUser } from '../../../common/interfaces/auth.interface';
-import {
-  NotificationPreferencesDto,
-  SendNotificationDto,
-  UpsertTemplateDto,
-} from '../dto';
+import { NotificationPreferencesDto, SendNotificationDto, UpsertTemplateDto } from '../dto';
 import { NotificationService } from '../services/notification.service';
 
 @ApiTags('Notifications')
@@ -35,6 +31,18 @@ export class NotificationController {
   @ApiOperation({ summary: 'Mark all notifications as read' })
   async markAllAsRead(@CurrentUser() user: AuthenticatedUser) {
     return this.notificationService.markAllAsRead(user.userId);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete a single notification' })
+  async deleteOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.notificationService.deleteNotification(id, user.userId);
+  }
+
+  @Delete()
+  @ApiOperation({ summary: 'Delete all notifications for current user' })
+  async deleteAll(@CurrentUser() user: AuthenticatedUser) {
+    return this.notificationService.deleteAllNotifications(user.userId);
   }
 
   @Post('send')

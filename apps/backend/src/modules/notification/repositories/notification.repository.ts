@@ -46,6 +46,18 @@ export class NotificationRepository {
     });
   }
 
+  async deleteById(id: string, userId: string) {
+    return this.prisma.notification.deleteMany({
+      where: { id, userId },
+    });
+  }
+
+  async deleteAllByUser(userId: string) {
+    return this.prisma.notification.deleteMany({
+      where: { userId },
+    });
+  }
+
   async create(data: Prisma.NotificationUncheckedCreateInput) {
     return this.prisma.notification.create({ data });
   }
@@ -85,7 +97,9 @@ export class NotificationRepository {
     }
 
     const data =
-      notification.data && typeof notification.data === 'object' && !Array.isArray(notification.data)
+      notification.data &&
+      typeof notification.data === 'object' &&
+      !Array.isArray(notification.data)
         ? (notification.data as Record<string, unknown>)
         : {};
     const deliveryLogs = Array.isArray(data.deliveryLogs) ? data.deliveryLogs : [];

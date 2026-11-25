@@ -56,6 +56,19 @@ export class NotificationService {
     return this.notificationRepository.markAllAsRead(userId);
   }
 
+  async deleteNotification(id: string, userId: string) {
+    const result = await this.notificationRepository.deleteById(id, userId);
+    if (result.count === 0) {
+      throw new NotFoundException('Notification not found');
+    }
+    return { deleted: true, id };
+  }
+
+  async deleteAllNotifications(userId: string) {
+    const result = await this.notificationRepository.deleteAllByUser(userId);
+    return { deleted: true, count: result.count };
+  }
+
   async send(dto: SendNotificationDto) {
     const rendered = await this.render(dto);
     const preferences = await this.getPreferences(dto.userId);

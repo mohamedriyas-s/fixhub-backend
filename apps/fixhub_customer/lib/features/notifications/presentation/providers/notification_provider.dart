@@ -77,6 +77,26 @@ class NotificationsListNotifier extends AsyncNotifier<List<NotificationModel>> {
       state = state.whenData((list) => list.map((n) => n.copyWith(isRead: true)).toList());
     } catch (_) {}
   }
+
+  Future<void> deleteNotification(String id) async {
+    final previous = state;
+    state = state.whenData((list) => list.where((n) => n.id != id).toList());
+    try {
+      await _dataSource.deleteNotification(id);
+    } catch (_) {
+      state = previous;
+    }
+  }
+
+  Future<void> deleteAll() async {
+    final previous = state;
+    state = const AsyncValue.data([]);
+    try {
+      await _dataSource.deleteAllNotifications();
+    } catch (_) {
+      state = previous;
+    }
+  }
 }
 
 class NotificationNotifier extends Notifier<AsyncValue<void>> {
@@ -91,6 +111,14 @@ class NotificationNotifier extends Notifier<AsyncValue<void>> {
 
   Future<void> markAllAsRead() async {
     await ref.read(notificationsProvider.notifier).markAllAsRead();
+  }
+
+  Future<void> deleteNotification(String id) async {
+    await ref.read(notificationsProvider.notifier).deleteNotification(id);
+  }
+
+  Future<void> deleteAll() async {
+    await ref.read(notificationsProvider.notifier).deleteAll();
   }
 }
 

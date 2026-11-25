@@ -1,17 +1,36 @@
 'use client';
 
-import { Bell, Check, CheckCircle2, Clock, MapPin, XCircle, Wrench, RefreshCw, AlertCircle } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { useAdminNotifications, AdminNotification } from '@/lib/hooks/use-admin-notifications';
-import { cn } from '@/lib/utils';
+import {
+  AlertCircle,
+  Bell,
+  Check,
+  CheckCircle2,
+  Clock,
+  MapPin,
+  RefreshCw,
+  Wrench,
+  X,
+  XCircle,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
+
+import { AdminNotification, useAdminNotifications } from '@/lib/hooks/use-admin-notifications';
+import { cn } from '@/lib/utils';
 
 export function NotificationDropdown() {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useAdminNotifications();
+  const {
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification,
+    deleteAllNotifications,
+  } = useAdminNotifications();
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -27,7 +46,7 @@ export function NotificationDropdown() {
     if (!notification.isRead) {
       markAsRead(notification.id);
     }
-    
+
     // Navigate based on type
     if (notification.metadata?.bookingId) {
       router.push(`/bookings/${notification.metadata.bookingId}`);
@@ -90,17 +109,30 @@ export function NotificationDropdown() {
                 </span>
               )}
             </div>
-            {unreadCount > 0 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  markAllAsRead();
-                }}
-                className="text-xs font-medium text-blue-600 hover:text-blue-700"
-              >
-                Mark all as read
-              </button>
-            )}
+            <div className="flex items-center gap-3">
+              {unreadCount > 0 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    markAllAsRead();
+                  }}
+                  className="text-xs font-medium text-blue-600 hover:text-blue-700"
+                >
+                  Mark all as read
+                </button>
+              )}
+              {notifications.length > 0 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteAllNotifications();
+                  }}
+                  className="text-xs font-medium text-red-600 hover:text-red-700"
+                >
+                  Delete all
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -110,7 +142,9 @@ export function NotificationDropdown() {
                   <Bell className="h-6 w-6 text-gray-400" />
                 </div>
                 <p className="text-sm font-medium text-gray-900">All caught up!</p>
-                <p className="text-xs text-gray-500 mt-1">Check back later for new notifications.</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Check back later for new notifications.
+                </p>
               </div>
             ) : (
               <ul className="divide-y divide-gray-50">
@@ -120,17 +154,17 @@ export function NotificationDropdown() {
                     onClick={() => handleNotificationClick(notification)}
                     className={cn(
                       'p-4 hover:bg-gray-50 cursor-pointer transition-colors flex gap-3',
-                      !notification.isRead && 'bg-blue-50/30'
+                      !notification.isRead && 'bg-blue-50/30',
                     )}
                   >
-                    <div className="flex-shrink-0 mt-0.5">
-                      {getIcon(notification.type)}
-                    </div>
+                    <div className="flex-shrink-0 mt-0.5">{getIcon(notification.type)}</div>
                     <div className="flex-1 min-w-0">
-                      <p className={cn(
-                        "text-sm font-medium",
-                        !notification.isRead ? "text-gray-900" : "text-gray-700"
-                      )}>
+                      <p
+                        className={cn(
+                          'text-sm font-medium',
+                          !notification.isRead ? 'text-gray-900' : 'text-gray-700',
+                        )}
+                      >
                         {notification.title}
                       </p>
                       <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">
@@ -140,17 +174,28 @@ export function NotificationDropdown() {
                         {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
                       </p>
                     </div>
-                    {!notification.isRead && (
-                      <div className="flex-shrink-0">
+                    <div className="flex-shrink-0 flex items-start gap-1.5">
+                      {!notification.isRead && (
                         <div className="h-2 w-2 rounded-full bg-blue-600 mt-1.5" />
-                      </div>
-                    )}
+                      )}
+                      <button
+                        type="button"
+                        aria-label="Delete notification"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteNotification(notification.id);
+                        }}
+                        className="p-0.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
             )}
           </div>
-          
+
           <div className="border-t border-gray-100 p-2 bg-gray-50/50">
             <button
               onClick={() => {

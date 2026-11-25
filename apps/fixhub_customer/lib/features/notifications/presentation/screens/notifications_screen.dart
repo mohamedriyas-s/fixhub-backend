@@ -33,6 +33,32 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     await ref.read(notificationNotifierProvider.notifier).markAllAsRead();
   }
 
+  Future<void> _confirmDeleteAll() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.elevatedSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Delete all notifications?'),
+        content: const Text('This will permanently remove all your notifications.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Delete all'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await ref.read(notificationNotifierProvider.notifier).deleteAll();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final notificationsAsync = ref.watch(notificationsProvider);
@@ -46,24 +72,40 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         actions: [
           notificationsAsync.maybeWhen(
             data: (notifications) {
+              if (notifications.isEmpty) return const SizedBox.shrink();
               final hasUnread = notifications.any((n) => !n.isRead);
-              if (!hasUnread) return const SizedBox.shrink();
 
-              return TextButton(
-                onPressed: isUpdating ? null : _markAllAsRead,
-                child: isUpdating
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(
-                        'Mark all as read',
-                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                              color: AppColors.buttonPrimary,
-                              fontWeight: FontWeight.w600,
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (hasUnread)
+                    TextButton(
+                      onPressed: isUpdating ? null : _markAllAsRead,
+                      child: isUpdating
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(
+                              'Mark all as read',
+                              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                    color: AppColors.buttonPrimary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                             ),
-                      ),
+                    ),
+                  TextButton(
+                    onPressed: isUpdating ? null : _confirmDeleteAll,
+                    child: Text(
+                      'Delete all',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                            color: AppColors.error,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ),
+                ],
               );
             },
             orElse: () => const SizedBox.shrink(),
@@ -217,7 +259,7 @@ class _NotificationCard extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         child: Text(
@@ -232,12 +274,27 @@ class _NotificationCard extends ConsumerWidget {
                         Container(
                           width: 8,
                           height: 8,
-                          margin: const EdgeInsets.only(left: AppSpacing.sm),
+                          margin: const EdgeInsets.only(top: 6, left: AppSpacing.xs),
                           decoration: const BoxDecoration(
                             color: AppColors.error,
                             shape: BoxShape.circle,
                           ),
                         ),
+                      const SizedBox(width: 4),
+                      InkWell(
+                        onTap: () => ref
+                            .read(notificationNotifierProvider.notifier)
+                            .deleteNotification(notification.id),
+                        borderRadius: BorderRadius.circular(16),
+                        child: const Padding(
+                          padding: EdgeInsets.all(4),
+                          child: Icon(
+                            Icons.close_rounded,
+                            size: 16,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 4),

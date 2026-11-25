@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Patch, Query } from '@nestjs/common';
+import { Controller, Delete, Get, Param, Patch, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 
@@ -36,5 +36,18 @@ export class AdminNotificationController {
   @ApiOperation({ summary: 'Mark all admin notifications as read' })
   async markAllRead() {
     return this.adminNotifService.markAllRead();
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete a single admin notification' })
+  @ApiParam({ name: 'id', description: 'AdminNotification id' })
+  async deleteOne(@Param('id') id: string) {
+    return this.adminNotifService.deleteOne(id);
+  }
+
+  @Delete()
+  @ApiOperation({ summary: 'Delete all admin notifications' })
+  async deleteAll() {
+    return this.adminNotifService.deleteAll();
   }
 }
