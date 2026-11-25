@@ -202,11 +202,21 @@ class _JobCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      job.subService.name,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            job.subService.name,
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        if (job.delaySeverity != null) ...[
+                          const SizedBox(width: 8),
+                          _buildDelayBadge(job.delaySeverity!, elapsed: job.delayElapsedText),
+                        ],
+                      ],
                     ),
                     if (job.subService.categoryName != null)
                       Text(
@@ -266,6 +276,62 @@ class _JobCard extends StatelessWidget {
                 color: AppColors.textSecondary,
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDelayBadge(String severity, {String? elapsed}) {
+    Color color;
+    Color textColor;
+    String label;
+
+    switch (severity) {
+      case 'WHITE':
+        color = Colors.white;
+        textColor = AppColors.textPrimary;
+        label = elapsed != null ? 'Today ($elapsed)' : 'Today';
+      case 'YELLOW':
+        color = const Color(0xFFFEF3C7);
+        textColor = const Color(0xFFD97706);
+        label = elapsed != null ? '$elapsed delay' : '2-5d';
+      case 'RED':
+      default:
+        color = const Color(0xFFFEE2E2);
+        textColor = const Color(0xFFDC2626);
+        label = elapsed != null ? '$elapsed delay' : '> 1w';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: severity == 'WHITE' ? AppColors.border : textColor.withValues(alpha: 0.5),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: textColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: textColor,
+            ),
           ),
         ],
       ),

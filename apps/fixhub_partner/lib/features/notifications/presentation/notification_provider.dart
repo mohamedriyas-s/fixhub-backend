@@ -7,11 +7,19 @@ final notificationsProvider =
     AsyncNotifierProvider<NotificationsNotifier, List<AppNotification>>(NotificationsNotifier.new);
 
 class NotificationsNotifier extends AsyncNotifier<List<AppNotification>> {
-  late final NotificationRepository _repository;
+  late NotificationRepository _repository;
+  Timer? _syncTimer;
 
   @override
   FutureOr<List<AppNotification>> build() async {
     _repository = ref.watch(notificationRepositoryProvider);
+    _syncTimer?.cancel();
+    _syncTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      load(silent: true);
+    });
+    ref.onDispose(() {
+      _syncTimer?.cancel();
+    });
     try {
       return await _repository.listNotifications();
     } catch (e) {

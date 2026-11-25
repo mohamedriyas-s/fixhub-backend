@@ -14,7 +14,10 @@ import '../../../core/widgets/fp_card.dart';
 import '../../../core/widgets/fp_skeleton.dart';
 import '../../../core/widgets/fp_offline_banner.dart';
 import '../../../core/widgets/fp_status_chip.dart';
+import '../../../core/widgets/fp_swipe_slider.dart';
 import '../domain/job_models.dart';
+import 'final_amount_sheet.dart';
+import 'final_otp_verification_view.dart';
 import 'job_provider.dart';
 import 'price_revision_sheet.dart';
 import 'verify_otp_sheet.dart';
@@ -37,10 +40,15 @@ class JobDetailsScreen extends ConsumerWidget {
           message: 'Could not load job details',
           onRetry: () => ref.invalidate(jobDetailsProvider(jobId)),
         ),
-        data: (job) => _JobDetailsBody(
-          key: ValueKey('${job.id}_${job.status}'),
-          job: job,
-        ),
+        data: (job) {
+          if (job.isAwaitingVerification || job.isPendingCollection) {
+            return FinalOtpVerificationView(job: job);
+          }
+          return _JobDetailsBody(
+            key: ValueKey('${job.id}_${job.status}'),
+            job: job,
+          );
+        },
       ),
     );
   }
@@ -90,6 +98,62 @@ class _JobDetailsBodyState extends ConsumerState<_JobDetailsBody> {
       _statusPollTimer?.cancel();
       _statusPollTimer = null;
     }
+  }
+
+  Widget _buildDelayBadge(String severity, {String? elapsed}) {
+    Color color;
+    Color textColor;
+    String label;
+
+    switch (severity) {
+      case 'WHITE':
+        color = Colors.white;
+        textColor = AppColors.textPrimary;
+        label = elapsed != null ? 'Today ($elapsed)' : 'Today';
+      case 'YELLOW':
+        color = const Color(0xFFFEF3C7);
+        textColor = const Color(0xFFD97706);
+        label = elapsed != null ? '$elapsed delay' : '2-5d';
+      case 'RED':
+      default:
+        color = const Color(0xFFFEE2E2);
+        textColor = const Color(0xFFDC2626);
+        label = elapsed != null ? '$elapsed delay' : '> 1w';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: severity == 'WHITE' ? AppColors.border : textColor.withValues(alpha: 0.5),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: textColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: textColor,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   String get _nextStatus {
@@ -291,9 +355,16 @@ class _JobDetailsBodyState extends ConsumerState<_JobDetailsBody> {
   Future<void> _openMaps() async {
     final lat = widget.job.address.latitude;
     final lng = widget.job.address.longitude;
-    if (lat == null || lng == null) return;
-    final uri = Uri.parse('https://maps.google.com/?q=$lat,$lng');
-    if (await canLaunchUrl(uri)) launchUrl(uri);
+    final Uri uri;
+    if (lat != null && lng != null && (lat != 0 || lng != 0)) {
+      uri = Uri.parse('https://maps.google.com/?q=$lat,$lng');
+    } else {
+      uri = Uri.parse(
+          'https://maps.google.com/?q=${Uri.encodeComponent(widget.job.address.fullAddress)}');
+    }
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   @override
@@ -504,44 +575,74 @@ class _JobDetailsBodyState extends ConsumerState<_JobDetailsBody> {
                       borderRadius: AppRadius.card,
                       border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
                     ),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: const BoxDecoration(
-                            color: AppColors.success,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.check_rounded,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Additional Charge Approved ✅',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13,
-                                  color: AppColors.success,
-                                ),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: const BoxDecoration(
+                                color: AppColors.success,
+                                shape: BoxShape.circle,
                               ),
-                              const SizedBox(height: 2),
+                              child: const Icon(
+                                Icons.check_rounded,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Additional Charge Approved ✅',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                      color: AppColors.success,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Customer approved additional charges. Revised total is ₹${job.totalAmount.toStringAsFixed(0)}. You may proceed with the work.',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (job.delaySeverity != null) ...[
+                          const SizedBox(height: AppSpacing.sm),
+                          const Divider(height: 1),
+                          const SizedBox(height: AppSpacing.sm),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.timer_outlined,
+                                size: 14,
+                                color: AppColors.textSecondary,
+                              ),
+                              const SizedBox(width: 4),
                               Text(
-                                'Customer approved additional charges. Revised total is ₹${job.totalAmount.toStringAsFixed(0)}. You may proceed with the work.',
+                                'Delay tracking: ${job.delayElapsedText ?? "Active"}',
                                 style: const TextStyle(
                                   fontSize: 12,
+                                  fontWeight: FontWeight.w600,
                                   color: AppColors.textSecondary,
                                 ),
                               ),
+                              const Spacer(),
+                              _buildDelayBadge(job.delaySeverity!, elapsed: job.delayElapsedText),
                             ],
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
@@ -638,18 +739,46 @@ class _JobDetailsBodyState extends ConsumerState<_JobDetailsBody> {
                   ),
                 ),
 
-                if (job.description != null && job.description!.isNotEmpty) ...[
+                // ── Customer Issue Details (Notes & Photos/Videos) ──
+                if ((job.description != null && job.description!.trim().isNotEmpty) ||
+                    job.media.where((m) => m.phase == 'BEFORE_SERVICE' || m.phase == null).isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.base),
                   _Section(
-                    title: 'Customer Note',
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: AppSpacing.xs,
-                      ),
-                      child: Text(
-                        job.description!,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
+                    title: 'Customer Issue Details',
+                    trailing: const Icon(
+                      Icons.report_problem_outlined,
+                      size: 20,
+                      color: AppColors.primary,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (job.description != null && job.description!.trim().isNotEmpty) ...[
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: AppSpacing.xs,
+                            ),
+                            child: Text(
+                              job.description!,
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    height: 1.4,
+                                  ),
+                            ),
+                          ),
+                        ],
+                        if (job.media.where((m) => m.phase == 'BEFORE_SERVICE' || m.phase == null).isNotEmpty) ...[
+                          if (job.description != null && job.description!.trim().isNotEmpty)
+                            const SizedBox(height: AppSpacing.sm),
+                          Wrap(
+                            spacing: AppSpacing.sm,
+                            runSpacing: AppSpacing.sm,
+                            children: job.media
+                                .where((m) => m.phase == 'BEFORE_SERVICE' || m.phase == null)
+                                .map((m) => _MediaThumbReadOnly(media: m))
+                                .toList(),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ],
@@ -674,22 +803,6 @@ class _JobDetailsBodyState extends ConsumerState<_JobDetailsBody> {
                               height: 1.4,
                             ),
                       ),
-                    ),
-                  ),
-                ],
-
-                // ── Issue Media ──────────────────────────────────
-                if (job.media.where((m) => m.phase == 'BEFORE_SERVICE').isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.base),
-                  _Section(
-                    title: 'Issue Media',
-                    child: Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.sm,
-                      children: job.media
-                          .where((m) => m.phase == 'BEFORE_SERVICE')
-                          .map((m) => _MediaThumbReadOnly(media: m))
-                          .toList(),
                     ),
                   ),
                 ],
@@ -745,7 +858,23 @@ class _JobDetailsBodyState extends ConsumerState<_JobDetailsBody> {
                 // Main CTA
                 Row(
                   children: [
-                    if (hasAction)
+                    if (isInProgress)
+                      Expanded(
+                        child: FpSwipeSlider(
+                          label: 'Slide to Complete Job',
+                          isEnabled: !_isUpdating,
+                          onComplete: () {
+                            FinalAmountSheet.show(
+                              context: context,
+                              job: job,
+                              onFinalized: () {
+                                ref.invalidate(jobDetailsProvider(job.id));
+                              },
+                            );
+                          },
+                        ),
+                      )
+                    else if (hasAction)
                       Expanded(
                         child: FpButton(
                           label: _nextStatusLabel,
@@ -953,10 +1082,14 @@ class _MediaThumbReadOnly extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isVideo = media.type == 'VIDEO';
+    final normalizedUrl = media.url.replaceAll(
+      'fixhub-uploads.s3.ap-south-1.amazonaws.com',
+      'spotfluencerbucket2.s3.ap-south-1.amazonaws.com',
+    );
 
     return GestureDetector(
       onTap: () {
-        final uri = Uri.parse(media.url);
+        final uri = Uri.parse(normalizedUrl);
         launchUrl(uri);
       },
       child: SizedBox(
@@ -979,7 +1112,7 @@ class _MediaThumbReadOnly extends StatelessWidget {
                       ),
                     )
                   : Image.network(
-                      media.url,
+                      normalizedUrl,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
                         color: AppColors.surfaceVariant,

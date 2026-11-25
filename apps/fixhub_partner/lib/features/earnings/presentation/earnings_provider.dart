@@ -37,7 +37,7 @@ class EarningsState {
 final earningsProvider = NotifierProvider<EarningsNotifier, EarningsState>(EarningsNotifier.new);
 
 class EarningsNotifier extends Notifier<EarningsState> {
-  late final EarningsRepository _repository;
+  late EarningsRepository _repository;
 
   @override
   EarningsState build() {

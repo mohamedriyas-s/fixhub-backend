@@ -7,17 +7,27 @@ import '../../../core/services/location_tracker.dart';
 final profileProvider = AsyncNotifierProvider<ProfileNotifier, TechnicianProfile?>(ProfileNotifier.new);
 
 class ProfileNotifier extends AsyncNotifier<TechnicianProfile?> {
-  late final ProfileRepository _repository;
+  late ProfileRepository _repository;
 
   @override
   FutureOr<TechnicianProfile?> build() async {
     _repository = ref.watch(profileRepositoryProvider);
-    return _repository.getProfile();
+    final profile = await _repository.getProfile();
+    if (profile.isAvailable) {
+      ref.read(locationTrackerProvider).start();
+    }
+    return profile;
   }
 
   Future<void> load() async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _repository.getProfile());
+    state = const AsyncLoading<TechnicianProfile?>().copyWithPrevious(state);
+    final profile = await _repository.getProfile();
+    state = AsyncValue.data(profile);
+    if (profile.isAvailable) {
+      ref.read(locationTrackerProvider).start();
+    } else {
+      ref.read(locationTrackerProvider).stop();
+    }
   }
 
   Future<void> toggleAvailability(bool isAvailable) async {
@@ -26,11 +36,16 @@ class ProfileNotifier extends AsyncNotifier<TechnicianProfile?> {
     // Grab GPS position before toggling (best-effort; null is OK — backend accepts without it)
     double? lat, lng;
     final locService = ref.read(locationServiceProvider);
-    final position = await locService.getCurrentPosition();
-    if (position != null) {
-      lat = position.latitude;
-      lng = position.longitude;
-    }
+    try {
+      final position = await locService.getCurrentPosition().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => null,
+      );
+      if (position != null) {
+        lat = position.latitude;
+        lng = position.longitude;
+      }
+    } catch (_) {}
 
     // Optimistic update
     if (current != null) {

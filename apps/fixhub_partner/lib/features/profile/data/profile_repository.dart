@@ -116,6 +116,12 @@ class ProfileRepository {
     );
   }
 
+  Future<void> pingHeartbeat() async {
+    try {
+      await _dio.post(ApiEndpoints.technicianHeartbeat);
+    } catch (_) {}
+  }
+
   /// POST /technicians/specializations — replaces existing specializations
   Future<void> updateSpecializations(List<String> subServiceIds) async {
     await _dio.post(

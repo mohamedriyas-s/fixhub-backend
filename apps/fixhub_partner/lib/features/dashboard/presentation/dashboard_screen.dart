@@ -18,6 +18,7 @@ import '../../jobs/domain/job_models.dart';
 import '../../earnings/presentation/earnings_provider.dart';
 import '../../notifications/presentation/notification_provider.dart';
 import '../../../core/services/fcm_service.dart';
+import '../../../core/services/location_tracker.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -39,6 +40,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       ref.read(notificationsProvider.notifier).load(silent: true);
       ref.invalidate(myJobsProvider(null));
       ref.invalidate(activeJobProvider);
+      final profile = ref.read(profileProvider).value;
+      if (profile?.isAvailable ?? false) {
+        ref.read(locationTrackerProvider).start();
+      }
     });
 
     // Periodic real-time poll for unread notifications and assigned jobs (every 8 seconds)
@@ -184,7 +189,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           onRefresh: () async {
             ref.invalidate(activeJobProvider);
             ref.invalidate(todayEarningsProvider);
-            ref.read(profileProvider.notifier).load();
+            await ref.read(profileProvider.notifier).load();
           },
           child: CustomScrollView(
             slivers: [
@@ -230,47 +235,52 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       ),
                       const SizedBox(width: AppSpacing.md),
                       // Notifications
-                      Stack(
-                        children: [
-                          IconButton(
-                            onPressed: () => context.push('/notifications'),
-                            icon: const Icon(
-                              Icons.notifications_outlined,
-                              size: 24,
-                            ),
-                            style: IconButton.styleFrom(
-                              backgroundColor: AppColors.surface,
-                              foregroundColor: AppColors.textPrimary,
-                              padding: const EdgeInsets.all(10),
-                              shape: const CircleBorder(
-                                side: BorderSide(color: AppColors.border),
+                      GestureDetector(
+                        onTap: () => context.push('/notifications'),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: AppColors.surface,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: AppColors.border, width: 0.5),
+                              ),
+                              child: const Icon(
+                                Icons.notifications_outlined,
+                                color: AppColors.textPrimary,
+                                size: 24,
                               ),
                             ),
-                          ),
-                          if (unreadCount > 0)
-                            Positioned(
-                              right: 2,
-                              top: 2,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-                                decoration: BoxDecoration(
-                                  color: AppColors.error,
-                                  borderRadius: BorderRadius.circular(9),
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  unreadCount > 99 ? '99+' : '$unreadCount',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    height: 1,
+                            if (unreadCount > 0)
+                              Positioned(
+                                right: -2,
+                                top: -2,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                  constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.error,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: AppColors.surface, width: 1.5),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      unreadCount > 99 ? '99+' : '$unreadCount',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                        height: 1,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -284,8 +294,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     // ── Availability Toggle ───────────────────────
                     FpAvailabilityToggle(
                       isAvailable: profile?.isAvailable ?? false,
-                      isLoading:
-                          _isTogglingAvailability || profileAsync.isLoading,
+                      isLoading: _isTogglingAvailability ||
+                          (profileAsync.isLoading && !profileAsync.hasError),
                       onChanged: _toggleAvailability,
                     ),
 

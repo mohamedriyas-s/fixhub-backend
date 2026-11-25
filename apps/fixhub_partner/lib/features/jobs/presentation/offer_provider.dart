@@ -8,7 +8,7 @@ final offersProvider =
     AsyncNotifierProvider<OffersNotifier, List<JobOffer>>(OffersNotifier.new);
 
 class OffersNotifier extends AsyncNotifier<List<JobOffer>> {
-  late final OfferRepository _repo;
+  late OfferRepository _repo;
   Timer? _pollTimer;
 
   @override

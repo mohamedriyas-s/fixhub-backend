@@ -42,7 +42,7 @@ final activeJobProvider =
     AsyncNotifierProvider<ActiveJobNotifier, Job?>(ActiveJobNotifier.new);
 
 class ActiveJobNotifier extends AsyncNotifier<Job?> {
-  late final JobRepository _repository;
+  late JobRepository _repository;
 
   @override
   FutureOr<Job?> build() async {
@@ -135,6 +135,56 @@ class ActiveJobNotifier extends AsyncNotifier<Job?> {
     state = await AsyncValue.guard(() async {
       final job = await _repository.proposeRevision(id, revisedAmount, note: note);
       ref.invalidate(jobDetailsProvider(id));
+      return job;
+    });
+    if (state.hasError) {
+      throw state.error!;
+    }
+    return state.value;
+  }
+
+  Future<Job?> finalizeAmount({
+    required String id,
+    required double finalAdditionalAmount,
+    required String paymentMethod,
+  }) async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      final job = await _repository.finalizeAmount(
+        id,
+        finalAdditionalAmount: finalAdditionalAmount,
+        paymentMethod: paymentMethod,
+      );
+      ref.invalidate(jobDetailsProvider(id));
+      _invalidateRelatedProviders();
+      return job;
+    });
+    if (state.hasError) {
+      throw state.error!;
+    }
+    return state.value;
+  }
+
+  Future<Job?> departNextSlot(String id) async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      final job = await _repository.departNextSlot(id);
+      ref.invalidate(jobDetailsProvider(id));
+      _invalidateRelatedProviders();
+      return job;
+    });
+    if (state.hasError) {
+      throw state.error!;
+    }
+    return state.value;
+  }
+
+  Future<Job?> verifyCompletionOtp(String id, String otp) async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      final job = await _repository.verifyCompletionOtp(id, otp);
+      ref.invalidate(jobDetailsProvider(id));
+      _invalidateRelatedProviders();
       return job;
     });
     if (state.hasError) {

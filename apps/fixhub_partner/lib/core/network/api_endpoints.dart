@@ -16,6 +16,7 @@ class ApiEndpoints {
   static const String technicianProfile = '/technicians/profile';
   static const String technicianAvailability = '/technicians/availability';
   static const String technicianLocation = '/technicians/location';
+  static const String technicianHeartbeat = '/technicians/heartbeat';
 
   // ── Technician Documents ────────────────────────────────────────
   static const String technicianDocuments = '/technicians/documents';
@@ -43,6 +44,12 @@ class ApiEndpoints {
       '/technicians/jobs/$id/propose-revision';
   static String technicianJobAdditionalCharge(String id) =>
       '/technicians/jobs/$id/additional-charge';
+  static String technicianJobFinalizeAmount(String id) =>
+      '/technicians/jobs/$id/finalize-amount';
+  static String technicianJobDepartNextSlot(String id) =>
+      '/technicians/jobs/$id/depart-next-slot';
+  static String technicianJobVerifyCompletionOtp(String id) =>
+      '/bookings/$id/verify-completion-otp';
 
   // ── Technician Job Offers (broadcast eligibility) ───────────────
   static const String technicianOffers = '/technicians/offers';

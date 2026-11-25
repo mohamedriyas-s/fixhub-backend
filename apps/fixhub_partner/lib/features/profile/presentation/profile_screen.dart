@@ -74,9 +74,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ),
       body: profileAsync.when(
         loading: () => const Center(child: FpPageLoader()),
-        error: (e, _) => FpErrorState(
-          message: 'Could not load profile',
-          onRetry: () => ref.read(profileProvider.notifier).load(),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.screenPadding),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                FpErrorState(
+                  message: 'Could not load profile',
+                  onRetry: () => ref.read(profileProvider.notifier).load(),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                FpButton(
+                  label: 'Logout',
+                  variant: FpButtonVariant.secondary,
+                  onPressed: () async {
+                    await ref.read(authProvider.notifier).logout();
+                    if (context.mounted) context.go('/login');
+                  },
+                ),
+              ],
+            ),
+          ),
         ),
         data: (profile) {
           if (profile == null) return const SizedBox();

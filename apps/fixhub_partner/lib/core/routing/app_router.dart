@@ -48,12 +48,21 @@ final GlobalKey<NavigatorState> _jobsNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _earningsNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _profileNavigatorKey = GlobalKey<NavigatorState>();
 
+// ── Router Notifier for Reactive Auth State ────────────────────────
+class _PartnerRouterNotifier extends ChangeNotifier {
+  _PartnerRouterNotifier(Ref ref) {
+    ref.listen(authProvider, (_, __) => notifyListeners());
+  }
+}
+
 // ── Router as Riverpod Provider ───────────────────────────────────
 final routerProvider = Provider<GoRouter>((ref) {
+  final notifier = _PartnerRouterNotifier(ref);
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/splash',
     debugLogDiagnostics: false,
+    refreshListenable: notifier,
     // ── Auth redirect guard ────────────────────────────────────
     redirect: (context, state) {
       final authState = ref.read(authProvider);

@@ -117,7 +117,7 @@ class JobMedia {
     id: json['id'] as String,
     url: json['url'] as String,
     type: json['type'] as String? ?? 'IMAGE',
-    phase: json['phase'] as String?,
+    phase: (json['uploadPhase'] ?? json['phase']) as String?,
   );
 }
 
@@ -155,6 +155,13 @@ class Job {
   final String? priceRevisionDescription;
   final String? priceRevisionNote;
   final DateTime? customerConsentAt;
+  final double? appealedAmount;
+  final double? finalAdditionalAmount;
+  final String? extraChargePaymentMethod;
+  final DateTime? extraChargePaidAt;
+  final String? completionOtp;
+  final DateTime? slotDepartureAt;
+  final bool? isPendingDelay;
   // Cancellation/failure fields
   final DateTime? cancelledAt;
   final String? cancelReason;
@@ -182,6 +189,13 @@ class Job {
     this.priceRevisionDescription,
     this.priceRevisionNote,
     this.customerConsentAt,
+    this.appealedAmount,
+    this.finalAdditionalAmount,
+    this.extraChargePaymentMethod,
+    this.extraChargePaidAt,
+    this.completionOtp,
+    this.slotDepartureAt,
+    this.isPendingDelay,
     this.cancelledAt,
     this.cancelReason,
     this.failedAt,
@@ -215,6 +229,21 @@ class Job {
     customerConsentAt: json['customerConsentAt'] != null
         ? DateTime.tryParse(json['customerConsentAt'] as String)
         : null,
+    appealedAmount: json['appealedAmount'] != null
+        ? double.tryParse(json['appealedAmount'].toString())
+        : null,
+    finalAdditionalAmount: json['finalAdditionalAmount'] != null
+        ? double.tryParse(json['finalAdditionalAmount'].toString())
+        : null,
+    extraChargePaymentMethod: json['extraChargePaymentMethod'] as String?,
+    extraChargePaidAt: json['extraChargePaidAt'] != null
+        ? DateTime.tryParse(json['extraChargePaidAt'] as String)
+        : null,
+    completionOtp: json['completionOtp'] as String?,
+    slotDepartureAt: json['slotDepartureAt'] != null
+        ? DateTime.tryParse(json['slotDepartureAt'] as String)
+        : null,
+    isPendingDelay: json['isPendingDelay'] as bool?,
     cancelledAt: json['cancelledAt'] != null
         ? DateTime.tryParse(json['cancelledAt'] as String)
         : null,
@@ -244,10 +273,18 @@ class Job {
         : null,
   );
 
-  /// An active job includes PRICE_REVISION_PENDING (tech is waiting for customer)
+  /// An active job includes PRICE_REVISION_PENDING (tech is waiting for customer),
+  /// AWAITING_COMPLETION_VERIFICATION (waiting for OTP/payment), and PENDING_COLLECTION
   bool get isActive =>
-      const ['ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS', 'PRICE_REVISION_PENDING']
-          .contains(status);
+      const [
+        'ACCEPTED',
+        'EN_ROUTE',
+        'ARRIVED',
+        'IN_PROGRESS',
+        'PRICE_REVISION_PENDING',
+        'AWAITING_COMPLETION_VERIFICATION',
+        'PENDING_COLLECTION',
+      ].contains(status);
 
   bool get isAssigned => status == 'ASSIGNED';
   bool get isCompleted => status == 'COMPLETED';
@@ -257,6 +294,66 @@ class Job {
   bool get isEnRoute => status == 'EN_ROUTE';
   bool get isArrived => status == 'ARRIVED';
   bool get isInProgress => status == 'IN_PROGRESS';
+  bool get isAwaitingVerification => status == 'AWAITING_COMPLETION_VERIFICATION';
+  bool get isPendingCollection => status == 'PENDING_COLLECTION';
+
+  bool get isExtraChargePaid =>
+      extraChargePaidAt != null ||
+      extraChargePaymentMethod == 'CASH' ||
+      (finalAdditionalAmount ?? 0) <= 0;
+
+  /// Returns whether delay tracking is currently active for this job.
+  /// Starts automatically once approx extra charge is approved by customer,
+  /// until the job is completed or cancelled.
+  bool get isDelayTrackingActive {
+    if (status == 'COMPLETED' || status == 'CANCELLED' || status == 'FAILED') {
+      return false;
+    }
+    return customerConsentAt != null ||
+        (isPendingDelay ?? false) ||
+        slotDepartureAt != null ||
+        isPendingCollection;
+  }
+
+  /// Start timestamp for delay counting
+  DateTime? get delayStartedAt => slotDepartureAt ?? customerConsentAt;
+
+  /// Delay severity for jobs where extra charge was approved and technician leaves for next slot:
+  /// 'WHITE' (same day), 'YELLOW' (2 - 5 days), 'RED' (> 1 week)
+  String? get delaySeverity {
+    if (!isDelayTrackingActive) return null;
+    final start = delayStartedAt;
+    if (start == null) return null;
+
+    final diffDays = DateTime.now().difference(start).inDays;
+    if (diffDays >= 7) {
+      return 'RED';
+    } else if (diffDays >= 2) {
+      return 'YELLOW';
+    } else {
+      return 'WHITE';
+    }
+  }
+
+  /// Human-readable elapsed delay text, e.g. "Today", "2d", "> 1w"
+  String? get delayElapsedText {
+    if (!isDelayTrackingActive) return null;
+    final start = delayStartedAt;
+    if (start == null) return null;
+
+    final diff = DateTime.now().difference(start);
+    if (diff.inDays >= 7) {
+      return '> 1w';
+    } else if (diff.inDays >= 2) {
+      return '${diff.inDays}d';
+    } else if (diff.inDays >= 1) {
+      return '1d';
+    } else if (diff.inHours >= 1) {
+      return '${diff.inHours}h';
+    } else {
+      return '${diff.inMinutes.clamp(1, 60)}m';
+    }
+  }
 
   /// The effective price (revised if approved, otherwise original)
   double get effectiveAmount => revisedAmount ?? totalAmount;

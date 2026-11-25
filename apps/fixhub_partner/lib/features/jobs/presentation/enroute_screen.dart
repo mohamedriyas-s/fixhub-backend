@@ -34,17 +34,20 @@ class _EnRouteScreenState extends ConsumerState<EnRouteScreen> {
   bool _isMarkingArrived = false;
 
   Future<void> _navigateToCustomer(JobAddress address) async {
-    if (address.latitude == null || address.longitude == null) {
-      _showSnackBar('Customer address coordinates not available');
-      return;
-    }
-    final uri = Uri.parse(
-      'google.navigation:q=${address.latitude},${address.longitude}&mode=d',
-    );
-    // Fallback to Google Maps web URL if the navigation intent isn't available
-    final fallbackUri = Uri.parse(
-      'https://www.google.com/maps/dir/?api=1&destination=${address.latitude},${address.longitude}&travelmode=driving',
-    );
+    final lat = address.latitude;
+    final lng = address.longitude;
+    final bool hasValidCoords =
+        lat != null && lng != null && (lat != 0 || lng != 0);
+
+    final uri = hasValidCoords
+        ? Uri.parse('google.navigation:q=$lat,$lng&mode=d')
+        : Uri.parse(
+            'google.navigation:q=${Uri.encodeComponent(address.fullAddress)}&mode=d');
+    final fallbackUri = hasValidCoords
+        ? Uri.parse(
+            'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving')
+        : Uri.parse(
+            'https://www.google.com/maps/dir/?api=1&destination=${Uri.encodeComponent(address.fullAddress)}&travelmode=driving');
 
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
