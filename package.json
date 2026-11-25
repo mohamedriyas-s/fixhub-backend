@@ -19,8 +19,7 @@
     "db:reset": "pnpm --filter @fixhub/backend prisma:reset",
     "docker:dev": "docker compose up -d",
     "docker:down": "docker compose down",
-    "docker:prod": "docker compose -f docker-compose.prod.yml up -d",
-    "prepare": "husky"
+    "docker:prod": "docker compose -f docker-compose.prod.yml up -d"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.6.1",
