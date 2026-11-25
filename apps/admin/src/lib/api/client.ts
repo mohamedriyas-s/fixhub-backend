@@ -4,7 +4,8 @@ import { clearAdminSessionMarker } from '@/lib/auth/session';
 
 import { endpoints } from './endpoints';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || 'https://fixhub-backend-fra0.onrender.com/api/v1';
 const isNgrokApi = API_BASE_URL.includes('.ngrok-free.');
 
 export const apiClient = axios.create({

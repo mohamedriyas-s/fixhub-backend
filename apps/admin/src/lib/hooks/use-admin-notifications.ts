@@ -1,7 +1,8 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+
 import { apiClient } from '../api/client';
 import { endpoints } from '../api/endpoints';
 
@@ -15,7 +16,8 @@ export interface AdminNotification {
   createdAt: string;
 }
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:3000/admin-notifications';
+const WS_URL =
+  process.env.NEXT_PUBLIC_WS_URL || 'https://fixhub-backend-fra0.onrender.com/admin-notifications';
 
 export function useAdminNotifications() {
   const queryClient = useQueryClient();
@@ -93,6 +95,18 @@ export function useAdminNotifications() {
       queryClient.setQueryData<number>(['adminNotificationsUnread'], () => 0);
     });
 
+    newSocket.on('notification:deleted', ({ id }) => {
+      queryClient.setQueryData<AdminNotification[]>(['adminNotifications'], (old = []) => {
+        return old.filter((n) => n.id !== id);
+      });
+      queryClient.invalidateQueries({ queryKey: ['adminNotificationsUnread'] });
+    });
+
+    newSocket.on('notification:all_deleted', () => {
+      queryClient.setQueryData<AdminNotification[]>(['adminNotifications'], () => []);
+      queryClient.setQueryData<number>(['adminNotificationsUnread'], () => 0);
+    });
+
     return () => {
       newSocket.disconnect();
     };
@@ -125,13 +139,49 @@ export function useAdminNotifications() {
     },
   });
 
-  const markAsRead = useCallback((id: string) => {
-    markAsReadMutation.mutate(id);
-  }, [markAsReadMutation]);
+  const deleteNotificationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiClient.delete(endpoints.adminNotifications.delete(id));
+    },
+    onSuccess: (_, id) => {
+      queryClient.setQueryData<AdminNotification[]>(['adminNotifications'], (old = []) => {
+        return old.filter((n) => n.id !== id);
+      });
+      queryClient.invalidateQueries({ queryKey: ['adminNotificationsUnread'] });
+    },
+  });
+
+  const deleteAllNotificationsMutation = useMutation({
+    mutationFn: async () => {
+      await apiClient.delete(endpoints.adminNotifications.deleteAll);
+    },
+    onSuccess: () => {
+      queryClient.setQueryData<AdminNotification[]>(['adminNotifications'], () => []);
+      queryClient.setQueryData<number>(['adminNotificationsUnread'], () => 0);
+    },
+  });
+
+  const markAsRead = useCallback(
+    (id: string) => {
+      markAsReadMutation.mutate(id);
+    },
+    [markAsReadMutation],
+  );
 
   const markAllAsRead = useCallback(() => {
     markAllAsReadMutation.mutate();
   }, [markAllAsReadMutation]);
+
+  const deleteNotification = useCallback(
+    (id: string) => {
+      deleteNotificationMutation.mutate(id);
+    },
+    [deleteNotificationMutation],
+  );
+
+  const deleteAllNotifications = useCallback(() => {
+    deleteAllNotificationsMutation.mutate();
+  }, [deleteAllNotificationsMutation]);
 
   return {
     notifications,
@@ -140,7 +190,11 @@ export function useAdminNotifications() {
     isConnected,
     markAsRead,
     markAllAsRead,
+    deleteNotification,
+    deleteAllNotifications,
     isMarkingRead: markAsReadMutation.isPending,
     isMarkingAllRead: markAllAsReadMutation.isPending,
+    isDeleting: deleteNotificationMutation.isPending,
+    isDeletingAll: deleteAllNotificationsMutation.isPending,
   };
 }

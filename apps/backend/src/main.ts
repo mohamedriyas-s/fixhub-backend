@@ -45,6 +45,8 @@ async function bootstrap() {
       if (
         !origin ||
         corsOrigins.includes(origin) ||
+        origin.endsWith('.vercel.app') ||
+        origin.endsWith('.onrender.com') ||
         origin.endsWith('.trycloudflare.com') ||
         origin.endsWith('.ngrok-free.app') ||
         origin.includes('localhost') ||

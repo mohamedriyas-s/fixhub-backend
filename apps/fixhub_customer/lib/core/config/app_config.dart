@@ -7,9 +7,9 @@ class AppConfig {
   static const String appName = 'FixHub';
   static const String appVersion = '1.0.0';
 
-  /// API base URL — falls back to local PC IP in development.
+  /// API base URL — falls back to Render backend.
   static String get apiBaseUrl =>
-      dotenv.env['API_BASE_URL'] ?? 'http://192.168.1.18:3000/api/v1';
+      dotenv.env['API_BASE_URL'] ?? 'https://fixhub-backend-fra0.onrender.com/api/v1';
 
   static String get googleMapsApiKey =>
       dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';

@@ -1,9 +1,8 @@
 'use client';
 
-import * as React from 'react';
-import { apiClient } from '@/lib/api/client';
-import { endpoints } from '@/lib/api/endpoints';
 import { useQuery } from '@tanstack/react-query';
+import { Download } from 'lucide-react';
+import * as React from 'react';
 import {
   Area,
   AreaChart,
@@ -15,9 +14,11 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Download } from 'lucide-react';
-import { formatDate } from '@/lib/utils';
+
 import { Button, Card, CardContent, CardHeader, CardTitle, Tabs } from '@/components/ui';
+import { API_BASE_URL,apiClient } from '@/lib/api/client';
+import { endpoints } from '@/lib/api/endpoints';
+import { formatDate } from '@/lib/utils';
 
 const PERIOD_OPTIONS = [
   { id: '7d', label: '7 Days' },
@@ -98,7 +99,7 @@ export default function ReportsPage() {
 
   const handleExport = async () => {
     // Basic export logic
-    const url = `${process.env.NEXT_PUBLIC_API_URL}${endpoints.reports[tab as keyof typeof endpoints.reports]}?${new URLSearchParams({ ...params, format: 'csv' })}`;
+    const url = `${API_BASE_URL}${endpoints.reports[tab as keyof typeof endpoints.reports]}?${new URLSearchParams({ ...params, format: 'csv' })}`;
     window.open(url, '_blank');
   };
 
@@ -137,10 +138,10 @@ export default function ReportsPage() {
               </button>
             ))}
           </div>
-          <Button 
-            variant="secondary" 
-            size="sm" 
-            leftIcon={<Download className="h-3.5 w-3.5" />} 
+          <Button
+            variant="secondary"
+            size="sm"
+            leftIcon={<Download className="h-3.5 w-3.5" />}
             onClick={handleExport}
             disabled={true}
           >
@@ -168,9 +169,21 @@ export default function ReportsPage() {
           {/* Summary cards */}
           <div className="grid grid-cols-3 gap-4">
             {[
-              { label: 'Total Revenue', value: `₹${revenueReport?.totalRevenue?.toLocaleString() ?? 0}`, change: '' },
-              { label: 'Total Bookings', value: bookingsReport?.total?.toString() ?? '0', change: '' },
-              { label: 'Avg per Booking', value: `₹${bookingsReport?.total ? Math.round((revenueReport?.totalRevenue ?? 0) / bookingsReport.total).toLocaleString() : 0}`, change: '' },
+              {
+                label: 'Total Revenue',
+                value: `₹${revenueReport?.totalRevenue?.toLocaleString() ?? 0}`,
+                change: '',
+              },
+              {
+                label: 'Total Bookings',
+                value: bookingsReport?.total?.toString() ?? '0',
+                change: '',
+              },
+              {
+                label: 'Avg per Booking',
+                value: `₹${bookingsReport?.total ? Math.round((revenueReport?.totalRevenue ?? 0) / bookingsReport.total).toLocaleString() : 0}`,
+                change: '',
+              },
             ].map(({ label, value, change }) => (
               <div key={label} className="card p-4">
                 <p className="text-xs text-[#9CA3AF] uppercase tracking-wide">{label}</p>
@@ -180,7 +193,9 @@ export default function ReportsPage() {
             ))}
           </div>
           <Card>
-            <CardHeader><CardTitle>Revenue Over Time</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Revenue Over Time</CardTitle>
+            </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={280}>
                 <AreaChart data={chartData}>
@@ -191,10 +206,35 @@ export default function ReportsPage() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false} interval={Math.floor(chartData.length / 7)} />
-                  <YAxis tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB', fontSize: '12px' }} formatter={(v: any) => [`₹${Number(v).toLocaleString()}`, 'Revenue']} />
-                  <Area type="monotone" dataKey="revenue" stroke="#6F7F5F" strokeWidth={2} fill="url(#revGrad)" dot={false} />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 10, fill: '#9CA3AF' }}
+                    tickLine={false}
+                    axisLine={false}
+                    interval={Math.floor(chartData.length / 7)}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: '#9CA3AF' }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: '8px',
+                      border: '1px solid #E5E7EB',
+                      fontSize: '12px',
+                    }}
+                    formatter={(v: any) => [`₹${Number(v).toLocaleString()}`, 'Revenue']}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="revenue"
+                    stroke="#6F7F5F"
+                    strokeWidth={2}
+                    fill="url(#revGrad)"
+                    dot={false}
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </CardContent>
@@ -206,9 +246,24 @@ export default function ReportsPage() {
         <div className="space-y-4">
           <div className="grid grid-cols-3 gap-4">
             {[
-              { label: 'Total Bookings', value: bookingsReport?.total?.toString() ?? '0', change: '' },
-              { label: 'Completed', value: bookingsReport?.byStatus?.find((s: any) => s.status === 'COMPLETED')?._count?.toString() ?? '0', change: '' },
-              { label: 'Cancellation Rate', value: `${bookingsReport?.total ? Math.round(((bookingsReport?.byStatus?.find((s: any) => s.status === 'CANCELLED')?._count ?? 0) / bookingsReport.total) * 100) : 0}%`, change: '' },
+              {
+                label: 'Total Bookings',
+                value: bookingsReport?.total?.toString() ?? '0',
+                change: '',
+              },
+              {
+                label: 'Completed',
+                value:
+                  bookingsReport?.byStatus
+                    ?.find((s: any) => s.status === 'COMPLETED')
+                    ?._count?.toString() ?? '0',
+                change: '',
+              },
+              {
+                label: 'Cancellation Rate',
+                value: `${bookingsReport?.total ? Math.round(((bookingsReport?.byStatus?.find((s: any) => s.status === 'CANCELLED')?._count ?? 0) / bookingsReport.total) * 100) : 0}%`,
+                change: '',
+              },
             ].map(({ label, value, change }) => (
               <div key={label} className="card p-4">
                 <p className="text-xs text-[#9CA3AF] uppercase tracking-wide">{label}</p>
@@ -218,14 +273,32 @@ export default function ReportsPage() {
             ))}
           </div>
           <Card>
-            <CardHeader><CardTitle>Bookings Over Time</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Bookings Over Time</CardTitle>
+            </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false} interval={Math.floor(chartData.length / 7)} />
-                  <YAxis tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false} />
-                  <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB', fontSize: '12px' }} />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 10, fill: '#9CA3AF' }}
+                    tickLine={false}
+                    axisLine={false}
+                    interval={Math.floor(chartData.length / 7)}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: '#9CA3AF' }}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: '8px',
+                      border: '1px solid #E5E7EB',
+                      fontSize: '12px',
+                    }}
+                  />
                   <Bar dataKey="bookings" fill="#3B82F6" radius={[3, 3, 0, 0]} maxBarSize={24} />
                 </BarChart>
               </ResponsiveContainer>
@@ -238,9 +311,21 @@ export default function ReportsPage() {
         <div className="space-y-4">
           <div className="grid grid-cols-3 gap-4">
             {[
-              { label: 'New Customers', value: customersReport?.newCustomers?.toString() ?? '0', change: '' },
-              { label: 'Returning Customers', value: customersReport?.returningCustomers?.toString() ?? '0', change: '' },
-              { label: 'Total Active Users', value: customersReport?.totalUsers?.toString() ?? '0', change: '' },
+              {
+                label: 'New Customers',
+                value: customersReport?.newCustomers?.toString() ?? '0',
+                change: '',
+              },
+              {
+                label: 'Returning Customers',
+                value: customersReport?.returningCustomers?.toString() ?? '0',
+                change: '',
+              },
+              {
+                label: 'Total Active Users',
+                value: customersReport?.totalUsers?.toString() ?? '0',
+                change: '',
+              },
             ].map(({ label, value, change }) => (
               <div key={label} className="card p-4">
                 <p className="text-xs text-[#9CA3AF] uppercase tracking-wide">{label}</p>
@@ -250,7 +335,9 @@ export default function ReportsPage() {
             ))}
           </div>
           <Card>
-            <CardHeader><CardTitle>Customer Acquisition</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Customer Acquisition</CardTitle>
+            </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={280}>
                 <AreaChart data={chartData}>
@@ -261,10 +348,33 @@ export default function ReportsPage() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false} interval={Math.floor(chartData.length / 7)} />
-                  <YAxis tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false} />
-                  <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB', fontSize: '12px' }} />
-                  <Area type="monotone" dataKey="customers" stroke="#8B5CF6" strokeWidth={2} fill="url(#custGrad)" dot={false} />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 10, fill: '#9CA3AF' }}
+                    tickLine={false}
+                    axisLine={false}
+                    interval={Math.floor(chartData.length / 7)}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: '#9CA3AF' }}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: '8px',
+                      border: '1px solid #E5E7EB',
+                      fontSize: '12px',
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="customers"
+                    stroke="#8B5CF6"
+                    strokeWidth={2}
+                    fill="url(#custGrad)"
+                    dot={false}
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </CardContent>
@@ -275,9 +385,27 @@ export default function ReportsPage() {
         <div className="space-y-4">
           <div className="grid grid-cols-3 gap-4">
             {[
-              { label: 'Total Technicians', value: techniciansReport?.total?.toString() ?? '0', change: '' },
-              { label: 'Verified', value: techniciansReport?.byVerification?.find((s: any) => s.verificationStatus === 'VERIFIED')?._count?.toString() ?? '0', change: '' },
-              { label: 'Pending Verification', value: techniciansReport?.byVerification?.find((s: any) => s.verificationStatus === 'PENDING')?._count?.toString() ?? '0', change: '' },
+              {
+                label: 'Total Technicians',
+                value: techniciansReport?.total?.toString() ?? '0',
+                change: '',
+              },
+              {
+                label: 'Verified',
+                value:
+                  techniciansReport?.byVerification
+                    ?.find((s: any) => s.verificationStatus === 'VERIFIED')
+                    ?._count?.toString() ?? '0',
+                change: '',
+              },
+              {
+                label: 'Pending Verification',
+                value:
+                  techniciansReport?.byVerification
+                    ?.find((s: any) => s.verificationStatus === 'PENDING')
+                    ?._count?.toString() ?? '0',
+                change: '',
+              },
             ].map(({ label, value, change }) => (
               <div key={label} className="card p-4">
                 <p className="text-xs text-[#9CA3AF] uppercase tracking-wide">{label}</p>
@@ -287,15 +415,40 @@ export default function ReportsPage() {
             ))}
           </div>
           <Card>
-            <CardHeader><CardTitle>Technician Growth</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Technician Growth</CardTitle>
+            </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={280}>
                 <AreaChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false} interval={Math.floor(chartData.length / 7)} />
-                  <YAxis tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false} />
-                  <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB', fontSize: '12px' }} />
-                  <Area type="monotone" dataKey="technicians" stroke="#F59E0B" strokeWidth={2} fill="#FEF3C7" dot={false} />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 10, fill: '#9CA3AF' }}
+                    tickLine={false}
+                    axisLine={false}
+                    interval={Math.floor(chartData.length / 7)}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: '#9CA3AF' }}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: '8px',
+                      border: '1px solid #E5E7EB',
+                      fontSize: '12px',
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="technicians"
+                    stroke="#F59E0B"
+                    strokeWidth={2}
+                    fill="#FEF3C7"
+                    dot={false}
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </CardContent>
@@ -307,9 +460,24 @@ export default function ReportsPage() {
         <div className="space-y-4">
           <div className="grid grid-cols-3 gap-4">
             {[
-              { label: 'Total Processed', value: `₹${paymentsReport?.totalCaptured?.toLocaleString() ?? 0}`, change: '' },
-              { label: 'Failed Payments', value: paymentsReport?.byStatus?.find((s: any) => s.status === 'FAILED')?._count?.toString() ?? '0', change: '' },
-              { label: 'Success Rate', value: `${paymentsReport?.totalCaptured ? '99.9%' : '0%'}`, change: '' },
+              {
+                label: 'Total Processed',
+                value: `₹${paymentsReport?.totalCaptured?.toLocaleString() ?? 0}`,
+                change: '',
+              },
+              {
+                label: 'Failed Payments',
+                value:
+                  paymentsReport?.byStatus
+                    ?.find((s: any) => s.status === 'FAILED')
+                    ?._count?.toString() ?? '0',
+                change: '',
+              },
+              {
+                label: 'Success Rate',
+                value: `${paymentsReport?.totalCaptured ? '99.9%' : '0%'}`,
+                change: '',
+              },
             ].map(({ label, value, change }) => (
               <div key={label} className="card p-4">
                 <p className="text-xs text-[#9CA3AF] uppercase tracking-wide">{label}</p>
@@ -319,14 +487,34 @@ export default function ReportsPage() {
             ))}
           </div>
           <Card>
-            <CardHeader><CardTitle>Payments Processed</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Payments Processed</CardTitle>
+            </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false} interval={Math.floor(chartData.length / 7)} />
-                  <YAxis tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB', fontSize: '12px' }} formatter={(v: any) => [`₹${Number(v).toLocaleString()}`, 'Payments']} />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 10, fill: '#9CA3AF' }}
+                    tickLine={false}
+                    axisLine={false}
+                    interval={Math.floor(chartData.length / 7)}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: '#9CA3AF' }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: '8px',
+                      border: '1px solid #E5E7EB',
+                      fontSize: '12px',
+                    }}
+                    formatter={(v: any) => [`₹${Number(v).toLocaleString()}`, 'Payments']}
+                  />
                   <Bar dataKey="payments" fill="#10B981" radius={[3, 3, 0, 0]} maxBarSize={24} />
                 </BarChart>
               </ResponsiveContainer>
@@ -339,9 +527,24 @@ export default function ReportsPage() {
         <div className="space-y-4">
           <div className="grid grid-cols-3 gap-4">
             {[
-              { label: 'Total Cancellations', value: cancellationsReport?.totalCancellations?.toString() ?? '0', change: '' },
-              { label: 'Top Reason', value: Object.entries(cancellationsReport?.byReason ?? {}).sort((a: any, b: any) => b[1] - a[1])[0]?.[0] ?? 'N/A', change: '' },
-              { label: 'System Cancelled', value: (cancellationsReport?.byReason?.['System Timeout'] ?? 0).toString(), change: '' },
+              {
+                label: 'Total Cancellations',
+                value: cancellationsReport?.totalCancellations?.toString() ?? '0',
+                change: '',
+              },
+              {
+                label: 'Top Reason',
+                value:
+                  Object.entries(cancellationsReport?.byReason ?? {}).sort(
+                    (a: any, b: any) => b[1] - a[1],
+                  )[0]?.[0] ?? 'N/A',
+                change: '',
+              },
+              {
+                label: 'System Cancelled',
+                value: (cancellationsReport?.byReason?.['System Timeout'] ?? 0).toString(),
+                change: '',
+              },
             ].map(({ label, value, change }) => (
               <div key={label} className="card p-4">
                 <p className="text-xs text-[#9CA3AF] uppercase tracking-wide">{label}</p>
@@ -351,15 +554,38 @@ export default function ReportsPage() {
             ))}
           </div>
           <Card>
-            <CardHeader><CardTitle>Cancellations Trend</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Cancellations Trend</CardTitle>
+            </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false} interval={Math.floor(chartData.length / 7)} />
-                  <YAxis tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false} />
-                  <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB', fontSize: '12px' }} />
-                  <Bar dataKey="cancellations" fill="#EF4444" radius={[3, 3, 0, 0]} maxBarSize={24} />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 10, fill: '#9CA3AF' }}
+                    tickLine={false}
+                    axisLine={false}
+                    interval={Math.floor(chartData.length / 7)}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: '#9CA3AF' }}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: '8px',
+                      border: '1px solid #E5E7EB',
+                      fontSize: '12px',
+                    }}
+                  />
+                  <Bar
+                    dataKey="cancellations"
+                    fill="#EF4444"
+                    radius={[3, 3, 0, 0]}
+                    maxBarSize={24}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -371,9 +597,24 @@ export default function ReportsPage() {
         <div className="space-y-4">
           <div className="grid grid-cols-3 gap-4">
             {[
-              { label: 'Growth Data Points', value: Array.isArray(growthReport) ? growthReport.length.toString() : '0', change: '' },
-              { label: 'Latest Month Revenue', value: `₹${Array.isArray(growthReport) && growthReport.length > 0 ? growthReport[growthReport.length - 1].revenue.toLocaleString() : 0}`, change: '' },
-              { label: 'Latest Month Bookings', value: Array.isArray(growthReport) && growthReport.length > 0 ? growthReport[growthReport.length - 1].bookings.toString() : '0', change: '' },
+              {
+                label: 'Growth Data Points',
+                value: Array.isArray(growthReport) ? growthReport.length.toString() : '0',
+                change: '',
+              },
+              {
+                label: 'Latest Month Revenue',
+                value: `₹${Array.isArray(growthReport) && growthReport.length > 0 ? growthReport[growthReport.length - 1].revenue.toLocaleString() : 0}`,
+                change: '',
+              },
+              {
+                label: 'Latest Month Bookings',
+                value:
+                  Array.isArray(growthReport) && growthReport.length > 0
+                    ? growthReport[growthReport.length - 1].bookings.toString()
+                    : '0',
+                change: '',
+              },
             ].map(({ label, value, change }) => (
               <div key={label} className="card p-4">
                 <p className="text-xs text-[#9CA3AF] uppercase tracking-wide">{label}</p>
@@ -383,15 +624,40 @@ export default function ReportsPage() {
             ))}
           </div>
           <Card>
-            <CardHeader><CardTitle>Growth Metric</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Growth Metric</CardTitle>
+            </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={280}>
                 <AreaChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false} interval={Math.floor(chartData.length / 7)} />
-                  <YAxis tick={{ fontSize: 10, fill: '#9CA3AF' }} tickLine={false} axisLine={false} />
-                  <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB', fontSize: '12px' }} />
-                  <Area type="monotone" dataKey="growth" stroke="#3B82F6" strokeWidth={2} fill="#DBEAFE" dot={false} />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 10, fill: '#9CA3AF' }}
+                    tickLine={false}
+                    axisLine={false}
+                    interval={Math.floor(chartData.length / 7)}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: '#9CA3AF' }}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: '8px',
+                      border: '1px solid #E5E7EB',
+                      fontSize: '12px',
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="growth"
+                    stroke="#3B82F6"
+                    strokeWidth={2}
+                    fill="#DBEAFE"
+                    dot={false}
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </CardContent>
