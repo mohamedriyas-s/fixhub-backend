@@ -111,6 +111,7 @@ function EditTechnicianDialog({
   }, [open, technician]);
 
   const handleSave = () => {
+    if (!technician) return;
     updateMutation.mutate(
       { id: technician.id, payload: { name: name.trim(), email: email.trim() || undefined } },
       {

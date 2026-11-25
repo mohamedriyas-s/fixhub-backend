@@ -12,6 +12,11 @@ export function clearAdminSessionMarker() {
   if (typeof document === 'undefined') return;
 
   document.cookie = `${SESSION_MARKER}=; Path=/; Max-Age=0; SameSite=Lax`;
+  document.cookie = `${SESSION_MARKER}=; Path=/; Max-Age=0; SameSite=Lax; Secure`;
+  document.cookie = `accessToken=; Path=/; Max-Age=0; SameSite=Lax`;
+  document.cookie = `accessToken=; Path=/; Max-Age=0; SameSite=Lax; Secure`;
+  document.cookie = `refreshToken=; Path=/; Max-Age=0; SameSite=Lax`;
+  document.cookie = `refreshToken=; Path=/; Max-Age=0; SameSite=Lax; Secure`;
 }
 
 export { SESSION_MARKER };

@@ -1,13 +1,15 @@
 'use client';
 
-import * as React from 'react';
 import { useQuery } from '@tanstack/react-query';
+import * as React from 'react';
+import { toast } from 'sonner';
+
+import { Avatar, Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui';
 import { apiClient } from '@/lib/api/client';
 import { endpoints } from '@/lib/api/endpoints';
-import { Avatar, Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui';
-import { toast } from 'sonner';
-import { formatDate } from '@/lib/utils';
+import { clearAdminSessionMarker } from '@/lib/auth/session';
 import type { User } from '@/lib/types';
+import { formatDate } from '@/lib/utils';
 
 export default function ProfilePage() {
   const { data: me } = useQuery({
@@ -36,13 +38,20 @@ export default function ProfilePage() {
             <Avatar name={me?.name} size="lg" />
             <div>
               <p className="font-semibold text-[#111827]">{me?.name ?? 'Admin'}</p>
-              <p className="text-sm text-[#9CA3AF]">{me?.role} · Joined {me?.createdAt ? formatDate(me.createdAt) : '—'}</p>
+              <p className="text-sm text-[#9CA3AF]">
+                {me?.role} · Joined {me?.createdAt ? formatDate(me.createdAt) : '—'}
+              </p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Input label="Full Name" defaultValue={me?.name ?? ''} placeholder="Your name" />
             <Input label="Phone" defaultValue={me?.phone ?? ''} disabled />
-            <Input label="Email" defaultValue={me?.email ?? ''} type="email" placeholder="admin@fixhub.in" />
+            <Input
+              label="Email"
+              defaultValue={me?.email ?? ''}
+              type="email"
+              placeholder="admin@fixhub.in"
+            />
             <Input label="Role" defaultValue={me?.role ?? 'ADMIN'} disabled />
           </div>
           <div className="flex justify-end">
@@ -52,16 +61,20 @@ export default function ProfilePage() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>Security</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Security</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-[#6B7280]">
-            Password management is handled via OTP-based authentication. Use the login screen to re-authenticate.
+            Password management is handled via OTP-based authentication. Use the login screen to
+            re-authenticate.
           </p>
           <Button
             variant="danger"
             onClick={() => {
               localStorage.removeItem('fixhub_admin_token');
-              window.location.href = '/login';
+              clearAdminSessionMarker();
+              window.location.href = '/login?logout=1';
             }}
           >
             Sign Out All Sessions

@@ -1,8 +1,6 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import * as React from 'react';
+import { useMutation } from '@tanstack/react-query';
 import {
   BarChart2,
   Bell,
@@ -22,7 +20,14 @@ import {
   Wrench,
   Zap,
 } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname , useRouter } from 'next/navigation';
+import * as React from 'react';
+import { toast } from 'sonner';
 
+import { apiClient } from '@/lib/api/client';
+import { endpoints } from '@/lib/api/endpoints';
+import { clearAdminSessionMarker } from '@/lib/auth/session';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -39,9 +44,7 @@ interface NavGroup {
 
 const navGroups: NavGroup[] = [
   {
-    items: [
-      { label: 'Dashboard', href: '/', icon: LayoutDashboard },
-    ],
+    items: [{ label: 'Dashboard', href: '/', icon: LayoutDashboard }],
   },
   {
     title: 'Operations',
@@ -78,13 +81,6 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-import { useMutation } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api/client';
-import { endpoints } from '@/lib/api/endpoints';
-import { clearAdminSessionMarker } from '@/lib/auth/session';
-import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
-
 export function Sidebar() {
   const [collapsed, setCollapsed] = React.useState(false);
   const pathname = usePathname();
@@ -104,8 +100,8 @@ export function Sidebar() {
       // to ensure the user is not stuck if the token is already expired.
       localStorage.removeItem('fixhub_admin_token');
       clearAdminSessionMarker();
-      router.push('/login');
-    }
+      window.location.href = '/login?logout=1';
+    },
   });
 
   return (
@@ -124,7 +120,9 @@ export function Sidebar() {
           {!collapsed && (
             <div>
               <span className="text-sm font-bold text-[#111827] tracking-tight">FixHub</span>
-              <span className="ml-1 text-[10px] font-medium text-[#9CA3AF] uppercase tracking-wider">Admin</span>
+              <span className="ml-1 text-[10px] font-medium text-[#9CA3AF] uppercase tracking-wider">
+                Admin
+              </span>
             </div>
           )}
         </div>
@@ -135,7 +133,11 @@ export function Sidebar() {
         onClick={() => setCollapsed(!collapsed)}
         className="absolute -right-3 top-[54px] z-10 flex h-6 w-6 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#6B7280] shadow-sm hover:text-[#111827] transition-colors"
       >
-        {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+        {collapsed ? (
+          <ChevronRight className="h-3.5 w-3.5" />
+        ) : (
+          <ChevronLeft className="h-3.5 w-3.5" />
+        )}
       </button>
 
       {/* Nav */}
@@ -165,10 +167,15 @@ export function Sidebar() {
                     'nav-item',
                     active && 'active',
                     collapsed && 'justify-center px-0',
-                    item.disabled && 'opacity-50 pointer-events-none cursor-not-allowed'
+                    item.disabled && 'opacity-50 pointer-events-none cursor-not-allowed',
                   )}
                 >
-                  <Icon className={cn('h-4 w-4 flex-shrink-0', active ? 'text-[#1F2937]' : 'text-[#9CA3AF]')} />
+                  <Icon
+                    className={cn(
+                      'h-4 w-4 flex-shrink-0',
+                      active ? 'text-[#1F2937]' : 'text-[#9CA3AF]',
+                    )}
+                  />
                   {!collapsed && <span>{item.label}</span>}
                   {item.disabled && !collapsed && (
                     <span className="ml-auto text-[9px] font-bold uppercase tracking-wider text-[#9CA3AF] bg-[#F3F4F6] px-1.5 py-0.5 rounded">
@@ -184,10 +191,7 @@ export function Sidebar() {
 
       {/* Bottom — Profile */}
       <div className="border-t border-[#E5E7EB] p-2">
-        <Link
-          href="/profile"
-          className={cn('nav-item', collapsed && 'justify-center')}
-        >
+        <Link href="/profile" className={cn('nav-item', collapsed && 'justify-center')}>
           <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#1F2937] text-[10px] font-bold text-white">
             A
           </div>

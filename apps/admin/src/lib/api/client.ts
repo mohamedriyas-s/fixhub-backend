@@ -1,6 +1,8 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
-import { endpoints } from './endpoints';
+
 import { clearAdminSessionMarker } from '@/lib/auth/session';
+
+import { endpoints } from './endpoints';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 const isNgrokApi = API_BASE_URL.includes('.ngrok-free.');
@@ -16,10 +18,19 @@ export const apiClient = axios.create({
 });
 
 let isRefreshing = false;
+let isRedirecting = false;
 let failedQueue: Array<{
   resolve: (value?: unknown) => void;
   reject: (reason?: unknown) => void;
 }> = [];
+
+function redirectToLogin() {
+  if (typeof window !== 'undefined' && !isRedirecting) {
+    isRedirecting = true;
+    clearAdminSessionMarker();
+    window.location.href = '/login?expired=1';
+  }
+}
 
 const processQueue = (error: Error | null, token: string | null = null) => {
   failedQueue.forEach((prom) => {
@@ -40,11 +51,11 @@ apiClient.interceptors.response.use(
 
     if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
       // If the refresh itself fails, log out
-      if (originalRequest.url?.includes(endpoints.auth.refresh) || (originalRequest as any)._isRefreshRequest) {
-        if (typeof window !== 'undefined') {
-          clearAdminSessionMarker();
-          window.location.href = '/login';
-        }
+      if (
+        originalRequest.url?.includes(endpoints.auth.refresh) ||
+        (originalRequest as any)._isRefreshRequest
+      ) {
+        redirectToLogin();
         return Promise.reject(error);
       }
 
@@ -68,29 +79,26 @@ apiClient.interceptors.response.use(
       try {
         // Use apiClient but mark it so it bypasses the 401 interceptor loop
         const refreshResponse = await apiClient.post(endpoints.auth.refresh, {}, {
-          _isRefreshRequest: true
+          _isRefreshRequest: true,
         } as any);
-        
+
         const newAccessToken = refreshResponse.data?.accessToken;
         if (newAccessToken) {
           apiClient.defaults.headers.common['Authorization'] = `Bearer ${newAccessToken}`;
           originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
         }
-        
+
         isRefreshing = false;
-        
+
         // Also update the queue with the new token
         failedQueue.forEach((prom) => prom.resolve(newAccessToken));
         failedQueue = [];
-        
+
         return apiClient(originalRequest);
       } catch (refreshError) {
         isRefreshing = false;
         processQueue(refreshError as Error);
-        if (typeof window !== 'undefined') {
-          clearAdminSessionMarker();
-          window.location.href = '/login';
-        }
+        redirectToLogin();
         return Promise.reject(refreshError);
       }
     }
