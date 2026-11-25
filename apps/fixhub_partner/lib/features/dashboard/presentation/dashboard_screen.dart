@@ -27,13 +27,15 @@ class DashboardScreen extends ConsumerStatefulWidget {
   ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+class _DashboardScreenState extends ConsumerState<DashboardScreen>
+    with WidgetsBindingObserver {
   bool _isTogglingAvailability = false;
   Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Initialize FCM and refresh data on mount
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(fcmServiceProvider).initialize();
@@ -57,7 +59,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      ref.read(notificationsProvider.notifier).load(silent: true);
+      ref.invalidate(myJobsProvider(null));
+      ref.invalidate(activeJobProvider);
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pollTimer?.cancel();
     super.dispose();
   }
@@ -91,6 +103,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final currentJobAsync = ref.watch(activeJobProvider);
     final todayEarningsAsync = ref.watch(todayEarningsProvider);
     final unreadCount = ref.watch(unreadCountProvider);
+    final assignedJobs = ref
+            .watch(myJobsProvider(null))
+            .value
+            ?.items
+            .where((j) => j.status == 'ASSIGNED')
+            .toList() ??
+        const <Job>[];
 
     final user = authState is AuthAuthenticated ? authState.user : null;
     final profile = profileAsync.value;
@@ -299,6 +318,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       onChanged: _toggleAvailability,
                     ),
 
+                    if (assignedJobs.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.base),
+                      _NewBookingBanner(
+                        assignedJobs: assignedJobs,
+                        onTap: () {
+                          if (assignedJobs.length == 1) {
+                            context.push('/job-details/${assignedJobs.first.id}');
+                          } else {
+                            context.go('/jobs');
+                          }
+                        },
+                      ),
+                    ],
+
                     const SizedBox(height: AppSpacing.xl),
 
                     // ── Today's Overview ──────────────────────────
@@ -370,13 +403,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     const SizedBox(height: AppSpacing.md),
                     currentJobAsync.when(
                       loading: () => const FpJobCardSkeleton(),
-                      error: (e, _) => FpCard(
-                        child: Center(
-                          child: Text(
-                            'Could not load jobs',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                        ),
+                      error: (e, _) => _NoActiveJobCard(
+                        onRefresh: () => ref.invalidate(activeJobProvider),
                       ),
                       data: (job) => job == null
                           ? _NoActiveJobCard()
@@ -437,6 +465,91 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       return NumberFormat('#,##0', 'en_IN').format(val);
     }
     return val.toStringAsFixed(0);
+  }
+}
+
+class _NewBookingBanner extends StatelessWidget {
+  final List<Job> assignedJobs;
+  final VoidCallback onTap;
+
+  const _NewBookingBanner({
+    required this.assignedJobs,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final count = assignedJobs.length;
+    final firstJob = assignedJobs.first;
+
+    return FpCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(AppSpacing.base),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.primaryContainer,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            child: const Icon(
+              Icons.notifications_active_rounded,
+              color: AppColors.primary,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  count == 1
+                      ? 'New Booking Assigned'
+                      : '$count New Bookings Assigned',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  count == 1
+                      ? '${firstJob.subService.name} · ${firstJob.scheduledSlot}'
+                      : 'Tap to review and respond to pending bookings',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.xs,
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            child: const Text(
+              'View',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -583,6 +696,10 @@ class _ActiveJobCard extends StatelessWidget {
 }
 
 class _NoActiveJobCard extends StatelessWidget {
+  final VoidCallback? onRefresh;
+
+  const _NoActiveJobCard({this.onRefresh});
+
   @override
   Widget build(BuildContext context) {
     return FpCard(
@@ -603,16 +720,25 @@ class _NoActiveJobCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
-            'No Active Job',
+            'No Active Jobs',
             style: Theme.of(
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            'Go online to receive job requests',
+            'No active jobs at the moment. Go online to receive requests.',
+            textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall,
           ),
+          if (onRefresh != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            TextButton.icon(
+              onPressed: onRefresh,
+              icon: const Icon(Icons.refresh_rounded, size: 16),
+              label: const Text('Refresh'),
+            ),
+          ],
           const SizedBox(height: AppSpacing.base),
         ],
       ),

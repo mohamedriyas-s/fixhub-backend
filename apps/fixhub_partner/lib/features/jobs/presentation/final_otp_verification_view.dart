@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -28,10 +29,50 @@ class _FinalOtpVerificationViewState
   final _otpCtrl = TextEditingController();
   bool _isVerifying = false;
   bool _isDeparting = false;
+  bool _isRefreshing = false;
   String? _errorText;
+  Timer? _pollTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncPolling();
+  }
+
+  @override
+  void didUpdateWidget(covariant FinalOtpVerificationView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncPolling();
+  }
+
+  void _syncPolling() {
+    if (widget.job.isExtraChargePaid) {
+      _pollTimer?.cancel();
+      _pollTimer = null;
+    } else if (_pollTimer == null) {
+      _pollTimer = Timer.periodic(
+        const Duration(seconds: 8),
+        (_) => _refreshPaymentStatus(silent: true),
+      );
+    }
+  }
+
+  Future<void> _refreshPaymentStatus({bool silent = false}) async {
+    if (!silent && mounted) setState(() => _isRefreshing = true);
+    try {
+      ref.invalidate(jobDetailsProvider(widget.job.id));
+      ref.invalidate(activeJobProvider);
+      await ref.read(jobDetailsProvider(widget.job.id).future);
+    } catch (_) {
+      // Ignore transient polling errors
+    } finally {
+      if (!silent && mounted) setState(() => _isRefreshing = false);
+    }
+  }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _otpCtrl.dispose();
     super.dispose();
   }
@@ -179,7 +220,7 @@ class _FinalOtpVerificationViewState
                       Text(
                         isPaid
                             ? 'Payment settled. Customer has their Completion OTP.'
-                            : 'Customer is reviewing quotation (₹${extraAmount.toStringAsFixed(0)} Online).',
+                            : 'Waiting for customer to pay ₹${extraAmount.toStringAsFixed(0)} online.',
                         style: const TextStyle(
                           fontSize: 13,
                           color: AppColors.textSecondary,
@@ -188,6 +229,18 @@ class _FinalOtpVerificationViewState
                     ],
                   ),
                 ),
+                if (!isPaid)
+                  IconButton(
+                    onPressed: _isRefreshing ? null : () => _refreshPaymentStatus(),
+                    tooltip: 'Check Payment Status',
+                    icon: _isRefreshing
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh_rounded, color: AppColors.warning),
+                  ),
               ],
             ),
           ),
@@ -289,6 +342,16 @@ class _FinalOtpVerificationViewState
             isLoading: _isVerifying,
             onPressed: isPaid && !_isVerifying ? _verifyOtp : null,
           ),
+
+          if (!isPaid && isOnline) ...[
+            const SizedBox(height: AppSpacing.md),
+            FpButton(
+              label: _isRefreshing ? 'Checking Payment...' : '↻ Refresh Payment Status',
+              variant: FpButtonVariant.secondary,
+              isLoading: _isRefreshing,
+              onPressed: _isRefreshing ? null : () => _refreshPaymentStatus(),
+            ),
+          ],
 
           if (!isPaid && isOnline && !widget.job.isPendingCollection) ...[
             const SizedBox(height: AppSpacing.md),

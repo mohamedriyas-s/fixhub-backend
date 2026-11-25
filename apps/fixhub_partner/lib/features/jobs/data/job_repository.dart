@@ -15,10 +15,17 @@ class JobRepository {
 
   /// GET /technicians/jobs/current
   Future<Job?> getCurrentJob() async {
-    final response = await _dio.get(ApiEndpoints.technicianCurrentJob);
-    final data = _unwrap(response.data);
-    if (data == null) return null;
-    return Job.fromJson(data);
+    try {
+      final response = await _dio.get(ApiEndpoints.technicianCurrentJob);
+      final data = _unwrap(response.data);
+      if (data == null) return null;
+      return Job.fromJson(data);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        return null;
+      }
+      rethrow;
+    }
   }
 
   /// GET /technicians/jobs?status=...&page=...
