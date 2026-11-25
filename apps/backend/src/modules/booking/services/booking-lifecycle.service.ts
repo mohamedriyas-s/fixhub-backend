@@ -59,7 +59,11 @@ export class BookingLifecycleService {
         actor.role === Role.TECHNICIAN &&
         err?.response?.errorCode === ErrorCodes.BOOKING_OTP_INVALID
       ) {
-        await this.bookingRepository.incrementStartOtpAttempts(bookingId);
+        if (dto.status === BookingStatus.IN_PROGRESS) {
+          await this.bookingRepository.incrementStartOtpAttempts(bookingId);
+        } else if (dto.status === BookingStatus.COMPLETED) {
+          await this.bookingRepository.incrementCompletionOtpAttempts(bookingId);
+        }
       }
       throw err;
     }

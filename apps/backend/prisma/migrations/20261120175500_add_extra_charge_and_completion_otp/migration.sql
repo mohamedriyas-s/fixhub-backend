@@ -1,0 +1,18 @@
+-- AlterEnum
+ALTER TYPE "BookingStatus" ADD VALUE IF NOT EXISTS 'AWAITING_COMPLETION_VERIFICATION';
+ALTER TYPE "BookingStatus" ADD VALUE IF NOT EXISTS 'PENDING_COLLECTION';
+
+-- AlterTable
+ALTER TABLE "bookings"
+ADD COLUMN IF NOT EXISTS "additional_amount" DECIMAL(10,2),
+ADD COLUMN IF NOT EXISTS "price_revision_description" TEXT,
+ADD COLUMN IF NOT EXISTS "appealed_amount" DECIMAL(10,2),
+ADD COLUMN IF NOT EXISTS "final_additional_amount" DECIMAL(10,2),
+ADD COLUMN IF NOT EXISTS "extra_charge_payment_method" TEXT,
+ADD COLUMN IF NOT EXISTS "extra_charge_paid_at" TIMESTAMP(3),
+ADD COLUMN IF NOT EXISTS "price_revision_rejected_at" TIMESTAMP(3),
+ADD COLUMN IF NOT EXISTS "completion_otp" VARCHAR(6),
+ADD COLUMN IF NOT EXISTS "completion_otp_attempts" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN IF NOT EXISTS "slot_departure_at" TIMESTAMP(3),
+ADD COLUMN IF NOT EXISTS "is_pending_delay" BOOLEAN NOT NULL DEFAULT false;
+

@@ -54,6 +54,41 @@ export class PaymentRepository {
     });
   }
 
+  async recordExtraChargePayment(
+    bookingId: string,
+    params: {
+      razorpayOrderId: string;
+      razorpayPaymentId: string;
+      razorpaySignature: string;
+      amount: number;
+    },
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const booking = await tx.booking.update({
+        where: { id: bookingId },
+        data: {
+          extraChargePaidAt: new Date(),
+          extraChargePaymentMethod: 'ONLINE',
+        },
+        include: {
+          customer: true,
+          technician: true,
+        },
+      });
+
+      await tx.bookingTimeline.create({
+        data: {
+          bookingId,
+          changedByUserId: booking.customerId,
+          status: booking.status,
+          note: `Additional charge of ₹${params.amount.toFixed(0)} paid via Razorpay (${params.razorpayPaymentId}). Completion OTP unlocked.`,
+        },
+      });
+
+      return booking;
+    });
+  }
+
   upsertOrder(
     tx: PrismaTx,
     params: {

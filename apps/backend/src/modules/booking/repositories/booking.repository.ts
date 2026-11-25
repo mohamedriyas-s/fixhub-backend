@@ -328,6 +328,62 @@ export class BookingRepository {
     });
   }
 
+  async incrementCompletionOtpAttempts(id: string) {
+    return this.prisma.booking.update({
+      where: { id },
+      data: {
+        completionOtpAttempts: { increment: 1 },
+      },
+    });
+  }
+
+  async finalizeAmount(
+    tx: PrismaTx,
+    bookingId: string,
+    data: {
+      finalAdditionalAmount: number;
+      paymentMethod: 'ONLINE' | 'CASH';
+      completionOtp: string;
+      actorUserId: string;
+    },
+  ) {
+    const booking = await tx.booking.findUniqueOrThrow({
+      where: { id: bookingId },
+      include: { subService: true },
+    });
+
+    const baseAmount = Number(booking.subService?.basePrice || booking.totalAmount);
+    const newTotal = baseAmount + data.finalAdditionalAmount;
+    const isCash = data.paymentMethod === 'CASH';
+    const isZeroExtra = data.finalAdditionalAmount === 0;
+
+    return tx.booking.update({
+      where: { id: bookingId },
+      data: {
+        finalAdditionalAmount: data.finalAdditionalAmount,
+        totalAmount: newTotal,
+        extraChargePaymentMethod: data.paymentMethod,
+        extraChargePaidAt: isCash || isZeroExtra ? new Date() : null,
+        completionOtp: data.completionOtp,
+        completionOtpAttempts: 0,
+        status: BookingStatus.AWAITING_COMPLETION_VERIFICATION,
+        updatedBy: data.actorUserId,
+      },
+      include: this.bookingInclude(),
+    });
+  }
+
+  async markExtraChargePaid(bookingId: string, actorUserId: string) {
+    return this.prisma.booking.update({
+      where: { id: bookingId },
+      data: {
+        extraChargePaidAt: new Date(),
+        updatedBy: actorUserId,
+      },
+      include: this.bookingInclude(),
+    });
+  }
+
   async updateLifecycleStatus(
     tx: PrismaTx,
     id: string,
@@ -440,6 +496,14 @@ export class BookingRepository {
     return this.prisma.booking.update({
       where: { id: bookingId },
       data: { notes, updatedBy },
+      include: this.bookingInclude(),
+    });
+  }
+
+  async updateIssueDetails(bookingId: string, description: string | undefined, updatedBy: string) {
+    return this.prisma.booking.update({
+      where: { id: bookingId },
+      data: { description, updatedBy },
       include: this.bookingInclude(),
     });
   }
@@ -598,6 +662,8 @@ export class BookingRepository {
         totalAmount: revisedAmount!,
         status: 'IN_PROGRESS',
         customerConsentAt: new Date(),
+        slotDepartureAt: new Date(),
+        isPendingDelay: true,
         updatedBy: actorUserId,
       },
       include: this.bookingInclude(),

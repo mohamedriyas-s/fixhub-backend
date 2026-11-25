@@ -1,6 +1,6 @@
 import { ErrorCodes } from '@fixhub/shared';
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { BookingStatus, Role } from '@prisma/client';
 
 import { AuthenticatedUser } from '../../../common/interfaces/auth.interface';
 import { BookingQueryDto } from '../dto';
@@ -70,9 +70,27 @@ export class BookingQueryService {
       const {
         startOtp: _startOtp,
         startOtpAttempts: _startOtpAttempts,
+        completionOtp: _completionOtp,
+        completionOtpAttempts: _completionOtpAttempts,
         ...sanitized
       } = booking as any;
       return sanitized;
+    }
+
+    if (actor.role === Role.CUSTOMER && booking) {
+      const b = booking as any;
+      const isOnlineUnpaid =
+        b.status === BookingStatus.AWAITING_COMPLETION_VERIFICATION &&
+        b.extraChargePaymentMethod === 'ONLINE' &&
+        Number(b.finalAdditionalAmount || 0) > 0 &&
+        !b.extraChargePaidAt;
+
+      if (isOnlineUnpaid) {
+        return {
+          ...b,
+          completionOtp: null, // Gated until customer completes payment!
+        };
+      }
     }
 
     return booking;

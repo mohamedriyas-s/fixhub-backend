@@ -15,8 +15,8 @@ import { BookingQueryCacheService } from './booking-query-cache.service';
 
 const IMAGE_CONTENT_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const VIDEO_CONTENT_TYPES = new Set(['video/mp4', 'video/quicktime', 'video/webm']);
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // 2 MB
+const MAX_VIDEO_BYTES = 30 * 1024 * 1024; // 30 MB
 const UPLOADABLE_STATUSES: BookingStatus[] = [
   BookingStatus.DRAFT,
   BookingStatus.CONFIRMED,
@@ -170,7 +170,8 @@ export class BookingMediaService {
 
   private validateMedia(dto: CreateBookingMediaDto) {
     const type = dto.type ?? this.inferMediaType(dto.contentType);
-    const allowedContentTypes = type === MediaType.VIDEO ? VIDEO_CONTENT_TYPES : IMAGE_CONTENT_TYPES;
+    const allowedContentTypes =
+      type === MediaType.VIDEO ? VIDEO_CONTENT_TYPES : IMAGE_CONTENT_TYPES;
     const maxBytes = type === MediaType.VIDEO ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
 
     if (!allowedContentTypes.has(dto.contentType)) {

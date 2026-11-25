@@ -156,6 +156,7 @@ async function main() {
     { name: 'Villivakkam', pincode: '600049', city: 'Chennai', state: 'Tamil Nadu' },
     { name: 'Perambur', pincode: '600011', city: 'Chennai', state: 'Tamil Nadu' },
     { name: 'Madhavaram', pincode: '600060', city: 'Chennai', state: 'Tamil Nadu' },
+    { name: 'Ponniammanmedu', pincode: '600110', city: 'Chennai', state: 'Tamil Nadu' },
   ];
 
   for (const area of serviceAreas) {
@@ -309,6 +310,8 @@ async function main() {
 
     const dbSubServices = await prisma.subService.findMany({
       where: { categoryId: electrical.id },
+      orderBy: { sortOrder: 'asc' },
+      take: 1,
     });
 
     for (const sub of dbSubServices) {
@@ -327,7 +330,7 @@ async function main() {
       });
     }
     console.log(
-      `  ✅ Test technician seeded (mapped to Kolathur & ${dbSubServices.length} sub-services)`,
+      `  ✅ Test technician seeded (mapped to Kolathur & only 1 sub-service: ${dbSubServices[0]?.name})`,
     );
   }
 

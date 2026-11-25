@@ -134,13 +134,24 @@ describe('BookingMediaService', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('rejects oversized videos', async () => {
+  it('rejects oversized images (>2MB)', async () => {
+    await expect(
+      service.prepareUpload(actor, booking.id, {
+        fileName: 'huge-photo.jpg',
+        contentType: 'image/jpeg',
+        type: MediaType.IMAGE,
+        sizeBytes: 3 * 1024 * 1024,
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects oversized videos (>30MB)', async () => {
     await expect(
       service.prepareUpload(actor, booking.id, {
         fileName: 'large.mp4',
         contentType: 'video/mp4',
         type: MediaType.VIDEO,
-        sizeBytes: 150 * 1024 * 1024,
+        sizeBytes: 35 * 1024 * 1024,
       }),
     ).rejects.toThrow(BadRequestException);
   });

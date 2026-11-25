@@ -7,6 +7,7 @@ import {
   ActorRoleValidator,
   AssignedTechnicianRequiredValidator,
   CancellationReasonValidator,
+  CompletionOtpValidator,
   CustomerOwnsBookingValidator,
   FailureReasonValidator,
   StartWorkOtpValidator,
@@ -21,6 +22,7 @@ export class BookingStateMachineService {
   private readonly cancellationReason = new CancellationReasonValidator();
   private readonly failureReason = new FailureReasonValidator();
   private readonly startWorkOtp = new StartWorkOtpValidator();
+  private readonly completionOtp = new CompletionOtpValidator();
 
   private readonly transitions = new Map<string, BookingTransitionDefinition>(
     [
@@ -118,9 +120,33 @@ export class BookingStateMachineService {
       ),
       this.define(
         BookingStatus.IN_PROGRESS,
-        BookingStatus.COMPLETED,
+        BookingStatus.AWAITING_COMPLETION_VERIFICATION,
         [Role.TECHNICIAN, Role.ADMIN],
         [this.assignedTechnicianRequired, this.technicianOwnsBooking],
+      ),
+      this.define(
+        BookingStatus.AWAITING_COMPLETION_VERIFICATION,
+        BookingStatus.COMPLETED,
+        [Role.TECHNICIAN, Role.ADMIN],
+        [this.assignedTechnicianRequired, this.technicianOwnsBooking, this.completionOtp],
+      ),
+      this.define(
+        BookingStatus.AWAITING_COMPLETION_VERIFICATION,
+        BookingStatus.PENDING_COLLECTION,
+        [Role.TECHNICIAN, Role.ADMIN],
+        [this.assignedTechnicianRequired, this.technicianOwnsBooking],
+      ),
+      this.define(
+        BookingStatus.PENDING_COLLECTION,
+        BookingStatus.COMPLETED,
+        [Role.TECHNICIAN, Role.ADMIN],
+        [this.assignedTechnicianRequired, this.technicianOwnsBooking, this.completionOtp],
+      ),
+      this.define(
+        BookingStatus.IN_PROGRESS,
+        BookingStatus.COMPLETED,
+        [Role.TECHNICIAN, Role.ADMIN],
+        [this.assignedTechnicianRequired, this.technicianOwnsBooking, this.completionOtp],
       ),
       this.define(
         BookingStatus.IN_PROGRESS,

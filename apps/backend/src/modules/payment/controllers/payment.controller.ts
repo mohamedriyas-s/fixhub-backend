@@ -1,11 +1,15 @@
-import { Body, Controller, Get, Headers, Param, Post, Query, RawBodyRequest, Req } from '@nestjs/common';
 import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiParam,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  Post,
+  Query,
+  RawBodyRequest,
+  Req,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { Request } from 'express';
 
@@ -17,6 +21,7 @@ import {
   CreatePaymentOrderDto,
   PaymentHistoryQueryDto,
   RefundPaymentDto,
+  VerifyExtraChargePaymentDto,
   VerifyPaymentDto,
 } from '../dto';
 import { PaymentService } from '../services/payment.service';
@@ -51,7 +56,8 @@ export class PaymentController {
   @Roles(Role.CUSTOMER)
   @Post('revision-order/:bookingId')
   @ApiOperation({
-    summary: 'Create a Razorpay order for the price-revision delta (customer must pay the difference)',
+    summary:
+      'Create a Razorpay order for the price-revision delta (customer must pay the difference)',
   })
   @ApiParam({ name: 'bookingId', description: 'Booking id' })
   @ApiResponse({ status: 201, description: 'Revision order created or no payment required' })
@@ -60,6 +66,31 @@ export class PaymentController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.paymentService.createRevisionOrder(bookingId, user.userId);
+  }
+
+  @ApiBearerAuth()
+  @Roles(Role.CUSTOMER)
+  @Post('extra-charge-order/:bookingId')
+  @ApiOperation({ summary: 'Create a Razorpay order for final additional charge' })
+  @ApiParam({ name: 'bookingId', description: 'Booking id' })
+  @ApiResponse({ status: 201, description: 'Extra charge order created' })
+  async createExtraChargeOrder(
+    @Param('bookingId') bookingId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.paymentService.createExtraChargeOrder(bookingId, user.userId);
+  }
+
+  @ApiBearerAuth()
+  @Roles(Role.CUSTOMER)
+  @Post('verify-extra-charge')
+  @ApiOperation({ summary: 'Verify Razorpay payment for final additional charge' })
+  @ApiResponse({ status: 201, description: 'Payment verified and OTP unlocked' })
+  async verifyExtraCharge(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: VerifyExtraChargePaymentDto,
+  ) {
+    return this.paymentService.verifyExtraChargePayment(user.userId, dto);
   }
 
   @ApiBearerAuth()

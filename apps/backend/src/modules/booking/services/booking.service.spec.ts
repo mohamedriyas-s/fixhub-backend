@@ -95,6 +95,7 @@ describe('BookingService creation', () => {
             setPriceRevision: jest.fn(),
             approveRevision: jest.fn(),
             rejectRevision: jest.fn(),
+            updateIssueDetails: jest.fn(),
             updateLifecycleStatus: jest.fn(),
             createTimelineEntry: jest.fn(),
             findTechnicianProfileByUserId: jest.fn(),
@@ -269,6 +270,24 @@ describe('BookingService creation', () => {
       id: booking.id,
       customerId: customer.id,
       status: BookingStatus.DRAFT,
+    });
+    (prisma.booking.update as jest.Mock).mockResolvedValue({
+      id: booking.id,
+      status: BookingStatus.CANCELLED,
+    });
+
+    const result = await service.cancelDraft(user, booking.id);
+
+    expect(result.message).toContain('cancelled and slot released');
+    expect(lockService.clearDraftExpiry).toHaveBeenCalledWith(booking.id);
+    expect(queryCacheService.invalidate).toHaveBeenCalled();
+  });
+
+  it('cancels pending payment booking and clears draft expiry to release slot lock', async () => {
+    (prisma.booking.findFirst as jest.Mock).mockResolvedValue({
+      id: booking.id,
+      customerId: customer.id,
+      status: BookingStatus.PENDING_PAYMENT,
     });
     (prisma.booking.update as jest.Mock).mockResolvedValue({
       id: booking.id,
@@ -460,5 +479,44 @@ describe('BookingService creation', () => {
       }),
     );
     expect(queryCacheService.invalidate).toHaveBeenCalled();
+  });
+
+  it('updates issue details for customer before service completion', async () => {
+    repository.findCustomerByUserId.mockResolvedValue(customer as never);
+    repository.findById.mockResolvedValue({
+      id: booking.id,
+      customerId: customer.id,
+      status: BookingStatus.CONFIRMED,
+      technician: { userId: 'tech-user-123' },
+    } as never);
+    repository.updateIssueDetails.mockResolvedValue({
+      id: booking.id,
+      description: 'Water leak from internal condenser',
+    } as never);
+
+    const result = await service.updateIssueDetails(user, booking.id, {
+      description: 'Water leak from internal condenser',
+    });
+
+    expect(result.description).toBe('Water leak from internal condenser');
+    expect(repository.updateIssueDetails).toHaveBeenCalledWith(
+      booking.id,
+      'Water leak from internal condenser',
+      user.userId,
+    );
+    expect(queryCacheService.invalidate).toHaveBeenCalled();
+  });
+
+  it('rejects issue update after booking is completed', async () => {
+    repository.findCustomerByUserId.mockResolvedValue(customer as never);
+    repository.findById.mockResolvedValue({
+      id: booking.id,
+      customerId: customer.id,
+      status: BookingStatus.COMPLETED,
+    } as never);
+
+    await expect(
+      service.updateIssueDetails(user, booking.id, { description: 'Too late' }),
+    ).rejects.toThrow();
   });
 });

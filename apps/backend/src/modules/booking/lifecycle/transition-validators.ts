@@ -112,3 +112,36 @@ export class StartWorkOtpValidator implements BookingTransitionValidator {
     }
   }
 }
+
+export class CompletionOtpValidator implements BookingTransitionValidator {
+  validate({ actor, booking, dto }: BookingTransitionContext): void {
+    if (actor.role !== Role.TECHNICIAN) {
+      return;
+    }
+
+    if (!booking.completionOtp) {
+      return;
+    }
+
+    if (!dto.otp || !dto.otp.trim()) {
+      throw new BadRequestException({
+        message: 'Customer Completion OTP is required to finish the service',
+        errorCode: ErrorCodes.BOOKING_OTP_REQUIRED,
+      });
+    }
+
+    if (booking.completionOtpAttempts >= 5) {
+      throw new ForbiddenException({
+        message: 'Maximum Completion OTP verification attempts exceeded. Please contact support.',
+        errorCode: ErrorCodes.BOOKING_OTP_MAX_ATTEMPTS,
+      });
+    }
+
+    if (dto.otp.trim() !== booking.completionOtp) {
+      throw new BadRequestException({
+        message: 'Invalid Completion OTP. Please check with the customer.',
+        errorCode: ErrorCodes.BOOKING_OTP_INVALID,
+      });
+    }
+  }
+}

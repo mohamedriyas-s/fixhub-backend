@@ -1,11 +1,12 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { NotificationType } from '@prisma/client';
 import { Queue } from 'bullmq';
 
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { QUEUE_NAMES } from '../../../common/queue/queue.constants';
 import { RedisService } from '../../../common/redis/redis.service';
+import { TrackingGateway } from '../../tracking/tracking.gateway';
 import {
   NotificationChannel,
   NotificationPreferencesDto,
@@ -40,6 +41,7 @@ export class NotificationService {
     @InjectQueue(QUEUE_NAMES.SMS) private readonly smsQueue: Queue,
     @InjectQueue(QUEUE_NAMES.EMAIL) private readonly emailQueue: Queue,
     @InjectQueue(QUEUE_NAMES.SCHEDULED_JOBS) private readonly deadLetterQueue: Queue,
+    @Optional() private readonly trackingGateway?: TrackingGateway,
   ) {}
 
   async listByUser(userId: string, pagination: PaginationDto) {
@@ -83,6 +85,21 @@ export class NotificationService {
     await Promise.all(
       channels.map((channel) => this.enqueueChannel(channel, { notificationId: notification.id })),
     );
+
+    if (this.trackingGateway) {
+      try {
+        this.trackingGateway.broadcastNotification(dto.userId, {
+          id: notification.id,
+          title: notification.title,
+          body: notification.body,
+          type: notification.type,
+          createdAt: notification.createdAt,
+          payload: dto.payload ?? {},
+        });
+      } catch (err: any) {
+        this.logger.warn(`WS notification broadcast failed: ${err?.message}`);
+      }
+    }
 
     return { queued: true, notificationId: notification.id, channels };
   }

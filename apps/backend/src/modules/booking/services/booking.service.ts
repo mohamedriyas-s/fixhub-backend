@@ -29,8 +29,10 @@ import {
   CreateBookingDto,
   CreateBookingMediaDto,
   CreateReviewDto,
+  FinalizeAmountDto,
   ProposeAdditionalChargeDto,
   ProposeRevisionDto,
+  UpdateIssueDto,
 } from '../dto';
 import { BookingRepository } from '../repositories/booking.repository';
 import { BookingLockService } from './booking-lock.service';
@@ -415,6 +417,38 @@ export class BookingService {
     return updated;
   }
 
+  async updateIssueDetails(user: AuthenticatedUser, bookingId: string, dto: UpdateIssueDto) {
+    const customer = await this.validateCustomer(user);
+    const booking = await this.bookingRepository.findById(bookingId);
+
+    if (!booking || booking.customerId !== customer.id) {
+      throw new NotFoundException({
+        message: 'Booking not found',
+        errorCode: ErrorCodes.BOOKING_NOT_FOUND,
+      });
+    }
+
+    if (
+      booking.status === BookingStatus.COMPLETED ||
+      booking.status === BookingStatus.CANCELLED ||
+      booking.status === BookingStatus.FAILED
+    ) {
+      throw new BadRequestException({
+        message: 'Cannot update issue details after booking is closed',
+        errorCode: ErrorCodes.BOOKING_INVALID_STATUS,
+      });
+    }
+
+    const updated = await this.bookingRepository.updateIssueDetails(
+      bookingId,
+      dto.description,
+      user.userId,
+    );
+
+    await this.bookingQueryCacheService.invalidate();
+    return updated;
+  }
+
   async submitReview(user: AuthenticatedUser, bookingId: string, dto: CreateReviewDto) {
     const customer = await this.validateCustomer(user);
     const booking = await this.bookingRepository.findById(bookingId);
@@ -711,6 +745,237 @@ export class BookingService {
     return updated;
   }
 
+  async finalizeAmount(user: AuthenticatedUser, bookingId: string, dto: FinalizeAmountDto) {
+    const technicianId = await this.resolveLinkedTechnicianId(user);
+    const booking = await this.bookingRepository.findById(bookingId);
+
+    if (!booking) {
+      throw new NotFoundException({
+        message: 'Booking not found',
+        errorCode: ErrorCodes.BOOKING_NOT_FOUND,
+      });
+    }
+
+    if (booking.technicianId !== technicianId) {
+      throw new ForbiddenException({
+        message: 'Only the assigned technician can finalize the bill',
+        errorCode: ErrorCodes.AUTH_FORBIDDEN,
+      });
+    }
+
+    if (
+      booking.status !== BookingStatus.IN_PROGRESS &&
+      booking.status !== BookingStatus.PRICE_REVISION_PENDING
+    ) {
+      throw new BadRequestException({
+        message: 'Job must be in progress to finalize amount',
+        errorCode: ErrorCodes.BOOKING_INVALID_STATUS,
+      });
+    }
+
+    const completionOtp = generateOtp(4);
+    const paymentMethod = dto.paymentMethod ?? 'ONLINE';
+
+    const updated = await this.bookingRepository.transaction(async (tx) => {
+      const b = await this.bookingRepository.finalizeAmount(tx, bookingId, {
+        finalAdditionalAmount: dto.finalAdditionalAmount,
+        paymentMethod,
+        completionOtp,
+        actorUserId: user.userId,
+      });
+
+      const note =
+        dto.finalAdditionalAmount > 0
+          ? `Technician finalized bill: ₹${Number(dto.finalAdditionalAmount).toFixed(0)} extra charge. Payment mode: ${paymentMethod}.`
+          : `Technician finalized bill with zero additional charge. Ready for completion verification.`;
+
+      await this.bookingRepository.createTimelineEntry(tx, {
+        bookingId,
+        status: BookingStatus.AWAITING_COMPLETION_VERIFICATION,
+        changedByUserId: user.userId,
+        note,
+      });
+
+      return b;
+    });
+
+    await this.bookingQueryCacheService.invalidate();
+
+    if (this.trackingGateway) {
+      try {
+        this.trackingGateway.broadcastStatusUpdate(
+          bookingId,
+          BookingStatus.AWAITING_COMPLETION_VERIFICATION,
+        );
+      } catch (err: any) {
+        this.logger.warn(`WS broadcast failed for booking ${bookingId}: ${err?.message}`);
+      }
+    }
+
+    const customerUserId = booking.customer?.userId;
+    if (customerUserId && this.notificationService) {
+      try {
+        const isCashOrZero = paymentMethod === 'CASH' || dto.finalAdditionalAmount === 0;
+        await this.notificationService.sendPushNotification({
+          userId: customerUserId,
+          title: isCashOrZero ? 'Job Finished - Verification Ready' : 'Final Bill Ready 💳',
+          body: isCashOrZero
+            ? `Technician has finished the service. Your completion OTP is ready. Share it once you are satisfied.`
+            : `Technician has finalized the bill (Extra: ₹${dto.finalAdditionalAmount.toFixed(0)}). Pay to receive your completion OTP.`,
+          type: NotificationType.BOOKING_UPDATE,
+          payload: {
+            bookingId: booking.id,
+            screen: 'booking_detail',
+            subType: 'AWAITING_COMPLETION_VERIFICATION',
+          },
+        });
+      } catch (err: unknown) {
+        this.logger.error(
+          `Failed to notify customer for bill finalization: ${(err as Error)?.message ?? String(err)}`,
+        );
+      }
+    }
+
+    return updated;
+  }
+
+  async payExtraCharge(user: AuthenticatedUser, bookingId: string) {
+    const customer = await this.validateCustomer(user);
+    const booking = await this.bookingRepository.findById(bookingId);
+
+    if (!booking || booking.customerId !== customer.id) {
+      throw new NotFoundException({
+        message: 'Booking not found',
+        errorCode: ErrorCodes.BOOKING_NOT_FOUND,
+      });
+    }
+
+    if (
+      booking.status !== BookingStatus.AWAITING_COMPLETION_VERIFICATION &&
+      booking.status !== BookingStatus.PENDING_COLLECTION
+    ) {
+      throw new BadRequestException({
+        message: 'Booking is not awaiting payment verification',
+        errorCode: ErrorCodes.BOOKING_INVALID_STATUS,
+      });
+    }
+
+    if (booking.extraChargePaidAt) {
+      return booking;
+    }
+
+    const updated = await this.bookingRepository.transaction(async (tx) => {
+      const b = await tx.booking.update({
+        where: { id: bookingId },
+        data: {
+          extraChargePaidAt: new Date(),
+          updatedBy: user.userId,
+        },
+      });
+
+      await this.bookingRepository.createTimelineEntry(tx, {
+        bookingId,
+        status: booking.status,
+        changedByUserId: user.userId,
+        note: `Additional charge of ₹${Number(booking.finalAdditionalAmount ?? 0).toFixed(0)} paid online by customer. Completion OTP unlocked.`,
+      });
+
+      return b;
+    });
+
+    await this.bookingQueryCacheService.invalidate();
+
+    if (this.trackingGateway) {
+      try {
+        this.trackingGateway.broadcastStatusUpdate(bookingId, booking.status);
+      } catch (err: any) {
+        this.logger.warn(`WS broadcast failed for booking ${bookingId}: ${err?.message}`);
+      }
+    }
+
+    const techUserId = booking.technician?.userId;
+    if (techUserId && this.notificationService) {
+      try {
+        await this.notificationService.sendPushNotification({
+          userId: techUserId,
+          title: 'Payment Received ✅',
+          body: `Customer paid the additional charge of ₹${Number(booking.finalAdditionalAmount ?? 0).toFixed(0)}. Please request the Completion OTP from customer.`,
+          type: NotificationType.BOOKING_UPDATE,
+          payload: {
+            bookingId: booking.id,
+            screen: 'job_detail',
+            subType: 'EXTRA_CHARGE_PAID',
+          },
+        });
+      } catch (err: unknown) {
+        this.logger.error(
+          `Failed to notify technician for extra charge payment: ${(err as Error)?.message ?? String(err)}`,
+        );
+      }
+    }
+
+    return updated;
+  }
+
+  async departNextSlot(user: AuthenticatedUser, bookingId: string) {
+    const technicianId = await this.resolveLinkedTechnicianId(user);
+    const booking = await this.bookingRepository.findById(bookingId);
+
+    if (!booking) {
+      throw new NotFoundException({
+        message: 'Booking not found',
+        errorCode: ErrorCodes.BOOKING_NOT_FOUND,
+      });
+    }
+
+    if (booking.technicianId !== technicianId) {
+      throw new ForbiddenException({
+        message: 'Only the assigned technician can update departure',
+        errorCode: ErrorCodes.AUTH_FORBIDDEN,
+      });
+    }
+
+    if (booking.status !== BookingStatus.AWAITING_COMPLETION_VERIFICATION) {
+      throw new BadRequestException({
+        message: 'Can only mark departure while awaiting completion verification',
+        errorCode: ErrorCodes.BOOKING_INVALID_STATUS,
+      });
+    }
+
+    const updated = await this.bookingRepository.transaction(async (tx) => {
+      const b = await tx.booking.update({
+        where: { id: bookingId },
+        data: {
+          status: BookingStatus.PENDING_COLLECTION,
+          slotDepartureAt: new Date(),
+          isPendingDelay: true,
+          updatedBy: user.userId,
+        },
+      });
+
+      await this.bookingRepository.createTimelineEntry(tx, {
+        bookingId,
+        status: BookingStatus.PENDING_COLLECTION,
+        changedByUserId: user.userId,
+        note: `Technician departed for next slot. Job status set to Pending Collection.`,
+      });
+
+      return b;
+    });
+
+    await this.bookingQueryCacheService.invalidate();
+
+    if (this.trackingGateway) {
+      try {
+        this.trackingGateway.broadcastStatusUpdate(bookingId, BookingStatus.PENDING_COLLECTION);
+      } catch (err: any) {
+        this.logger.warn(`WS broadcast failed for booking ${bookingId}: ${err?.message}`);
+      }
+    }
+
+    return updated;
+  }
+
   /** Resolve the technician profile ID for a technician-role user. */
   private async resolveLinkedTechnicianId(user: AuthenticatedUser): Promise<string> {
     if (user.role !== Role.TECHNICIAN) {
@@ -845,7 +1110,14 @@ export class BookingService {
 
     const techIds = eligibleTechnicians.map((t) => t.id);
     const scheduledDate = new Date(`${query.date}T00:00:00.000Z`);
-    const slots = ['09:00-11:00', '11:00-13:00', '13:00-15:00', '15:00-17:00', '17:00-19:00'];
+    const slots = [
+      '09:00-11:00',
+      '11:00-13:00',
+      '13:00-15:00',
+      '15:00-17:00',
+      '17:00-19:00',
+      '19:00-21:00',
+    ];
 
     // 2. Fetch all conflicting bookings on this date for these technicians or in this area
     const bookedJobs = await this.prisma.booking.findMany({
@@ -933,7 +1205,7 @@ export class BookingService {
       where: {
         id: bookingId,
         customerId: customer.id,
-        status: BookingStatus.DRAFT,
+        status: { in: [BookingStatus.DRAFT, BookingStatus.PENDING_PAYMENT] },
       },
     });
 

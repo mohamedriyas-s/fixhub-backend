@@ -31,7 +31,10 @@ export class VerifyPaymentDto {
 }
 
 export class RefundPaymentDto {
-  @ApiPropertyOptional({ example: 49900, description: 'Refund amount in paise. Defaults to full payment amount.' })
+  @ApiPropertyOptional({
+    example: 49900,
+    description: 'Refund amount in paise. Defaults to full payment amount.',
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -50,6 +53,24 @@ export class RefundPaymentDto {
   @IsString()
   @MaxLength(120)
   idempotencyKey?: string;
+}
+
+export class VerifyExtraChargePaymentDto {
+  @ApiProperty({ example: 'uuid-booking-id' })
+  @IsString()
+  bookingId!: string;
+
+  @ApiProperty({ example: 'order_Nabc123' })
+  @IsString()
+  razorpayOrderId!: string;
+
+  @ApiProperty({ example: 'pay_Nabc123' })
+  @IsString()
+  razorpayPaymentId!: string;
+
+  @ApiProperty({ example: 'hex_signature' })
+  @IsString()
+  razorpaySignature!: string;
 }
 
 export class PaymentHistoryQueryDto {

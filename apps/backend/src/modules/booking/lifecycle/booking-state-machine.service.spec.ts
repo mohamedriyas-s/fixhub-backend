@@ -93,6 +93,7 @@ describe('BookingStateMachineService', () => {
 
   it('returns allowed next statuses for a status', () => {
     expect(service.getAllowedTransitions(BookingStatus.IN_PROGRESS)).toEqual([
+      BookingStatus.AWAITING_COMPLETION_VERIFICATION,
       BookingStatus.COMPLETED,
       BookingStatus.FAILED,
     ]);

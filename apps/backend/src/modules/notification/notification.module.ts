@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { QueueModule } from '../../common/queue/queue.module';
 import { RedisModule } from '../../common/redis/redis.module';
+import { TrackingModule } from '../tracking/tracking.module';
 import { NotificationController } from './controllers/notification.controller';
 import {
   EmailNotificationProcessor,
@@ -9,15 +10,15 @@ import {
   SmsNotificationProcessor,
 } from './processors/notification.processor';
 import { NotificationRepository } from './repositories/notification.repository';
+import { NotificationService } from './services/notification.service';
 import {
   EmailNotificationChannel,
   PushNotificationChannel,
   SmsNotificationChannel,
 } from './services/notification-channel.service';
-import { NotificationService } from './services/notification.service';
 
 @Module({
-  imports: [QueueModule, RedisModule],
+  imports: [QueueModule, RedisModule, TrackingModule],
   controllers: [NotificationController],
   providers: [
     NotificationService,

@@ -27,19 +27,20 @@ export class CreateBookingMediaDto {
   contentType!: string;
 
   @ApiPropertyOptional({
-    example: 5242880,
-    description: 'Client-side file size in bytes. Images max 10MB, videos max 100MB.',
+    example: 2097152,
+    description: 'Client-side file size in bytes. Images max 2MB, videos max 30MB.',
   })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(104_857_600)
+  @Max(31_457_280)
   sizeBytes?: number;
 
   @ApiPropertyOptional({
     example: 45,
-    description: 'Duration of the video in seconds. Required for VIDEO type. Max 60 seconds (SRS §2.4).',
+    description:
+      'Duration of the video in seconds. Required for VIDEO type. Max 60 seconds (SRS §2.4).',
   })
   @IsOptional()
   @Type(() => Number)

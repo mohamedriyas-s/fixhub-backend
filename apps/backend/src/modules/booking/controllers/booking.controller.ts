@@ -11,7 +11,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Role } from '@prisma/client';
+import { BookingStatus, Role } from '@prisma/client';
 
 import { PrismaService } from '../../../common/database/prisma.service';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
@@ -26,7 +26,10 @@ import {
   CreateBookingMediaBatchDto,
   CreateBookingMediaDto,
   CreateReviewDto,
+  FinalizeAmountDto,
   UpdateBookingStatusDto,
+  UpdateIssueDto,
+  VerifyCompletionOtpDto,
 } from '../dto';
 import { BookingService } from '../services/booking.service';
 import { BookingLifecycleService } from '../services/booking-lifecycle.service';
@@ -234,6 +237,22 @@ export class BookingController {
     return this.bookingService.submitReview(user, id, dto);
   }
 
+  // ── Issue Details (Stage 2) ──────────────────────────────────────
+
+  @Patch(':id/issue')
+  @ApiOperation({
+    summary: 'Update issue description and details (CUSTOMER only, before completion)',
+  })
+  @ApiParam({ name: 'id', description: 'Booking id' })
+  @ApiResponse({ status: 200, description: 'Issue details updated' })
+  async updateIssueDetails(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateIssueDto,
+  ) {
+    return this.bookingService.updateIssueDetails(user, id, dto);
+  }
+
   // ── Price Revision ───────────────────────────────────────────────
 
   @Patch(':id/approve-revision')
@@ -256,5 +275,70 @@ export class BookingController {
   })
   async rejectRevision(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.bookingService.rejectRevision(user, id);
+  }
+
+  // ── Extra Charge & Finalization ───────────────────────────────────
+
+  @Post(':id/finalize-amount')
+  @ApiOperation({
+    summary: 'Technician finalizes final additional amount and payment method (Cash or Online)',
+  })
+  @ApiParam({ name: 'id', description: 'Booking id' })
+  @ApiResponse({
+    status: 201,
+    description: 'Booking finalized and entered AWAITING_COMPLETION_VERIFICATION',
+  })
+  async finalizeAmount(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: FinalizeAmountDto,
+  ) {
+    return this.bookingService.finalizeAmount(user, id, dto);
+  }
+
+  @Post(':id/pay-extra-charge')
+  @ApiOperation({
+    summary: 'Customer pays additional charge online, unlocking Completion OTP',
+  })
+  @ApiParam({ name: 'id', description: 'Booking id' })
+  @ApiResponse({
+    status: 201,
+    description: 'Extra charge payment recorded and Completion OTP unlocked',
+  })
+  async payExtraCharge(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.bookingService.payExtraCharge(user, id);
+  }
+
+  @Post(':id/depart-next-slot')
+  @ApiOperation({
+    summary: 'Technician leaves for next scheduled slot before customer pays online',
+  })
+  @ApiParam({ name: 'id', description: 'Booking id' })
+  @ApiResponse({
+    status: 201,
+    description: 'Booking transitioned to PENDING_COLLECTION with delay tracking',
+  })
+  async departNextSlot(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.bookingService.departNextSlot(user, id);
+  }
+
+  @Post(':id/verify-completion-otp')
+  @ApiOperation({
+    summary: 'Technician verifies customer Completion OTP to complete the booking',
+  })
+  @ApiParam({ name: 'id', description: 'Booking id' })
+  @ApiResponse({
+    status: 201,
+    description: 'Completion OTP verified and booking marked COMPLETED',
+  })
+  async verifyCompletionOtp(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: VerifyCompletionOtpDto,
+  ) {
+    return this.bookingLifecycleService.transition(id, user, {
+      status: BookingStatus.COMPLETED,
+      otp: dto.otp,
+    });
   }
 }

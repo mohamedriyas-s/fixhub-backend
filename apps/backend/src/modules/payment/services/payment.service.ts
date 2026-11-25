@@ -29,10 +29,12 @@ import {
 } from '../../admin/services/admin-notification.service';
 import { BookingDispatchService } from '../../booking/services/booking-dispatch.service';
 import { NotificationService } from '../../notification/services/notification.service';
+import { TrackingGateway } from '../../tracking/tracking.gateway';
 import {
   CreatePaymentOrderDto,
   PaymentHistoryQueryDto,
   RefundPaymentDto,
+  VerifyExtraChargePaymentDto,
   VerifyPaymentDto,
 } from '../dto';
 import { PaymentRepository } from '../repositories/payment.repository';
@@ -54,6 +56,7 @@ export class PaymentService {
     @InjectQueue(QUEUE_NAMES.PAYMENT_WEBHOOK)
     private readonly webhookQueue: Queue,
     @Optional() private readonly adminNotifService?: AdminNotificationService,
+    @Optional() private readonly trackingGateway?: TrackingGateway,
   ) {}
 
   async createOrder(bookingId: string, userId: string, dto: CreatePaymentOrderDto = {}) {
@@ -83,13 +86,14 @@ export class PaymentService {
     }
 
     const payableStatuses: BookingStatus[] = [
+      BookingStatus.DRAFT,
       BookingStatus.CONFIRMED,
       BookingStatus.PENDING_PAYMENT,
     ];
 
     if (!payableStatuses.includes(booking.status)) {
       throw new BadRequestException({
-        message: 'Payment order can be created only for confirmed bookings',
+        message: 'Payment order can be created only for draft, confirmed, or pending bookings',
         errorCode: ErrorCodes.BOOKING_INVALID_STATUS,
       });
     }
@@ -257,6 +261,121 @@ export class PaymentService {
       orderId: razorpayOrder.id,
       deltaAmount: deltaAmountInPaise,
       currency: CURRENCY,
+    };
+  }
+
+  async createExtraChargeOrder(bookingId: string, userId: string) {
+    const booking = await this.paymentRepository.findBookingForPayment(bookingId);
+
+    if (!booking) {
+      throw new NotFoundException({
+        message: 'Booking not found',
+        errorCode: ErrorCodes.BOOKING_NOT_FOUND,
+      });
+    }
+
+    if (booking.customer.userId !== userId) {
+      throw new ForbiddenException({
+        message: 'Cannot create payment order for another customer booking',
+        errorCode: ErrorCodes.AUTH_FORBIDDEN,
+      });
+    }
+
+    const extraAmount = Number((booking as any).finalAdditionalAmount ?? 0);
+    if (extraAmount <= 0) {
+      throw new BadRequestException({
+        message: 'No additional charge pending for this booking',
+        errorCode: ErrorCodes.PAYMENT_AMOUNT_MISMATCH,
+      });
+    }
+
+    const amountInPaise = this.toPaise(extraAmount);
+
+    const razorpayOrder = await this.razorpayGateway.createOrder({
+      amountInPaise,
+      currency: CURRENCY,
+      receipt: `${(booking as any).bookingNumber ?? booking.id}-EXTRA`,
+      notes: { bookingId, type: 'final_extra_charge' },
+    });
+
+    return {
+      keyId: this.razorpayGateway.getKeyId(),
+      orderId: razorpayOrder.id,
+      amount: amountInPaise,
+      currency: CURRENCY,
+    };
+  }
+
+  async verifyExtraChargePayment(userId: string, dto: VerifyExtraChargePaymentDto) {
+    const validSignature = this.razorpayGateway.verifyCheckoutSignature({
+      orderId: dto.razorpayOrderId,
+      paymentId: dto.razorpayPaymentId,
+      signature: dto.razorpaySignature,
+    });
+
+    if (!validSignature) {
+      throw new UnauthorizedException({
+        message: 'Payment signature verification failed',
+        errorCode: ErrorCodes.PAYMENT_VERIFICATION_FAILED,
+      });
+    }
+
+    const booking = await this.paymentRepository.findBookingForPayment(dto.bookingId);
+    if (!booking) {
+      throw new NotFoundException({
+        message: 'Booking not found',
+        errorCode: ErrorCodes.BOOKING_NOT_FOUND,
+      });
+    }
+
+    if (booking.customer.userId !== userId) {
+      throw new ForbiddenException({
+        message: 'Cannot verify payment for another customer booking',
+        errorCode: ErrorCodes.AUTH_FORBIDDEN,
+      });
+    }
+
+    const amount = Number((booking as any).finalAdditionalAmount ?? 0);
+    const updated = await this.paymentRepository.recordExtraChargePayment(dto.bookingId, {
+      razorpayOrderId: dto.razorpayOrderId,
+      razorpayPaymentId: dto.razorpayPaymentId,
+      razorpaySignature: dto.razorpaySignature,
+      amount,
+    });
+
+    if (this.trackingGateway) {
+      try {
+        this.trackingGateway.broadcastStatusUpdate(dto.bookingId, updated.status);
+      } catch (err: any) {
+        this.logger.warn(`WS broadcast failed for booking ${dto.bookingId}: ${err?.message}`);
+      }
+    }
+
+    const techUserId = updated.technician?.userId;
+    if (techUserId && this.notificationService) {
+      try {
+        await this.notificationService.sendPushNotification({
+          userId: techUserId,
+          title: 'Payment Received ✅',
+          body: `Customer paid the additional charge of ₹${amount.toFixed(0)}. Please request the Completion OTP from customer.`,
+          type: NotificationType.BOOKING_UPDATE,
+          payload: {
+            bookingId: dto.bookingId,
+            screen: 'job_detail',
+            subType: 'EXTRA_CHARGE_PAID',
+          },
+        });
+      } catch (err: unknown) {
+        this.logger.error(
+          `Failed to notify technician for extra charge payment: ${(err as Error)?.message ?? String(err)}`,
+        );
+      }
+    }
+
+    return {
+      success: true,
+      booking: updated,
+      completionOtp: (updated as any).completionOtp,
     };
   }
 

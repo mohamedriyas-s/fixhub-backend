@@ -46,7 +46,9 @@ enum BookingStatus {
   ARRIVED
   IN_PROGRESS
   PRICE_REVISION_PENDING // Technician proposed a revised price; awaiting customer consent
+  AWAITING_COMPLETION_VERIFICATION // Technician swiped to complete & entered final amount; awaiting payment & completion OTP
   COMPLETED
+  PENDING_COLLECTION // Stage 4: Attended job with unpaid extra charge awaiting deferred collection
   CANCELLED
   FAILED
 }
@@ -474,16 +476,27 @@ model Booking {
   description       String?
   totalAmount       Decimal            @map("total_amount") @db.Decimal(10, 2)
   notes             String? // Internal notes (admin/technician)
-  // Price revision — technician can propose a revised price after inspection
+  // Price revision / Extra charge — technician appeals approximate amount after inspection
+  appealedAmount           Decimal?           @map("appealed_amount") @db.Decimal(10, 2)
   revisedAmount            Decimal?           @map("revised_amount") @db.Decimal(10, 2)
   additionalAmount         Decimal?           @map("additional_amount") @db.Decimal(10, 2)
+  finalAdditionalAmount    Decimal?           @map("final_additional_amount") @db.Decimal(10, 2)
+  extraChargePaymentMethod String?            @map("extra_charge_payment_method") // ONLINE, CASH
+  extraChargePaidAt        DateTime?          @map("extra_charge_paid_at")
   priceRevisionDescription String?            @map("price_revision_description")
   priceRevisionNote        String?            @map("price_revision_note")
   customerConsentAt        DateTime?          @map("customer_consent_at")
+  priceRevisionRejectedAt  DateTime?          @map("price_revision_rejected_at")
   // OTP Verification — Work Initiation
   startOtp          String?            @map("start_otp") @db.VarChar(6)
   startOtpAttempts  Int                @default(0) @map("start_otp_attempts")
   workStartedAt     DateTime?          @map("work_started_at")
+  // OTP Verification — Completion (gated by customer payment)
+  completionOtp         String?            @map("completion_otp") @db.VarChar(6)
+  completionOtpAttempts Int                @default(0) @map("completion_otp_attempts")
+  // Next-Slot Delay Tracking (Stage 4)
+  slotDepartureAt       DateTime?          @map("slot_departure_at")
+  isPendingDelay        Boolean            @default(false) @map("is_pending_delay")
   // Completion
   completedAt       DateTime?          @map("completed_at")
   // Cancellation

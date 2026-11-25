@@ -173,6 +173,29 @@ describe('PaymentService', () => {
     );
   });
 
+  it('creates order successfully for DRAFT booking', async () => {
+    repository.findBookingForPayment.mockResolvedValue({
+      ...booking,
+      status: BookingStatus.DRAFT,
+    } as any);
+    gateway.createOrder.mockResolvedValue({
+      id: 'order_draft_123',
+      amount: 49900,
+      currency: 'INR',
+      receipt: booking.bookingNumber,
+    });
+    repository.upsertOrder.mockResolvedValue(payment as any);
+
+    const result = await service.createOrder(booking.id, booking.customer.userId);
+
+    expect(result.orderId).toBe('order_draft_123');
+    expect(repository.updateBookingStatus).toHaveBeenCalledWith(
+      {},
+      booking.id,
+      BookingStatus.PENDING_PAYMENT,
+    );
+  });
+
   it('verifies, captures, and stores payment', async () => {
     gateway.verifyCheckoutSignature.mockReturnValue(true);
     repository.findPaymentByOrderId.mockResolvedValue(payment as any);
