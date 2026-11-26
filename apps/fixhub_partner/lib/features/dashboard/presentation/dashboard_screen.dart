@@ -42,9 +42,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       ref.read(notificationsProvider.notifier).load(silent: true);
       ref.invalidate(myJobsProvider(null));
       ref.invalidate(activeJobProvider);
-      final profile = ref.read(profileProvider).value;
-      if (profile?.isAvailable ?? false) {
-        ref.read(locationTrackerProvider).start();
+      if (!ref.read(profileProvider).isLoading) {
+        ref.read(profileProvider.notifier).load();
       }
     });
 
@@ -64,6 +63,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       ref.read(notificationsProvider.notifier).load(silent: true);
       ref.invalidate(myJobsProvider(null));
       ref.invalidate(activeJobProvider);
+      final profile = ref.read(profileProvider).value;
+      if (profile?.isAvailable ?? false) {
+        ref.read(locationTrackerProvider).start();
+      }
+      ref.read(profileProvider.notifier).load();
     }
   }
 

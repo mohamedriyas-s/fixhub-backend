@@ -130,6 +130,16 @@ export class TechnicianController {
     return this.specializationService.addSpecializations(user.userId, dto);
   }
 
+  @Put('specializations')
+  @ApiOperation({ summary: 'Replace/sync technician specializations (sub-services)' })
+  @ApiResponse({ status: 200, description: 'Specializations synced' })
+  async syncSpecializations(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: AddSpecializationsDto,
+  ) {
+    return this.specializationService.syncSpecializations(user.userId, dto);
+  }
+
   @Delete('specializations')
   @ApiOperation({ summary: 'Remove specializations (sub-services)' })
   async removeSpecializations(

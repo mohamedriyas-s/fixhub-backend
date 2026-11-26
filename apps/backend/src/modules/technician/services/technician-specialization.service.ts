@@ -19,13 +19,10 @@ export class TechnicianSpecializationService {
     return this.specializationRepository.findByTechnicianId(technicianId);
   }
 
-  async addSpecializations(userId: string, dto: AddSpecializationsDto) {
-    const technicianId = await this.technicianService.resolveTechnicianId(userId);
-
-    // Validate all sub-services exist and are active
+  private async validateSubServiceIds(subServiceIds: string[]) {
     const validServices = await this.prisma.subService.findMany({
       where: {
-        id: { in: dto.subServiceIds },
+        id: { in: subServiceIds },
         isActive: true,
         deletedAt: null,
       },
@@ -33,7 +30,7 @@ export class TechnicianSpecializationService {
     });
 
     const validIds = new Set(validServices.map((s) => s.id));
-    const invalidIds = dto.subServiceIds.filter((id) => !validIds.has(id));
+    const invalidIds = subServiceIds.filter((id) => !validIds.has(id));
 
     if (invalidIds.length > 0) {
       throw new BadRequestException({
@@ -41,7 +38,11 @@ export class TechnicianSpecializationService {
         errorCode: ErrorCodes.SERVICE_NOT_FOUND,
       });
     }
+  }
 
+  async addSpecializations(userId: string, dto: AddSpecializationsDto) {
+    const technicianId = await this.technicianService.resolveTechnicianId(userId);
+    await this.validateSubServiceIds(dto.subServiceIds);
     await this.specializationRepository.addMany(technicianId, dto.subServiceIds);
     return this.specializationRepository.findByTechnicianId(technicianId);
   }
@@ -49,6 +50,13 @@ export class TechnicianSpecializationService {
   async removeSpecializations(userId: string, dto: RemoveSpecializationsDto) {
     const technicianId = await this.technicianService.resolveTechnicianId(userId);
     await this.specializationRepository.removeMany(technicianId, dto.subServiceIds);
+    return this.specializationRepository.findByTechnicianId(technicianId);
+  }
+
+  async syncSpecializations(userId: string, dto: AddSpecializationsDto) {
+    const technicianId = await this.technicianService.resolveTechnicianId(userId);
+    await this.validateSubServiceIds(dto.subServiceIds);
+    await this.specializationRepository.replaceAll(technicianId, dto.subServiceIds);
     return this.specializationRepository.findByTechnicianId(technicianId);
   }
 }

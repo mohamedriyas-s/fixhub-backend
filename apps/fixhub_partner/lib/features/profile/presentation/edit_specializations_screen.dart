@@ -75,7 +75,7 @@ class _EditSpecializationsScreenState
       await ref
           .read(profileRepositoryProvider)
           .updateSpecializations(_selectedSubServiceIds);
-      ref.invalidate(profileProvider);
+      await ref.read(profileProvider.notifier).load();
       if (mounted) {
         context.pop();
         ScaffoldMessenger.of(context).showSnackBar(

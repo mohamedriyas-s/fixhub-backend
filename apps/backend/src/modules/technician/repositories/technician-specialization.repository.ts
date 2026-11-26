@@ -43,4 +43,22 @@ export class TechnicianSpecializationRepository {
       },
     });
   }
+
+  async replaceAll(technicianId: string, subServiceIds: string[]) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.technicianSpecialization.deleteMany({
+        where: {
+          technicianId,
+          subServiceId: { notIn: subServiceIds },
+        },
+      });
+      await tx.technicianSpecialization.createMany({
+        data: subServiceIds.map((subServiceId) => ({
+          technicianId,
+          subServiceId,
+        })),
+        skipDuplicates: true,
+      });
+    });
+  }
 }

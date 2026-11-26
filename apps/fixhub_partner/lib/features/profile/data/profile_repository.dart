@@ -122,9 +122,9 @@ class ProfileRepository {
     } catch (_) {}
   }
 
-  /// POST /technicians/specializations — replaces existing specializations
+  /// PUT /technicians/specializations — replaces existing specializations
   Future<void> updateSpecializations(List<String> subServiceIds) async {
-    await _dio.post(
+    await _dio.put(
       ApiEndpoints.technicianSpecializations,
       data: {'subServiceIds': subServiceIds},
     );

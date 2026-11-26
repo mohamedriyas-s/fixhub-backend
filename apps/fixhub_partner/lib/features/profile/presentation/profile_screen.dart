@@ -73,6 +73,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ],
       ),
       body: profileAsync.when(
+        skipLoadingOnReload: profileAsync.value != null,
+        skipLoadingOnRefresh: profileAsync.value != null,
         loading: () => const Center(child: FpPageLoader()),
         error: (e, _) => Center(
           child: Padding(
@@ -98,10 +100,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
         ),
         data: (profile) {
-          if (profile == null) return const SizedBox();
+          if (profile == null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted && !ref.read(profileProvider).isLoading) {
+                ref.read(profileProvider.notifier).load();
+              }
+            });
+            return const Center(child: FpPageLoader());
+          }
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.screenPadding),
+          return RefreshIndicator(
+            onRefresh: () => ref.read(profileProvider.notifier).load(),
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(AppSpacing.screenPadding),
             child: Column(
               children: [
                 // ── Avatar ───────────────────────────────────────
@@ -311,6 +323,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                 const SizedBox(height: AppSpacing.xxxl),
               ],
+            ),
             ),
           );
         },

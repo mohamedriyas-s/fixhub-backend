@@ -6,23 +6,25 @@ import { PrismaService } from '../../../common/database/prisma.service';
 export class TechnicianRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  private readonly fullProfileInclude = {
+    user: { select: { id: true, phone: true, name: true, email: true, role: true } },
+    serviceAreas: { include: { serviceArea: true } },
+    specializations: {
+      include: {
+        subService: {
+          include: { category: { select: { id: true, name: true, slug: true } } },
+        },
+      },
+    },
+    documents: {
+      orderBy: { createdAt: 'desc' as const },
+    },
+  };
+
   async findByUserId(userId: string) {
     return this.prisma.technician.findUnique({
       where: { userId },
-      include: {
-        user: { select: { id: true, phone: true, name: true, email: true, role: true } },
-        serviceAreas: { include: { serviceArea: true } },
-        specializations: {
-          include: {
-            subService: {
-              include: { category: { select: { id: true, name: true, slug: true } } },
-            },
-          },
-        },
-        documents: {
-          orderBy: { createdAt: 'desc' },
-        },
-      },
+      include: this.fullProfileInclude,
     });
   }
 
@@ -34,13 +36,16 @@ export class TechnicianRepository {
     return technician;
   }
 
-  async updateProfile(userId: string, data: {
-    name?: string;
-    email?: string;
-    profilePictureUrl?: string;
-    latitude?: number;
-    longitude?: number;
-  }) {
+  async updateProfile(
+    userId: string,
+    data: {
+      name?: string;
+      email?: string;
+      profilePictureUrl?: string;
+      latitude?: number;
+      longitude?: number;
+    },
+  ) {
     return this.prisma.$transaction(async (tx) => {
       // Update User-level fields
       if (data.name !== undefined || data.email !== undefined) {
@@ -55,7 +60,8 @@ export class TechnicianRepository {
 
       // Update Technician-level fields
       const technicianUpdate: Record<string, unknown> = {};
-      if (data.profilePictureUrl !== undefined) technicianUpdate.profilePictureUrl = data.profilePictureUrl;
+      if (data.profilePictureUrl !== undefined)
+        technicianUpdate.profilePictureUrl = data.profilePictureUrl;
       if (data.latitude !== undefined) technicianUpdate.latitude = data.latitude;
       if (data.longitude !== undefined) technicianUpdate.longitude = data.longitude;
       if (data.latitude !== undefined || data.longitude !== undefined) {
@@ -80,23 +86,17 @@ export class TechnicianRepository {
       // Return full profile
       return tx.technician.findUnique({
         where: { userId },
-        include: {
-          user: { select: { id: true, phone: true, name: true, email: true, role: true } },
-          serviceAreas: { include: { serviceArea: true } },
-          specializations: {
-            include: {
-              subService: {
-                include: { category: { select: { id: true, name: true, slug: true } } },
-              },
-            },
-          },
-          documents: { orderBy: { createdAt: 'desc' } },
-        },
+        include: this.fullProfileInclude,
       });
     });
   }
 
-  async updateAvailability(userId: string, isAvailable: boolean, latitude?: number, longitude?: number) {
+  async updateAvailability(
+    userId: string,
+    isAvailable: boolean,
+    latitude?: number,
+    longitude?: number,
+  ) {
     const technician = await this.prisma.technician.update({
       where: { userId },
       data: {
@@ -105,9 +105,7 @@ export class TechnicianRepository {
         ...(longitude !== undefined && { longitude }),
         ...((latitude !== undefined || longitude !== undefined) && { lastLocationAt: new Date() }),
       },
-      include: {
-        user: { select: { id: true, phone: true, name: true, email: true, role: true } },
-      },
+      include: this.fullProfileInclude,
     });
 
     if (latitude !== undefined && longitude !== undefined) {

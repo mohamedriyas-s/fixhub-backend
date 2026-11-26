@@ -1,32 +1,66 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../auth/domain/auth_state.dart';
+import '../../auth/presentation/auth_provider.dart';
 import '../data/profile_repository.dart';
 import '../../../core/services/location_service.dart';
 import '../../../core/services/location_tracker.dart';
+import '../../../core/storage/local_storage.dart';
 
 final profileProvider = AsyncNotifierProvider<ProfileNotifier, TechnicianProfile?>(ProfileNotifier.new);
 
 class ProfileNotifier extends AsyncNotifier<TechnicianProfile?> {
   late ProfileRepository _repository;
 
+  Future<void> _syncCacheWithAvailability(bool isAvailable) async {
+    try {
+      final storage = ref.read(localStorageProvider);
+      final cached = await storage.getUserData();
+      if (cached != null) {
+        final updated = Map<String, dynamic>.from(cached);
+        if (updated['technician'] is Map) {
+          final techMap = Map<String, dynamic>.from(updated['technician'] as Map);
+          techMap['isAvailable'] = isAvailable;
+          updated['technician'] = techMap;
+        } else {
+          updated['technician'] = {'isAvailable': isAvailable};
+        }
+        await storage.saveUserData(updated);
+      }
+    } catch (_) {}
+  }
+
   @override
   FutureOr<TechnicianProfile?> build() async {
     _repository = ref.watch(profileRepositoryProvider);
+    final authState = ref.watch(authProvider);
+    if (authState is! AuthAuthenticated) {
+      return null;
+    }
     final profile = await _repository.getProfile();
     if (profile.isAvailable) {
       ref.read(locationTrackerProvider).start();
     }
+    _syncCacheWithAvailability(profile.isAvailable);
     return profile;
   }
 
   Future<void> load() async {
-    state = const AsyncLoading<TechnicianProfile?>().copyWithPrevious(state);
-    final profile = await _repository.getProfile();
-    state = AsyncValue.data(profile);
-    if (profile.isAvailable) {
-      ref.read(locationTrackerProvider).start();
-    } else {
-      ref.read(locationTrackerProvider).stop();
+    if (ref.read(authProvider) is! AuthAuthenticated) return;
+    if (state.value == null) {
+      state = const AsyncValue.loading();
+    }
+    try {
+      final profile = await _repository.getProfile();
+      state = AsyncValue.data(profile);
+      if (profile.isAvailable) {
+        ref.read(locationTrackerProvider).start();
+      } else {
+        ref.read(locationTrackerProvider).stop();
+      }
+      _syncCacheWithAvailability(profile.isAvailable);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
     }
   }
 
@@ -76,6 +110,8 @@ class ProfileNotifier extends AsyncNotifier<TechnicianProfile?> {
       } else {
         tracker.stop();
       }
+
+      await _syncCacheWithAvailability(isAvailable);
     } catch (e, st) {
       if (current != null) state = AsyncValue.data(current);
       state = AsyncValue.error(e, st);

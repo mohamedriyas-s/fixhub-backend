@@ -25,7 +25,9 @@ export class TechnicianHeartbeatService implements OnModuleInit, OnModuleDestroy
     this.subscriberClient.on('message', async (channel: string, message: string) => {
       if (channel === '__keyevent@0__:expired' && message.startsWith(HEARTBEAT_PREFIX)) {
         const technicianId = message.replace(HEARTBEAT_PREFIX, '');
-        this.logger.warn(`Heartbeat expired for technician: ${technicianId}. Marking unavailable.`);
+        this.logger.log(
+          `Heartbeat expired in cache for technician: ${technicianId}. Client is in background or inactive.`,
+        );
         await this.handleExpiredHeartbeat(technicianId);
       }
     });
@@ -44,13 +46,12 @@ export class TechnicianHeartbeatService implements OnModuleInit, OnModuleDestroy
 
   private async handleExpiredHeartbeat(technicianId: string) {
     try {
-      const technician = await this.prisma.technician.update({
-        where: { id: technicianId },
-        data: { isAvailable: false },
-      });
-      this.eventEmitter.emit('technician.availability_changed', technicianId);
+      // Do not mutate persistent DB isAvailable to false on passive 5-minute Redis key expiry.
+      // The technician's manual toggle represents their active shift preference. Overwriting Postgres
+      // caused availability to unexpectedly turn offline whenever the app was backgrounded or reopened.
+      this.eventEmitter.emit('technician.heartbeat_expired', technicianId);
     } catch (error) {
-      this.logger.error(`Failed to mark technician ${technicianId} unavailable`, error);
+      this.logger.error(`Failed to handle expired heartbeat for technician ${technicianId}`, error);
     }
   }
 }
