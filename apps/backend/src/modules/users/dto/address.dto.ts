@@ -119,4 +119,9 @@ export class UpdateAddressDto {
   @Type(() => Number)
   @IsLongitude()
   longitude?: number;
+
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @IsBoolean()
+  isDefault?: boolean;
 }

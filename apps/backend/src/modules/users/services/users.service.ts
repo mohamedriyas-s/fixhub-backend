@@ -182,6 +182,10 @@ export class UsersService {
     const address = await this.requireAddress(customer.id, addressId);
 
     return this.usersRepository.transaction(async (tx) => {
+      if (dto.isDefault === true) {
+        await this.usersRepository.clearDefaultAddresses(tx, customer.id);
+      }
+
       const updated = await this.usersRepository.updateAddress(tx, addressId, dto);
 
       await this.usersRepository.createAuditLog(tx, {
@@ -362,31 +366,33 @@ export class UsersService {
       deletedAt: user.deletedAt,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
-      ...(user.role === Role.CUSTOMER && user.customer && {
-        profile: {
-          type: Role.CUSTOMER,
-          id: user.customer.id,
-          profilePictureUrl: user.customer.profilePictureUrl,
-          createdAt: user.customer.createdAt,
-          updatedAt: user.customer.updatedAt,
-        },
-      }),
-      ...(user.role === Role.TECHNICIAN && user.technician && {
-        profile: {
-          type: Role.TECHNICIAN,
-          id: user.technician.id,
-          profilePictureUrl: user.technician.profilePictureUrl,
-          isAvailable: user.technician.isAvailable,
-          verificationStatus: user.technician.verificationStatus,
-          rating: Number(user.technician.rating),
-          totalJobs: user.technician.totalJobs,
-          latitude: user.technician.latitude ? Number(user.technician.latitude) : null,
-          longitude: user.technician.longitude ? Number(user.technician.longitude) : null,
-          lastLocationAt: user.technician.lastLocationAt,
-          createdAt: user.technician.createdAt,
-          updatedAt: user.technician.updatedAt,
-        },
-      }),
+      ...(user.role === Role.CUSTOMER &&
+        user.customer && {
+          profile: {
+            type: Role.CUSTOMER,
+            id: user.customer.id,
+            profilePictureUrl: user.customer.profilePictureUrl,
+            createdAt: user.customer.createdAt,
+            updatedAt: user.customer.updatedAt,
+          },
+        }),
+      ...(user.role === Role.TECHNICIAN &&
+        user.technician && {
+          profile: {
+            type: Role.TECHNICIAN,
+            id: user.technician.id,
+            profilePictureUrl: user.technician.profilePictureUrl,
+            isAvailable: user.technician.isAvailable,
+            verificationStatus: user.technician.verificationStatus,
+            rating: Number(user.technician.rating),
+            totalJobs: user.technician.totalJobs,
+            latitude: user.technician.latitude ? Number(user.technician.latitude) : null,
+            longitude: user.technician.longitude ? Number(user.technician.longitude) : null,
+            lastLocationAt: user.technician.lastLocationAt,
+            createdAt: user.technician.createdAt,
+            updatedAt: user.technician.updatedAt,
+          },
+        }),
       ...(user.role === Role.ADMIN && {
         profile: {
           type: Role.ADMIN,
@@ -400,7 +406,7 @@ export class UsersService {
     if (!urlOrKey) {
       return { downloadUrl: '' };
     }
-    
+
     // Extract key if it's a full URL
     let key = urlOrKey;
     try {

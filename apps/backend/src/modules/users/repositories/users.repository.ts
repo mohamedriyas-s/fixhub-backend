@@ -31,11 +31,7 @@ export class UsersRepository {
     });
   }
 
-  updateUser(
-    tx: PrismaTx,
-    userId: string,
-    data: Prisma.UserUpdateInput,
-  ) {
+  updateUser(tx: PrismaTx, userId: string, data: Prisma.UserUpdateInput) {
     return tx.user.update({
       where: { id: userId },
       data,
@@ -46,23 +42,14 @@ export class UsersRepository {
     });
   }
 
-  updateTechnicianProfile(
-    tx: PrismaTx,
-    userId: string,
-    data: Prisma.TechnicianUpdateInput,
-  ) {
+  updateTechnicianProfile(tx: PrismaTx, userId: string, data: Prisma.TechnicianUpdateInput) {
     return tx.technician.update({
       where: { userId },
       data,
     });
   }
 
-  updateProfileImage(
-    tx: PrismaTx,
-    userId: string,
-    role: Role,
-    imageUrl: string,
-  ) {
+  updateProfileImage(tx: PrismaTx, userId: string, role: Role, imageUrl: string) {
     if (role === Role.TECHNICIAN) {
       return tx.technician.update({
         where: { userId },
@@ -133,11 +120,7 @@ export class UsersRepository {
     });
   }
 
-  createAddress(
-    tx: PrismaTx,
-    customerId: string,
-    dto: CreateAddressDto,
-  ) {
+  createAddress(tx: PrismaTx, customerId: string, dto: CreateAddressDto) {
     return tx.address.create({
       data: {
         customerId,
@@ -155,11 +138,7 @@ export class UsersRepository {
     });
   }
 
-  updateAddress(
-    tx: PrismaTx,
-    addressId: string,
-    dto: UpdateAddressDto,
-  ) {
+  updateAddress(tx: PrismaTx, addressId: string, dto: UpdateAddressDto) {
     return tx.address.update({
       where: { id: addressId },
       data: {
@@ -172,6 +151,7 @@ export class UsersRepository {
         ...(dto.pincode !== undefined && { pincode: dto.pincode }),
         ...(dto.latitude !== undefined && { latitude: dto.latitude }),
         ...(dto.longitude !== undefined && { longitude: dto.longitude }),
+        ...(dto.isDefault !== undefined && { isDefault: dto.isDefault }),
       },
     });
   }
@@ -203,12 +183,7 @@ export class UsersRepository {
     });
   }
 
-  upsertDeviceToken(
-    tx: PrismaTx,
-    userId: string,
-    token: string,
-    platform: DevicePlatform,
-  ) {
+  upsertDeviceToken(tx: PrismaTx, userId: string, token: string, platform: DevicePlatform) {
     return tx.deviceToken.upsert({
       where: { token },
       create: { userId, token, platform, isActive: true },
@@ -254,7 +229,15 @@ export class UsersRepository {
   }
 
   private addressSortField(sortBy?: string) {
-    const allowed = new Set(['createdAt', 'updatedAt', 'label', 'city', 'state', 'pincode', 'isDefault']);
+    const allowed = new Set([
+      'createdAt',
+      'updatedAt',
+      'label',
+      'city',
+      'state',
+      'pincode',
+      'isDefault',
+    ]);
     return allowed.has(sortBy ?? '') ? sortBy! : 'createdAt';
   }
 }

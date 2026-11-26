@@ -29,7 +29,7 @@ class AddressRemoteDataSource {
   }
 
   Future<Map<String, dynamic>> updateAddress(String id, Map<String, dynamic> data) async {
-    final response = await _dio.put(ApiEndpoints.customerAddress(id), data: data);
+    final response = await _dio.patch(ApiEndpoints.customerAddress(id), data: data);
     final raw = response.data;
     if (raw is Map && raw['data'] is Map) {
       return Map<String, dynamic>.from(raw['data'] as Map);

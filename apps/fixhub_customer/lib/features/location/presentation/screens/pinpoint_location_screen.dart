@@ -115,6 +115,8 @@ class _PinpointLocationScreenState
 
   String _resolvedTitle = 'Locating...';
   String _resolvedSubtitle = 'Drag the map to pinpoint your exact building';
+  String? _detectedLine1;
+  String? _detectedLine2;
   String? _detectedPincode;
   String? _detectedCity;
   String? _detectedState;
@@ -198,17 +200,32 @@ class _PinpointLocationScreenState
 
       if (placemarks.isNotEmpty && mounted) {
         final p = placemarks.first;
-        final streetParts = [
-          if (p.street != null && p.street!.isNotEmpty && p.street != p.subLocality)
-            p.street!,
-          if (p.subLocality != null && p.subLocality!.isNotEmpty)
-            p.subLocality!,
+        final street = p.street?.trim();
+        final subLocality = p.subLocality?.trim();
+        final thoroughfare = p.thoroughfare?.trim();
+        final name = p.name?.trim();
+        final locality = p.locality?.trim();
+
+        final line1 = (street != null && street.isNotEmpty && street != subLocality)
+            ? street
+            : (name != null && name.isNotEmpty && name != subLocality && name != locality)
+                ? name
+                : null;
+        final line2 = (subLocality != null && subLocality.isNotEmpty && subLocality != line1)
+            ? subLocality
+            : (thoroughfare != null && thoroughfare.isNotEmpty && thoroughfare != line1)
+                ? thoroughfare
+                : null;
+
+        final titleParts = [
+          if (line1 != null && line1.isNotEmpty) line1,
+          if (line2 != null && line2.isNotEmpty) line2,
         ];
         final areaParts = [
-          if (p.locality != null && p.locality!.isNotEmpty) p.locality!,
+          if (locality != null && locality.isNotEmpty) locality,
           if (p.subAdministrativeArea != null &&
               p.subAdministrativeArea!.isNotEmpty &&
-              p.subAdministrativeArea != p.locality)
+              p.subAdministrativeArea != locality)
             p.subAdministrativeArea!,
           if (p.administrativeArea != null && p.administrativeArea!.isNotEmpty)
             p.administrativeArea!,
@@ -216,12 +233,14 @@ class _PinpointLocationScreenState
         ];
 
         setState(() {
-          _resolvedTitle = streetParts.isNotEmpty
-              ? streetParts.join(', ')
-              : (p.name ?? 'Selected Location');
+          _detectedLine1 = line1;
+          _detectedLine2 = line2;
+          _resolvedTitle = titleParts.isNotEmpty
+              ? titleParts.join(', ')
+              : (name ?? 'Selected Location');
           _resolvedSubtitle = areaParts.join(', ');
           _detectedPincode = p.postalCode;
-          _detectedCity = p.locality ?? p.subAdministrativeArea;
+          _detectedCity = locality?.isNotEmpty == true ? locality : p.subAdministrativeArea;
           _detectedState = p.administrativeArea;
         });
         return;
@@ -368,21 +387,16 @@ class _PinpointLocationScreenState
       final lat = _currentCenter.latitude;
       final lng = _currentCenter.longitude;
 
-      if (initial != null) {
-        // Update existing address
+      if (initial != null && initial.id.isNotEmpty) {
+        // Update existing saved address
         final updatedAddress = initial.copyWith(
           latitude: lat,
           longitude: lng,
-          line1: initial.line1.isNotEmpty ? initial.line1 : _resolvedTitle,
-          city: initial.city.isNotEmpty
-              ? initial.city
-              : (_detectedCity ?? 'Chennai'),
-          state: initial.state.isNotEmpty
-              ? initial.state
-              : (_detectedState ?? 'Tamil Nadu'),
-          pincode: initial.pincode.isNotEmpty
-              ? initial.pincode
-              : (_detectedPincode ?? '600099'),
+          line1: _detectedLine1 ?? (initial.line1.isNotEmpty ? initial.line1 : _resolvedTitle),
+          line2: _detectedLine2 ?? initial.line2,
+          city: _detectedCity ?? (initial.city.isNotEmpty ? initial.city : 'Chennai'),
+          state: _detectedState ?? (initial.state.isNotEmpty ? initial.state : 'Tamil Nadu'),
+          pincode: _detectedPincode ?? (initial.pincode.isNotEmpty ? initial.pincode : '600099'),
         );
 
         final result = await ref
@@ -397,14 +411,15 @@ class _PinpointLocationScreenState
           Navigator.pop(context, result);
         }
       } else {
-        // Return freshly created coordinates model
+        // Return freshly selected coordinates model to the caller form
         final newAddress = AddressModel(
           id: '',
           label: 'Service Location',
-          line1: _resolvedTitle,
-          city: _detectedCity ?? 'Chennai',
-          state: _detectedState ?? 'Tamil Nadu',
-          pincode: _detectedPincode ?? '600099',
+          line1: _detectedLine1 ?? (_resolvedTitle == 'Locating...' ? '' : _resolvedTitle),
+          line2: _detectedLine2,
+          city: _detectedCity ?? (initial?.city.isNotEmpty == true ? initial!.city : 'Chennai'),
+          state: _detectedState ?? (initial?.state.isNotEmpty == true ? initial!.state : 'Tamil Nadu'),
+          pincode: _detectedPincode ?? (initial?.pincode.isNotEmpty == true ? initial!.pincode : '600099'),
           latitude: lat,
           longitude: lng,
         );

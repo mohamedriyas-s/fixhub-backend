@@ -13,10 +13,8 @@ class AddressRepositoryImpl implements AddressRepository {
     return (data as List).map((json) => AddressModel.fromJson(Map<String, dynamic>.from(json))).toList();
   }
 
-  @override
-  Future<AddressModel> addAddress(AddressModel address) async {
-    // Explicitly map fields to keys the backend expects
-    final payload = {
+  Map<String, dynamic> _toPayload(AddressModel address) {
+    return {
       'label': address.label,
       'line1': address.line1,
       'line2': address.line2,
@@ -28,13 +26,17 @@ class AddressRepositoryImpl implements AddressRepository {
       if (address.latitude != null) 'latitude': address.latitude,
       if (address.longitude != null) 'longitude': address.longitude,
     };
-    final data = await _remoteDataSource.addAddress(payload);
+  }
+
+  @override
+  Future<AddressModel> addAddress(AddressModel address) async {
+    final data = await _remoteDataSource.addAddress(_toPayload(address));
     return AddressModel.fromJson(Map<String, dynamic>.from(data));
   }
 
   @override
   Future<AddressModel> updateAddress(String id, AddressModel address) async {
-    final data = await _remoteDataSource.updateAddress(id, address.toJson());
+    final data = await _remoteDataSource.updateAddress(id, _toPayload(address));
     return AddressModel.fromJson(Map<String, dynamic>.from(data));
   }
 

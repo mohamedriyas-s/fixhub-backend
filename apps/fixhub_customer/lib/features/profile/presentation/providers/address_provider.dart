@@ -36,7 +36,10 @@ class AddressNotifier extends StateNotifier<AsyncValue<List<AddressModel>>> {
     try {
       final newAddress = await _repository.addAddress(address);
       if (state.hasValue) {
-        state = AsyncValue.data([...state.value!, newAddress]);
+        final existing = newAddress.isDefault
+            ? state.value!.map((a) => a.copyWith(isDefault: false)).toList()
+            : state.value!;
+        state = AsyncValue.data([...existing, newAddress]);
       } else {
         state = AsyncValue.data([newAddress]);
       }
@@ -50,7 +53,10 @@ class AddressNotifier extends StateNotifier<AsyncValue<List<AddressModel>>> {
       final updated = await _repository.updateAddress(id, address);
       if (state.hasValue) {
         state = AsyncValue.data(
-          state.value!.map((a) => a.id == id ? updated : a).toList(),
+          state.value!.map((a) {
+            if (a.id == id) return updated;
+            return updated.isDefault ? a.copyWith(isDefault: false) : a;
+          }).toList(),
         );
       }
       return updated;

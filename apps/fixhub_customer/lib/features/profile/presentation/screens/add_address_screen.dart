@@ -13,7 +13,9 @@ import '../../../location/presentation/providers/location_provider.dart';
 import '../../../location/presentation/screens/pinpoint_location_screen.dart';
 
 class AddAddressScreen extends ConsumerStatefulWidget {
-  const AddAddressScreen({super.key});
+  const AddAddressScreen({super.key, this.initialAddress});
+
+  final AddressModel? initialAddress;
 
   @override
   ConsumerState<AddAddressScreen> createState() => _AddAddressScreenState();
@@ -25,20 +27,49 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
   final _labelController = TextEditingController();
   final _addressLine1Controller = TextEditingController();
   final _addressLine2Controller = TextEditingController();
+  final _landmarkController = TextEditingController();
   final _cityController = TextEditingController();
   final _stateController = TextEditingController();
   final _pincodeController = TextEditingController();
   
+  String _selectedLabelType = 'Home';
   bool _isDefault = false;
   bool _isValidating = false;
   double? _latitude;
   double? _longitude;
+
+  bool get _isEditing => widget.initialAddress != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final init = widget.initialAddress;
+    if (init != null) {
+      final knownLabels = ['Home', 'Work'];
+      if (knownLabels.contains(init.label)) {
+        _selectedLabelType = init.label;
+      } else {
+        _selectedLabelType = 'Other';
+        _labelController.text = init.label;
+      }
+      _addressLine1Controller.text = init.line1;
+      _addressLine2Controller.text = init.line2 ?? '';
+      _landmarkController.text = init.landmark ?? '';
+      _cityController.text = init.city;
+      _stateController.text = init.state;
+      _pincodeController.text = init.pincode;
+      _isDefault = init.isDefault;
+      _latitude = init.latitude;
+      _longitude = init.longitude;
+    }
+  }
 
   @override
   void dispose() {
     _labelController.dispose();
     _addressLine1Controller.dispose();
     _addressLine2Controller.dispose();
+    _landmarkController.dispose();
     _cityController.dispose();
     _stateController.dispose();
     _pincodeController.dispose();
@@ -52,7 +83,22 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
     final selected = await Navigator.push<AddressModel>(
       context,
       MaterialPageRoute(
-        builder: (ctx) => const PinpointLocationScreen(),
+        builder: (ctx) => PinpointLocationScreen(
+          initialAddress: _latitude != null && _longitude != null
+              ? AddressModel(
+                  id: '',
+                  line1: _addressLine1Controller.text,
+                  line2: _addressLine2Controller.text.isEmpty
+                      ? null
+                      : _addressLine2Controller.text,
+                  city: _cityController.text,
+                  state: _stateController.text,
+                  pincode: _pincodeController.text,
+                  latitude: _latitude,
+                  longitude: _longitude,
+                )
+              : null,
+        ),
       ),
     );
 
@@ -60,8 +106,11 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
       setState(() {
         _latitude = selected.latitude;
         _longitude = selected.longitude;
-        if (selected.line1.isNotEmpty && _addressLine1Controller.text.isEmpty) {
+        if (selected.line1.isNotEmpty) {
           _addressLine1Controller.text = selected.line1;
+        }
+        if (selected.line2 != null && selected.line2!.isNotEmpty) {
+          _addressLine2Controller.text = selected.line2!;
         }
         if (selected.city.isNotEmpty) {
           _cityController.text = selected.city;
@@ -97,12 +146,17 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
           return;
         }
 
+        final finalLabel = _selectedLabelType == 'Other'
+            ? (_labelController.text.trim().isEmpty ? 'Other' : _labelController.text.trim())
+            : _selectedLabelType;
+
         final addressModel = AddressModel(
-          id: '',
-          customerId: '',
-          label: _labelController.text.trim(),
+          id: widget.initialAddress?.id ?? '',
+          customerId: widget.initialAddress?.customerId ?? '',
+          label: finalLabel,
           line1: _addressLine1Controller.text.trim(),
-          line2: _addressLine2Controller.text.trim(),
+          line2: _addressLine2Controller.text.trim().isEmpty ? null : _addressLine2Controller.text.trim(),
+          landmark: _landmarkController.text.trim().isEmpty ? null : _landmarkController.text.trim(),
           city: _cityController.text.trim(),
           state: _stateController.text.trim(),
           pincode: pincode,
@@ -111,10 +165,17 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
           isDefault: _isDefault,
         );
 
-        await ref.read(addressesProvider.notifier).addAddress(addressModel);
+        if (_isEditing) {
+          await ref.read(addressesProvider.notifier).updateAddress(widget.initialAddress!.id, addressModel);
+        } else {
+          await ref.read(addressesProvider.notifier).addAddress(addressModel);
+        }
 
         if (mounted) {
-          FixHubSnackbar.success(context, 'Address added successfully');
+          FixHubSnackbar.success(
+            context,
+            _isEditing ? 'Address updated successfully' : 'Address added successfully',
+          );
           context.pop();
         }
       } catch (e) {
@@ -138,7 +199,7 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: const FixHubAppBar(title: 'Add New Address'),
+      appBar: FixHubAppBar(title: _isEditing ? 'Edit Address' : 'Add New Address'),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -214,13 +275,35 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
-            FixHubTextField(
-              controller: _labelController,
-              label: 'Label (e.g., Home, Work)',
-              hint: 'Home',
-              validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+
+            // Quick Address Label Type Chips
+            Text(
+              'Save Address As',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
+            const SizedBox(height: AppSpacing.xs),
+            Row(
+              children: [
+                _buildLabelChip('Home', Icons.home_rounded),
+                const SizedBox(width: AppSpacing.sm),
+                _buildLabelChip('Work', Icons.work_rounded),
+                const SizedBox(width: AppSpacing.sm),
+                _buildLabelChip('Other', Icons.location_on_rounded),
+              ],
+            ),
+            if (_selectedLabelType == 'Other') ...[
+              const SizedBox(height: AppSpacing.sm),
+              FixHubTextField(
+                controller: _labelController,
+                label: 'Custom Label Name',
+                hint: 'e.g., Mom\'s House, Warehouse',
+                validator: (value) => _selectedLabelType == 'Other' && (value == null || value.trim().isEmpty)
+                    ? 'Please provide a label name'
+                    : null,
+              ),
+            ],
             const SizedBox(height: AppSpacing.md),
+
             FixHubTextField(
               controller: _addressLine1Controller,
               label: 'Flat / House No. / Building',
@@ -231,8 +314,14 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
             FixHubTextField(
               controller: _addressLine2Controller,
               label: 'Street / Area / Locality',
-              hint: 'e.g. MG Road',
+              hint: 'e.g. MG Road, Indiranagar',
               validator: (value) => value == null || value.isEmpty ? 'Required' : null,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            FixHubTextField(
+              controller: _landmarkController,
+              label: 'Landmark (Optional)',
+              hint: 'e.g. Near Apollo Pharmacy, Opposite Park',
             ),
             const SizedBox(height: AppSpacing.md),
             Row(
@@ -264,7 +353,7 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
               keyboardType: TextInputType.number,
               validator: (value) {
                 if (value == null || value.isEmpty) return 'Required';
-                if (value.length != 6) return 'Must be 6 digits';
+                if (value.length != 6 || int.tryParse(value) == null) return 'Must be 6 digits';
                 return null;
               },
             ),
@@ -273,6 +362,10 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
               title: Text(
                 'Set as Default Address',
                 style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              subtitle: Text(
+                'Use this as primary address for future bookings',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
               ),
               value: _isDefault,
               onChanged: (val) {
@@ -291,12 +384,44 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.screenPadding),
           child: FixHubButton(
-            label: _isValidating ? 'Validating Area...' : 'Save Address',
+            label: _isValidating
+                ? 'Validating Area...'
+                : (_isEditing ? 'Update Address' : 'Save Address'),
             isLoading: isLoading || _isValidating,
             onPressed: _saveAddress,
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildLabelChip(String label, IconData icon) {
+    final isSelected = _selectedLabelType == label;
+    return ChoiceChip(
+      avatar: Icon(
+        icon,
+        size: 16,
+        color: isSelected ? Colors.white : AppColors.textSecondary,
+      ),
+      label: Text(label),
+      labelStyle: TextStyle(
+        color: isSelected ? Colors.white : AppColors.textPrimary,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+      ),
+      selected: isSelected,
+      selectedColor: AppColors.buttonPrimary,
+      backgroundColor: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isSelected ? AppColors.buttonPrimary : AppColors.border,
+        ),
+      ),
+      onSelected: (_) {
+        setState(() {
+          _selectedLabelType = label;
+        });
+      },
     );
   }
 }

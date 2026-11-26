@@ -28,6 +28,53 @@ class _SelectAddressScreenState extends ConsumerState<SelectAddressScreen> {
   AddressModel? _selectedAddress;
   bool _isChecking = false;
 
+  void _confirmDelete(AddressModel address) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.background,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Delete Address?',
+          style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+        ),
+        content: Text(
+          'Are you sure you want to delete "${address.label}"? This action cannot be undone.',
+          style: const TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                await ref.read(addressesProvider.notifier).deleteAddress(address.id);
+                if (mounted) {
+                  if (_selectedAddress?.id == address.id) {
+                    setState(() => _selectedAddress = null);
+                  }
+                  FixHubSnackbar.success(context, 'Address removed successfully');
+                }
+              } catch (e) {
+                if (mounted) {
+                  FixHubSnackbar.error(context, 'Failed to delete address');
+                }
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _handleContinue() async {
     if (_selectedAddress == null || _isChecking) return;
 
@@ -189,6 +236,23 @@ class _SelectAddressScreenState extends ConsumerState<SelectAddressScreen> {
   Widget build(BuildContext context) {
     final addressesAsync = ref.watch(addressesProvider);
 
+    // Auto-select initial address: either already selected, or default, or first
+    addressesAsync.whenData((addresses) {
+      if (_selectedAddress == null && addresses.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _selectedAddress == null) {
+            final defaultAddr = addresses.firstWhere(
+              (a) => a.isDefault,
+              orElse: () => addresses.first,
+            );
+            setState(() {
+              _selectedAddress = defaultAddr;
+            });
+          }
+        });
+      }
+    });
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: const FixHubAppBar(title: 'Select Address'),
@@ -295,14 +359,41 @@ class _SelectAddressScreenState extends ConsumerState<SelectAddressScreen> {
                                           color: AppColors.textSecondary,
                                         ),
                                   ),
+                                  if (address.landmark != null && address.landmark!.isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Landmark: ${address.landmark}',
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                            color: AppColors.textDisabled,
+                                            fontStyle: FontStyle.italic,
+                                          ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
-                            if (isSelected)
-                              const Icon(
-                                Icons.check_circle_rounded,
-                                color: AppColors.success,
-                              ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  tooltip: 'Edit Address',
+                                  icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.textSecondary),
+                                  onPressed: () {
+                                    context.push('/add-address', extra: address);
+                                  },
+                                ),
+                                IconButton(
+                                  tooltip: 'Delete Address',
+                                  icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.error),
+                                  onPressed: () => _confirmDelete(address),
+                                ),
+                                if (isSelected)
+                                  const Icon(
+                                    Icons.check_circle_rounded,
+                                    color: AppColors.success,
+                                  ),
+                              ],
+                            ),
                           ],
                         ),
                       ),
