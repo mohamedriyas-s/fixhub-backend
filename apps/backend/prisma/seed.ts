@@ -171,19 +171,61 @@ async function main() {
   // ── Layer 3: Categories ───────────────────────────────────
 
   const categories = [
-    { name: 'Electrical', slug: 'electrical', sortOrder: 1, isActive: true },
-    { name: 'AC Service', slug: 'ac-service', sortOrder: 2, isActive: false },
-    { name: 'Plumbing', slug: 'plumbing', sortOrder: 3, isActive: false },
-    { name: 'Cleaning', slug: 'cleaning', sortOrder: 4, isActive: false },
-    { name: 'Painting', slug: 'painting', sortOrder: 5, isActive: false },
-    { name: 'Carpentry', slug: 'carpentry', sortOrder: 6, isActive: false },
-    { name: 'Appliance Repair', slug: 'appliance-repair', sortOrder: 7, isActive: false },
+    {
+      name: 'Electrical',
+      slug: 'electrical',
+      iconUrl: 'https://img.icons8.com/fluency/96/electrical.png',
+      sortOrder: 1,
+      isActive: true,
+    },
+    {
+      name: 'AC Service',
+      slug: 'ac-service',
+      iconUrl: 'https://img.icons8.com/fluency/96/air-conditioner.png',
+      sortOrder: 2,
+      isActive: false,
+    },
+    {
+      name: 'Plumbing',
+      slug: 'plumbing',
+      iconUrl: 'https://img.icons8.com/fluency/96/plumbing.png',
+      sortOrder: 3,
+      isActive: false,
+    },
+    {
+      name: 'Cleaning',
+      slug: 'cleaning',
+      iconUrl: 'https://img.icons8.com/fluency/96/broom.png',
+      sortOrder: 4,
+      isActive: false,
+    },
+    {
+      name: 'Painting',
+      slug: 'painting',
+      iconUrl: 'https://img.icons8.com/fluency/96/roller-brush.png',
+      sortOrder: 5,
+      isActive: false,
+    },
+    {
+      name: 'Carpentry',
+      slug: 'carpentry',
+      iconUrl: 'https://img.icons8.com/fluency/96/saw.png',
+      sortOrder: 6,
+      isActive: false,
+    },
+    {
+      name: 'Appliance Repair',
+      slug: 'appliance-repair',
+      iconUrl: 'https://img.icons8.com/fluency/96/washing-machine.png',
+      sortOrder: 7,
+      isActive: false,
+    },
   ];
 
   for (const cat of categories) {
     await prisma.category.upsert({
       where: { slug: cat.slug },
-      update: { sortOrder: cat.sortOrder },
+      update: { sortOrder: cat.sortOrder, iconUrl: cat.iconUrl },
       create: cat,
     });
   }
@@ -201,6 +243,7 @@ async function main() {
         name: 'Fan Repair',
         slug: 'fan-repair',
         description: 'Ceiling fan, table fan, exhaust fan repair and installation',
+        iconUrl: 'https://img.icons8.com/fluency/96/fan.png',
         basePrice: 299,
         estimatedDurationMins: 60,
         sortOrder: 1,
@@ -209,6 +252,7 @@ async function main() {
         name: 'Switch & Socket',
         slug: 'switch-socket',
         description: 'Switch board, socket, plug point repair and replacement',
+        iconUrl: 'https://img.icons8.com/fluency/96/wall-socket.png',
         basePrice: 199,
         estimatedDurationMins: 30,
         sortOrder: 2,
@@ -217,6 +261,7 @@ async function main() {
         name: 'Wiring',
         slug: 'wiring',
         description: 'New wiring, rewiring, and wire repair',
+        iconUrl: 'https://img.icons8.com/fluency/96/electrical-sensor.png',
         basePrice: 499,
         estimatedDurationMins: 120,
         sortOrder: 3,
@@ -225,6 +270,7 @@ async function main() {
         name: 'MCB & Fuse',
         slug: 'mcb-fuse',
         description: 'MCB, fuse box, circuit breaker repair and replacement',
+        iconUrl: 'https://img.icons8.com/fluency/96/circuit.png',
         basePrice: 349,
         estimatedDurationMins: 45,
         sortOrder: 4,
@@ -233,6 +279,7 @@ async function main() {
         name: 'Light Installation',
         slug: 'light-installation',
         description: 'LED light, tube light, bulb installation and repair',
+        iconUrl: 'https://img.icons8.com/fluency/96/light-on.png',
         basePrice: 249,
         estimatedDurationMins: 45,
         sortOrder: 5,
@@ -241,6 +288,7 @@ async function main() {
         name: 'Inverter & Stabilizer',
         slug: 'inverter-stabilizer',
         description: 'Inverter, UPS, voltage stabilizer repair and installation',
+        iconUrl: 'https://img.icons8.com/fluency/96/charge-battery.png',
         basePrice: 599,
         estimatedDurationMins: 90,
         sortOrder: 6,
@@ -254,6 +302,7 @@ async function main() {
           basePrice: sub.basePrice,
           estimatedDurationMins: sub.estimatedDurationMins,
           sortOrder: sub.sortOrder,
+          iconUrl: sub.iconUrl,
         },
         create: {
           ...sub,

@@ -83,11 +83,24 @@ class _ServiceListTile extends StatelessWidget {
                 color: AppColors.surface,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(
-                Icons.build_rounded,
-                color: AppColors.textPrimary,
-                size: 24,
-              ),
+              child: (service.iconUrl != null && service.iconUrl!.isNotEmpty)
+                  ? Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Image.network(
+                        service.iconUrl!,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.build_rounded,
+                          color: AppColors.textPrimary,
+                          size: 24,
+                        ),
+                      ),
+                    )
+                  : const Icon(
+                      Icons.build_rounded,
+                      color: AppColors.textPrimary,
+                      size: 24,
+                    ),
             ),
             const SizedBox(width: AppSpacing.md),
             Expanded(

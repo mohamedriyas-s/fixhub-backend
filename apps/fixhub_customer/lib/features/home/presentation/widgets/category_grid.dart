@@ -116,7 +116,10 @@ class _CategoryItemState extends State<_CategoryItem>
                   ),
                 ),
                 child: Center(
-                  child: _CategoryIcon(slug: category.slug),
+                  child: _CategoryIcon(
+                    slug: category.slug,
+                    iconUrl: category.iconUrl,
+                  ),
                 ),
               ),
               // "Coming Soon" overlay for inactive
@@ -202,18 +205,29 @@ class _CategoryItemState extends State<_CategoryItem>
 
 /// Category-specific icon widget.
 class _CategoryIcon extends StatelessWidget {
-  const _CategoryIcon({required this.slug});
+  const _CategoryIcon({required this.slug, this.iconUrl});
 
   final String slug;
+  final String? iconUrl;
 
   @override
   Widget build(BuildContext context) {
     final config = _iconConfig(slug);
-    return Icon(
+    final fallback = Icon(
       config.$1,
       color: config.$2,
       size: 28,
     );
+    if (iconUrl != null && iconUrl!.isNotEmpty) {
+      return Image.network(
+        iconUrl!,
+        width: 32,
+        height: 32,
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => fallback,
+      );
+    }
+    return fallback;
   }
 
   (IconData, Color) _iconConfig(String slug) {

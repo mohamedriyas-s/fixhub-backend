@@ -116,11 +116,23 @@ class _ServiceCardState extends State<_ServiceCard>
                   borderRadius: AppRadius.smallRadius,
                 ),
                 child: Center(
-                  child: Icon(
-                    iconConfig.$1,
-                    size: 22,
-                    color: iconConfig.$2,
-                  ),
+                  child: (service.iconUrl != null && service.iconUrl!.isNotEmpty)
+                      ? Image.network(
+                          service.iconUrl!,
+                          width: 26,
+                          height: 26,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Icon(
+                            iconConfig.$1,
+                            size: 22,
+                            color: iconConfig.$2,
+                          ),
+                        )
+                      : Icon(
+                          iconConfig.$1,
+                          size: 22,
+                          color: iconConfig.$2,
+                        ),
                 ),
               ),
               const Spacer(),
