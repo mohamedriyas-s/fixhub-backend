@@ -17,20 +17,20 @@ class AuthRepository {
   AuthRepository(this._dio, this._storage);
 
   /// POST /auth/send-otp
-  Future<Map<String, dynamic>> sendOtp(String phone) async {
+  Future<Map<String, dynamic>> sendOtp(String email) async {
     final response = await _dio.post(
       ApiEndpoints.sendOtp,
-      data: {'phone': phone},
+      data: {'email': email},
     );
     return _unwrap(response.data);
   }
 
   /// POST /auth/verify-otp — returns raw response map.
   /// Token storage is now handled by the provider (single responsibility).
-  Future<Map<String, dynamic>> verifyOtp(String phone, String otp) async {
+  Future<Map<String, dynamic>> verifyOtp(String email, String otp) async {
     final response = await _dio.post(
       ApiEndpoints.verifyOtp,
-      data: {'phone': phone, 'otp': otp, 'role': 'TECHNICIAN'},
+      data: {'email': email, 'otp': otp, 'role': 'TECHNICIAN'},
     );
     return _unwrap(response.data);
   }
@@ -49,7 +49,7 @@ class AuthRepository {
       final userData = await _storage.getUserData();
       if (userData == null || userData.isEmpty) return null;
       // Ensure essential fields exist
-      if (userData['id'] == null || userData['phone'] == null) return null;
+      if (userData['id'] == null) return null;
       return AuthUser.fromJson(userData);
     } catch (e) {
       debugPrint('[AuthRepository] getCachedUser failed: $e');

@@ -60,11 +60,11 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
-  /// Send OTP to the given phone number.
+  /// Send OTP to the given email address.
   /// Returns the raw response map (contains cooldownSeconds, devOtp, etc.)
-  Future<Map<String, dynamic>> sendOtp(String phone) async {
+  Future<Map<String, dynamic>> sendOtp(String email) async {
     try {
-      final result = await _repo.sendOtp(phone);
+      final result = await _repo.sendOtp(email);
       // Don't transition state — let the screen handle navigation
       return result;
     } catch (e) {
@@ -74,13 +74,13 @@ class AuthNotifier extends Notifier<AuthState> {
 
   /// Verify OTP and authenticate the user.
   /// On success, transitions to AuthAuthenticated.
-  Future<void> verifyOtp(String phone, String otp) async {
+  Future<void> verifyOtp(String email, String otp) async {
     try {
       // 1. Wipe previous session data and state completely
       await _storage.clearAll();
       _resetUserSession();
 
-      final result = await _repo.verifyOtp(phone, otp);
+      final result = await _repo.verifyOtp(email, otp);
 
       final accessToken = result['accessToken'] as String?;
       final refreshToken = result['refreshToken'] as String?;
@@ -107,7 +107,7 @@ class AuthNotifier extends Notifier<AuthState> {
         debugPrint('[AuthNotifier] FCM login sync error: $e');
       });
     } catch (e) {
-      state = AuthError(_humanizeError(e), phone: phone);
+      state = AuthError(_humanizeError(e), email: email);
       rethrow;
     }
   }

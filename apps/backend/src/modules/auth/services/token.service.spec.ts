@@ -17,6 +17,7 @@ describe('TokenService', () => {
   const mockUser = {
     id: 'user-uuid-1',
     phone: '+919876543210',
+    loginEmail: null,
     name: null,
     email: null,
     password: null,
@@ -121,9 +122,9 @@ describe('TokenService', () => {
     it('should throw for invalid refresh token', async () => {
       authRepository.findRefreshToken.mockResolvedValue(null);
 
-      await expect(
-        tokenService.refreshTokens('invalid-token'),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(tokenService.refreshTokens('invalid-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('should detect replay attack and revoke all tokens', async () => {
@@ -137,9 +138,9 @@ describe('TokenService', () => {
         user: mockUser,
       } as any);
 
-      await expect(
-        tokenService.refreshTokens('stolen-token'),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(tokenService.refreshTokens('stolen-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
 
       expect(authRepository.revokeAllRefreshTokens).toHaveBeenCalledWith('user-uuid-1');
     });
@@ -155,9 +156,9 @@ describe('TokenService', () => {
         user: mockUser,
       } as any);
 
-      await expect(
-        tokenService.refreshTokens('expired-token'),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(tokenService.refreshTokens('expired-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
 
       expect(authRepository.revokeRefreshToken).toHaveBeenCalledWith('token-id-1');
     });
@@ -173,9 +174,7 @@ describe('TokenService', () => {
         user: { ...mockUser, isActive: false },
       } as any);
 
-      await expect(
-        tokenService.refreshTokens('some-token'),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(tokenService.refreshTokens('some-token')).rejects.toThrow(UnauthorizedException);
 
       expect(authRepository.revokeAllRefreshTokens).toHaveBeenCalledWith('user-uuid-1');
     });
@@ -212,11 +211,7 @@ describe('TokenService', () => {
 
       await tokenService.blacklistAccessToken('some-jwt');
 
-      expect(redisService.set).toHaveBeenCalledWith(
-        'token_bl:some-jwt',
-        '1',
-        expect.any(Number),
-      );
+      expect(redisService.set).toHaveBeenCalledWith('token_bl:some-jwt', '1', expect.any(Number));
     });
 
     it('should skip blacklisting for already-expired token', async () => {
@@ -229,12 +224,12 @@ describe('TokenService', () => {
     });
 
     it('should handle decode failure gracefully', async () => {
-      jwtService.decode.mockImplementation(() => { throw new Error('bad token'); });
+      jwtService.decode.mockImplementation(() => {
+        throw new Error('bad token');
+      });
 
       // Should not throw
-      await expect(
-        tokenService.blacklistAccessToken('garbage'),
-      ).resolves.toBeUndefined();
+      await expect(tokenService.blacklistAccessToken('garbage')).resolves.toBeUndefined();
     });
   });
 

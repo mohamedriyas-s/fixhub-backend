@@ -141,8 +141,9 @@ enum CancellationActor {
 /// with role-specific profiles via 1:1 Customer/Technician.
 model User {
   id        String    @id @default(uuid()) @db.Uuid
-  phone     String
-  email     String?
+  phone      String?
+  email      String?
+  loginEmail String? @unique @map("login_email")
   password  String?
   name      String?
   role      Role

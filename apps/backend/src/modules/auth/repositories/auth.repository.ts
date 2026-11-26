@@ -31,17 +31,17 @@ export class AuthRepository {
 
   async findUserByEmail(email: string) {
     return this.prisma.user.findFirst({
-      where: { email, deletedAt: null },
+      where: { email, role: Role.ADMIN, deletedAt: null },
     });
   }
 
   /**
-   * Find existing user by phone or create a new one with the
+   * Find existing user by verified login email or create a new one with the
    * associated role profile (Customer or Technician).
    * Uses a transaction to guarantee atomicity.
    */
-  async findOrCreateUser(phone: string, role: Role) {
-    const existingUser = await this.findUserByPhone(phone);
+  async findOrCreateUser(email: string, role: Role) {
+    const existingUser = await this.prisma.user.findUnique({ where: { loginEmail: email } });
 
     if (existingUser) {
       if (existingUser.role !== role) {
@@ -56,7 +56,7 @@ export class AuthRepository {
     // Create user + role profile in a single transaction
     const newUser = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
-        data: { phone, role },
+        data: { email, loginEmail: email, role },
       });
 
       if (role === Role.CUSTOMER) {

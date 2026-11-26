@@ -1,11 +1,9 @@
-import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, type JwtSignOptions } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 
 import type { AppConfigValues } from '../../common/config/app.config';
-import { QUEUE_NAMES } from '../../common/queue/queue.constants';
 import { AuthController } from './controllers/auth.controller';
 import { AuthRepository } from './repositories/auth.repository';
 import { AuthService } from './services/auth.service';
@@ -16,9 +14,6 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
-    BullModule.registerQueue({
-      name: QUEUE_NAMES.SMS,
-    }),
     JwtModule.registerAsync({
       useFactory: (configService: ConfigService<AppConfigValues>) => {
         const accessExpiration = configService.getOrThrow('jwt.accessExpiration', { infer: true });

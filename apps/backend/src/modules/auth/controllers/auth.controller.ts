@@ -39,12 +39,12 @@ export class AuthController {
   @Post('send-otp')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Send OTP to phone number',
+    summary: 'Send OTP to email address',
     description:
-      'Sends a 6-digit OTP to the provided phone number. Rate limited to 1 request per 60 seconds per phone.',
+      'Sends a 6-digit OTP to the provided email address. Rate limited to 1 request per 60 seconds per email.',
   })
   @ApiResponse({ status: 200, description: 'OTP sent successfully' })
-  @ApiResponse({ status: 400, description: 'Invalid phone number' })
+  @ApiResponse({ status: 400, description: 'Invalid email address' })
   @ApiResponse({ status: 429, description: 'Rate limit exceeded' })
   async sendOtp(@Body() dto: SendOtpDto) {
     return this.authService.sendOtp(dto);

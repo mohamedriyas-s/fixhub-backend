@@ -146,6 +146,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       await service.updateProfile(
         name: _nameController.text,
         email: _emailController.text,
+        phone: _phoneController.text,
       );
 
       // Refresh profile in AuthProvider so the UI syncs everywhere
@@ -279,26 +280,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
             const SizedBox(height: AppSpacing.md),
 
-            // ── Phone (read-only) ─────────────────────────────────────
-            _FieldLabel(text: 'Phone Number'),
+            _FieldLabel(text: 'Booking Contact Number'),
             const SizedBox(height: AppSpacing.xs),
             TextFormField(
               controller: _phoneController,
-              enabled: false,
-              decoration: _inputDecoration(hint: 'Phone number').copyWith(
-                suffixIcon: const Icon(
-                  Icons.lock_outline_rounded,
-                  size: 18,
-                  color: AppColors.textDisabled,
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xxs),
-            Text(
-              'Phone number cannot be changed.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textDisabled,
-                  ),
+              keyboardType: TextInputType.phone,
+              decoration: _inputDecoration(hint: '+91 98765 43210'),
             ),
 
             const SizedBox(height: AppSpacing.xxl),

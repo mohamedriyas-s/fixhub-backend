@@ -1,9 +1,8 @@
-import { getQueueToken } from '@nestjs/bullmq';
 import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Role } from '@prisma/client';
 
-import { QUEUE_NAMES } from '../../../common/queue/queue.constants';
 import { AuthRepository } from '../repositories/auth.repository';
 import { AuthService } from './auth.service';
 import { OtpService } from './otp.service';
@@ -13,11 +12,13 @@ describe('AuthService', () => {
   let authService: AuthService;
   let otpService: jest.Mocked<OtpService>;
   let tokenService: jest.Mocked<TokenService>;
+  let config: ConfigService;
   let authRepository: jest.Mocked<AuthRepository>;
 
   const mockUser = {
     id: 'user-uuid-1',
-    phone: '+919876543210',
+    phone: null,
+    loginEmail: 'customer@example.com',
     name: null,
     email: null,
     password: null,
@@ -39,9 +40,9 @@ describe('AuthService', () => {
       providers: [
         AuthService,
         {
-          provide: getQueueToken(QUEUE_NAMES.SMS),
+          provide: ConfigService,
           useValue: {
-            add: jest.fn().mockResolvedValue({ id: 'mock-job-id' }),
+            get: jest.fn(),
           },
         },
         {
@@ -75,6 +76,7 @@ describe('AuthService', () => {
       ],
     }).compile();
 
+    config = module.get(ConfigService);
     authService = module.get<AuthService>(AuthService);
     otpService = module.get(OtpService);
     tokenService = module.get(TokenService);
@@ -95,11 +97,42 @@ describe('AuthService', () => {
         isResend: false,
       });
 
-      const result = await authService.sendOtp({ phone: '+919876543210' });
+      const result = await authService.sendOtp({ email: 'customer@example.com' });
 
       expect(result.message).toBe('OTP sent successfully');
       expect(result.expiresInSeconds).toBe(300);
-      expect(otpService.generateAndStore).toHaveBeenCalledWith('+919876543210');
+      expect(otpService.generateAndStore).toHaveBeenCalledWith('customer@example.com');
+    });
+
+    it.each([true, false])('handles Resend acceptance (%s)', async (accepted) => {
+      jest
+        .mocked(config.get)
+        .mockImplementation((key) => (key === 'RESEND_API_KEY' ? 'test-key' : 'login@example.com'));
+      otpService.getDevOtp.mockResolvedValue(null);
+      otpService.generateAndStore.mockResolvedValue({
+        otp: '123456',
+        expiresInSeconds: 300,
+        isResend: false,
+      });
+      const fetchMock = jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValue(new Response(null, { status: accepted ? 200 : 429 }));
+      try {
+        const result = authService.sendOtp({ email: 'customer@example.com' });
+        if (accepted) await expect(result).resolves.toMatchObject({ devOtp: undefined });
+        else {
+          await expect(result).rejects.toThrow('Unable to send the sign-in email');
+          expect(otpService.cleanup).toHaveBeenCalledWith('customer@example.com');
+        }
+        expect(fetchMock).toHaveBeenCalledWith(
+          'https://api.resend.com/emails',
+          expect.objectContaining({
+            body: expect.stringContaining('Your HelpTap sign-in code'),
+          }),
+        );
+      } finally {
+        fetchMock.mockRestore();
+      }
     });
 
     it('should return cooldown message when OTP was recently sent', async () => {
@@ -110,7 +143,7 @@ describe('AuthService', () => {
       });
       otpService.getCooldownRemaining.mockResolvedValue(45);
 
-      const result = await authService.sendOtp({ phone: '+919876543210' });
+      const result = await authService.sendOtp({ email: 'customer@example.com' });
 
       expect(result.message).toContain('wait');
       expect(result.cooldownSeconds).toBe(45);
@@ -129,7 +162,7 @@ describe('AuthService', () => {
       tokenService.generateTokenPair.mockResolvedValue(mockTokenPair);
 
       const result = await authService.verifyOtp({
-        phone: '+919876543210',
+        email: 'customer@example.com',
         otp: '123456',
         role: Role.CUSTOMER,
       });
@@ -150,7 +183,7 @@ describe('AuthService', () => {
       tokenService.generateTokenPair.mockResolvedValue(mockTokenPair);
 
       const result = await authService.verifyOtp({
-        phone: '+919876543210',
+        email: 'customer@example.com',
         otp: '123456',
         role: Role.CUSTOMER,
       });
@@ -161,7 +194,7 @@ describe('AuthService', () => {
     it('should reject admin role for OTP login', async () => {
       await expect(
         authService.verifyOtp({
-          phone: '+919876543210',
+          email: 'customer@example.com',
           otp: '123456',
           role: Role.ADMIN,
         }),
@@ -177,7 +210,7 @@ describe('AuthService', () => {
 
       await expect(
         authService.verifyOtp({
-          phone: '+919876543210',
+          email: 'customer@example.com',
           otp: '123456',
           role: Role.CUSTOMER,
         }),
@@ -193,7 +226,7 @@ describe('AuthService', () => {
 
       await expect(
         authService.verifyOtp({
-          phone: '+919876543210',
+          email: 'customer@example.com',
           otp: '999999',
           role: Role.CUSTOMER,
         }),
@@ -209,7 +242,7 @@ describe('AuthService', () => {
 
       await expect(
         authService.verifyOtp({
-          phone: '+919876543210',
+          email: 'customer@example.com',
           otp: '000000',
           role: Role.CUSTOMER,
         }),
@@ -225,7 +258,7 @@ describe('AuthService', () => {
 
       await expect(
         authService.verifyOtp({
-          phone: '+919876543210',
+          email: 'customer@example.com',
           otp: '123456',
           role: Role.CUSTOMER,
         }),

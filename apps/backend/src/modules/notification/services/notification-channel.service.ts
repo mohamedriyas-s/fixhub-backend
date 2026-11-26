@@ -211,7 +211,11 @@ export class SmsNotificationChannel {
     if (apiKey) {
       try {
         if (provider === 'FAST2SMS') {
-          // Fast2SMS Quick SMS API
+          const number = params.phone.trim().replace(/^\+91/, '');
+          if (!/^[6-9]\d{9}$/.test(number)) {
+            throw new Error('Fast2SMS requires a valid Indian mobile number');
+          }
+
           const response = await fetch('https://www.fast2sms.com/dev/bulkV2', {
             method: 'POST',
             headers: {
@@ -221,12 +225,19 @@ export class SmsNotificationChannel {
             body: JSON.stringify({
               route: 'q',
               message: params.body,
-              numbers: params.phone.replace('+91', ''),
+              numbers: number,
             }),
           });
-          const resJson = await response.json();
-          this.logger.log(`[Fast2SMS] Sent to ${params.phone}: ${JSON.stringify(resJson)}`);
-          return { status: 'SENT', providerMessageId: `fast2sms:${Date.now()}` };
+          const result: { return?: boolean; request_id?: string; status_code?: number } | null =
+            await response.json();
+          if (!response.ok || result?.return !== true || !result.request_id) {
+            const code = Number.isInteger(result?.status_code)
+              ? result?.status_code
+              : response.status;
+            throw new Error(`Fast2SMS rejected the SMS request (code ${code})`);
+          }
+
+          return { status: 'SENT', providerMessageId: result.request_id };
         } else if (provider === 'MSG91') {
           // MSG91 API
           await fetch('https://control.msg91.com/api/v5/flow/', {
@@ -247,9 +258,11 @@ export class SmsNotificationChannel {
       }
     }
 
-    // Default zero-cost Development / Simulation mode
-    this.logger.log(`[SMS Simulation] To: ${params.phone} | Body: ${params.body}`);
-    return { status: 'SENT', providerMessageId: `simulated:${Date.now()}` };
+    const environment = this.configService.get<string>('nodeEnv');
+    if ((environment === 'development' || environment === 'test') && provider === 'DEV') {
+      return { status: 'SENT', providerMessageId: `simulated:${Date.now()}` };
+    }
+    throw new Error('SMS delivery requires a configured provider and API key');
   }
 }
 

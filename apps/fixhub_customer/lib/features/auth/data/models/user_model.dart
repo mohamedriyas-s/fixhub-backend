@@ -28,6 +28,7 @@ class UserModel {
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     final normalized = Map<String, dynamic>.from(json);
+    normalized['phone'] ??= '';
     if (normalized['customer'] == null && normalized['profile'] != null) {
       normalized['customer'] = normalized['profile'];
     }

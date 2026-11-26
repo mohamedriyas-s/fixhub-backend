@@ -1,14 +1,17 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform , Type } from 'class-transformer';
 import {
   IsEmail,
   IsLatitude,
   IsLongitude,
   IsOptional,
+  IsPhoneNumber,
   IsString,
   IsUrl,
   MaxLength,
 } from 'class-validator';
+
+import { normalizePhone } from '../../../common/utils/helpers.util';
 
 export class UpdateProfileDto {
   @ApiPropertyOptional({ example: 'Ramesh Kumar' })
@@ -21,6 +24,12 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsEmail()
   email?: string;
+
+  @ApiPropertyOptional({ example: '+919876543210', description: 'Booking contact number' })
+  @IsOptional()
+  @IsPhoneNumber('IN')
+  @Transform(({ value }) => (typeof value === 'string' ? normalizePhone(value) : value))
+  phone?: string;
 
   @ApiPropertyOptional({ example: 'https://cdn.fixhub.in/profiles/photo.jpg' })
   @IsOptional()

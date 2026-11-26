@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/config/theme/app_colors.dart';
@@ -9,7 +8,7 @@ import '../../../../core/widgets/fixhub_button.dart';
 import '../../../../core/widgets/fixhub_snackbar.dart';
 import '../providers/auth_provider.dart';
 
-/// Login screen — phone number input with +91 prefix.
+/// Login screen — email address entry.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -18,27 +17,26 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _phoneController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController();
   bool _isValid = false;
 
   @override
   void dispose() {
-    _phoneController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 
-  void _onPhoneChanged(String value) {
+  void _onEmailChanged(String value) {
     setState(() {
-      _isValid = value.length == 10 && RegExp(r'^[6-9]\d{9}$').hasMatch(value);
+      _isValid = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value.trim());
     });
   }
 
   Future<void> _sendOtp() async {
     if (!_isValid) return;
 
-    final phone = '+91${_phoneController.text.trim()}';
-    await ref.read(authProvider.notifier).sendOtp(phone);
+    final email = _emailController.text.trim();
+    await ref.read(authProvider.notifier).sendOtp(email);
   }
 
   @override
@@ -89,101 +87,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
               const SizedBox(height: AppSpacing.xxl),
 
-              // Phone input
-              Form(
-                key: _formKey,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.elevatedSurface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Row(
-                    children: [
-                      // Country code
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.md,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text(
-                              '🇮🇳',
-                              style: TextStyle(fontSize: 20),
-                            ),
-                            const SizedBox(width: AppSpacing.xs),
-                            Text(
-                              '+91',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyLarge
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textPrimary,
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Divider
-                      Container(
-                        width: 1,
-                        height: 24,
-                        color: AppColors.border,
-                      ),
-
-                      // Phone number field
-                      Expanded(
-                        child: TextField(
-                          controller: _phoneController,
-                          onChanged: _onPhoneChanged,
-                          keyboardType: TextInputType.phone,
-                          maxLength: 10,
-                          autofocus: true,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                            LengthLimitingTextInputFormatter(10),
-                          ],
-                          style:
-                              Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                    color: AppColors.textPrimary,
-                                    fontWeight: FontWeight.w500,
-                                    letterSpacing: 1.5,
-                                  ),
-                          decoration: const InputDecoration(
-                            hintText: '98765 43210',
-                            counterText: '',
-                            border: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            focusedBorder: InputBorder.none,
-                            filled: false,
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: AppSpacing.md,
-                              vertical: AppSpacing.lg,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+              TextField(
+                controller: _emailController,
+                onChanged: _onEmailChanged,
+                keyboardType: TextInputType.emailAddress,
+                autofillHints: const [AutofillHints.email],
+                decoration: const InputDecoration(
+                  labelText: 'Email address',
+                  hintText: 'you@example.com',
                 ),
-              ),
-
-              const SizedBox(height: AppSpacing.xs),
-
-              // Helper text
-              Text(
-                'Indian phone numbers only',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textDisabled,
-                    ),
               ),
 
               const Spacer(),
 
-              // CTA
               FixHubButton(
                 label: 'Continue',
                 onPressed: _isValid ? _sendOtp : null,

@@ -32,7 +32,7 @@ class AuthUser {
     final profile = json['profile'] as Map<String, dynamic>?;
     return AuthUser(
       id: json['id'] as String,
-      phone: json['phone'] as String,
+      phone: json['phone'] as String? ?? '',
       name: json['name'] as String?,
       email: json['email'] as String?,
       role: json['role'] as String,
@@ -87,7 +87,7 @@ class AuthUser {
     );
   }
 
-  String get displayName => name ?? phone;
+  String get displayName => name ?? email ?? phone;
 
   bool get isVerified => verificationStatus == 'VERIFIED';
 }
@@ -108,15 +108,15 @@ class AuthLoading extends AuthState {
 
 /// OTP has been sent, waiting for user to enter it.
 class AuthOtpSent extends AuthState {
-  final String phone;
+  final String email;
   final String? devOtp;
-  const AuthOtpSent({required this.phone, this.devOtp});
+  const AuthOtpSent({required this.email, this.devOtp});
 }
 
 /// OTP submitted, awaiting server verification.
 class AuthVerifying extends AuthState {
-  final String phone;
-  const AuthVerifying({required this.phone});
+  final String email;
+  const AuthVerifying({required this.email});
 }
 
 class AuthAuthenticated extends AuthState {
@@ -130,6 +130,6 @@ class AuthUnauthenticated extends AuthState {
 
 class AuthError extends AuthState {
   final String message;
-  final String? phone; // Preserve phone so user can retry
-  const AuthError(this.message, {this.phone});
+  final String? email; // Preserve email so user can retry
+  const AuthError(this.message, {this.email});
 }

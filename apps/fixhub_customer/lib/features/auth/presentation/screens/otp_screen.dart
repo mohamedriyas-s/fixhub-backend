@@ -69,13 +69,13 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
 
   Future<void> _verifyOtp(String otp) async {
     if (_isVerifying) return;
-    final phone = ref.read(authProvider).phone;
-    if (phone == null) return;
+    final email = ref.read(authProvider).email;
+    if (email == null) return;
 
     setState(() => _isVerifying = true);
     try {
       await ref.read(authProvider.notifier).verifyOtp(
-            phone: phone,
+            email: email,
             otp: otp,
           );
     } catch (_) {
@@ -112,7 +112,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
-    final phone = authState.phone ?? '';
+    final email = authState.email ?? '';
 
     // Listen for state changes
     ref.listen<AuthState>(authProvider, (previous, next) {
@@ -181,7 +181,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                   children: [
                     const TextSpan(text: 'We\'ve sent a 6-digit code to '),
                     TextSpan(
-                      text: _formatPhone(phone),
+                      text: email,
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
@@ -282,10 +282,4 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     );
   }
 
-  String _formatPhone(String phone) {
-    if (phone.length >= 13) {
-      return '${phone.substring(0, 3)} ${phone.substring(3, 8)} ${phone.substring(8)}';
-    }
-    return phone;
-  }
 }

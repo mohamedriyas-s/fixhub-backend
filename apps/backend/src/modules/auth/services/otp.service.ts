@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { RedisService } from '../../../common/redis/redis.service';
@@ -6,9 +6,9 @@ import { generateOtp, hashString } from '../../../common/utils/helpers.util';
 
 /**
  * Redis key patterns:
- *   otp:{phone}           → hashed OTP value     (TTL: 300s)
- *   otp_attempts:{phone}  → attempt counter       (TTL: 300s)
- *   otp_cooldown:{phone}  → resend cooldown flag  (TTL: 60s)
+ *   otp:{email}           → hashed OTP value     (TTL: 300s)
+ *   otp_attempts:{email}  → attempt counter       (TTL: 300s)
+ *   otp_cooldown:{email}  → resend cooldown flag  (TTL: 60s)
  */
 const OTP_PREFIX = 'otp:';
 const OTP_ATTEMPTS_PREFIX = 'otp_attempts:';
@@ -17,7 +17,6 @@ const OTP_LOCKOUT_PREFIX = 'otp_lockout:';
 
 @Injectable()
 export class OtpService {
-  private readonly logger = new Logger(OtpService.name);
   private readonly otpExpiration: number;
   private readonly otpLength: number;
   private readonly maxAttempts: number;
@@ -34,30 +33,31 @@ export class OtpService {
   }
 
   private isSimulationMode(): boolean {
-    const isProd = this.configService.get<string>('nodeEnv') === 'production';
-    const hasSmsKey = !!this.configService.get<string>('sms.apiKey');
-    const smsProvider = this.configService.get<string>('sms.provider') || 'DEV';
-    return !isProd || !hasSmsKey || smsProvider === 'DEV';
+    const environment = this.configService.get<string>('nodeEnv');
+    return (
+      (environment === 'development' || environment === 'test') &&
+      !this.configService.get<string>('RESEND_API_KEY')
+    );
   }
 
   /**
-   * Generate and store a new OTP for the given phone number.
+   * Generate and store a new OTP for the given email number.
    *
    * Security measures:
    * 1. OTP is hashed before storing in Redis (SHA-256)
    * 2. Resend cooldown prevents spam (60s)
    * 3. Attempt counter is reset on new OTP
    *
-   * @returns The plaintext OTP (for SMS delivery)
+   * @returns The plaintext OTP (for email delivery)
    * @throws if cooldown period has not elapsed
    */
-  async generateAndStore(phone: string): Promise<{
+  async generateAndStore(email: string): Promise<{
     otp: string;
     expiresInSeconds: number;
     isResend: boolean;
   }> {
     // Check lockout
-    const lockoutKey = `${OTP_LOCKOUT_PREFIX}${phone}`;
+    const lockoutKey = `${OTP_LOCKOUT_PREFIX}${email}`;
     const lockoutTtl = await this.redisService.getClient().ttl(lockoutKey);
     if (lockoutTtl > 0) {
       throw new ForbiddenException(
@@ -66,11 +66,11 @@ export class OtpService {
     }
 
     // Check resend cooldown
-    const cooldownKey = `${OTP_COOLDOWN_PREFIX}${phone}`;
+    const cooldownKey = `${OTP_COOLDOWN_PREFIX}${email}`;
     const isOnCooldown = await this.redisService.exists(cooldownKey);
 
-    const otpKey = `${OTP_PREFIX}${phone}`;
-    const attemptsKey = `${OTP_ATTEMPTS_PREFIX}${phone}`;
+    const otpKey = `${OTP_PREFIX}${email}`;
+    const attemptsKey = `${OTP_ATTEMPTS_PREFIX}${email}`;
 
     // If on cooldown, check if there's an existing OTP still valid
     if (isOnCooldown) {
@@ -100,14 +100,9 @@ export class OtpService {
     pipeline.set(cooldownKey, '1', 'EX', this.cooldownSeconds);
 
     if (this.isSimulationMode()) {
-      pipeline.set(`dev_otp:${phone}`, otp, 'EX', this.otpExpiration);
+      pipeline.set(`dev_otp:${email}`, otp, 'EX', this.otpExpiration);
     }
     await pipeline.exec();
-
-    // Dev-only / Simulation logging
-    if (this.isSimulationMode()) {
-      this.logger.log(`[DEV/SIMULATION] OTP for ${phone}: ${otp}`);
-    }
 
     return {
       otp,
@@ -117,17 +112,17 @@ export class OtpService {
   }
 
   /**
-   * Get dev OTP if in non-production or simulation environment
+   * Get the dev OTP during local development or testing without a configured email provider
    */
-  async getDevOtp(phone: string): Promise<string | null> {
+  async getDevOtp(email: string): Promise<string | null> {
     if (!this.isSimulationMode()) {
       return null;
     }
-    return this.redisService.get(`dev_otp:${phone}`);
+    return this.redisService.get(`dev_otp:${email}`);
   }
 
   /**
-   * Verify an OTP for the given phone number.
+   * Verify an OTP for the given email number.
    *
    * Security measures:
    * 1. Compare hashed values only
@@ -138,15 +133,15 @@ export class OtpService {
    * @returns { valid: false, reason: string } on failure
    */
   async verify(
-    phone: string,
+    email: string,
     otp: string,
   ): Promise<{
     valid: boolean;
     reason?: 'EXPIRED' | 'INVALID' | 'MAX_ATTEMPTS';
     remainingAttempts?: number;
   }> {
-    const otpKey = `${OTP_PREFIX}${phone}`;
-    const attemptsKey = `${OTP_ATTEMPTS_PREFIX}${phone}`;
+    const otpKey = `${OTP_PREFIX}${email}`;
+    const attemptsKey = `${OTP_ATTEMPTS_PREFIX}${email}`;
 
     // Atomic increment and set expiry in a pipeline
     const client = this.redisService.getClient();
@@ -159,11 +154,11 @@ export class OtpService {
 
     if (attempts > this.maxAttempts) {
       // Set lockout (e.g. 30 minutes)
-      const lockoutKey = `${OTP_LOCKOUT_PREFIX}${phone}`;
+      const lockoutKey = `${OTP_LOCKOUT_PREFIX}${email}`;
       await this.redisService.set(lockoutKey, '1', 30 * 60);
 
       // Wipe the OTP to force re-request
-      await this.cleanup(phone);
+      await this.cleanup(email);
       return { valid: false, reason: 'MAX_ATTEMPTS', remainingAttempts: 0 };
     }
 
@@ -189,20 +184,31 @@ export class OtpService {
       };
     }
 
-    // Success — cleanup all OTP keys
-    await this.cleanup(phone);
-    return { valid: true };
+    // Consume the matching code atomically so concurrent verification cannot reuse it.
+    const consumed = await client.eval(
+      `if redis.call('GET', KEYS[1]) == ARGV[1] then
+         return redis.call('DEL', KEYS[1], KEYS[2], KEYS[3], KEYS[4])
+       end
+       return 0`,
+      4,
+      otpKey,
+      attemptsKey,
+      `${OTP_COOLDOWN_PREFIX}${email}`,
+      `dev_otp:${email}`,
+      inputHash,
+    );
+    return consumed ? { valid: true } : { valid: false, reason: 'EXPIRED' };
   }
 
   /**
-   * Remove all OTP-related keys for a phone number.
+   * Remove all OTP-related keys for a email number.
    */
-  async cleanup(phone: string): Promise<void> {
+  async cleanup(email: string): Promise<void> {
     await Promise.all([
-      this.redisService.del(`${OTP_PREFIX}${phone}`),
-      this.redisService.del(`${OTP_ATTEMPTS_PREFIX}${phone}`),
-      this.redisService.del(`${OTP_COOLDOWN_PREFIX}${phone}`),
-      this.redisService.del(`dev_otp:${phone}`),
+      this.redisService.del(`${OTP_PREFIX}${email}`),
+      this.redisService.del(`${OTP_ATTEMPTS_PREFIX}${email}`),
+      this.redisService.del(`${OTP_COOLDOWN_PREFIX}${email}`),
+      this.redisService.del(`dev_otp:${email}`),
     ]);
   }
 
@@ -210,8 +216,8 @@ export class OtpService {
    * Check remaining resend cooldown time.
    * Returns 0 if no cooldown.
    */
-  async getCooldownRemaining(phone: string): Promise<number> {
-    const ttl = await this.redisService.getClient().ttl(`${OTP_COOLDOWN_PREFIX}${phone}`);
+  async getCooldownRemaining(email: string): Promise<number> {
+    const ttl = await this.redisService.getClient().ttl(`${OTP_COOLDOWN_PREFIX}${email}`);
     return ttl > 0 ? ttl : 0;
   }
 }

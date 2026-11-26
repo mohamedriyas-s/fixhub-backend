@@ -8,23 +8,23 @@ class AuthRemoteDataSource {
   AuthRemoteDataSource(this._dio);
 
   /// POST /auth/send-otp
-  Future<Map<String, dynamic>> sendOtp(String phone) async {
+  Future<Map<String, dynamic>> sendOtp(String email) async {
     final response = await _dio.post(
       ApiEndpoints.sendOtp,
-      data: {'phone': phone},
+      data: {'email': email},
     );
     return response.data;
   }
 
   /// POST /auth/verify-otp
   Future<Map<String, dynamic>> verifyOtp({
-    required String phone,
+    required String email,
     required String otp,
     required String role,
   }) async {
     final response = await _dio.post(
       ApiEndpoints.verifyOtp,
-      data: {'phone': phone, 'otp': otp, 'role': role},
+      data: {'email': email, 'otp': otp, 'role': role},
     );
     return response.data;
   }
