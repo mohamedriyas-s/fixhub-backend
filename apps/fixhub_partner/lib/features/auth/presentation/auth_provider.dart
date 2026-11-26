@@ -101,6 +101,7 @@ class AuthNotifier extends Notifier<AuthState> {
 
       final user = AuthUser.fromJson(userData);
       state = AuthAuthenticated(user);
+      ref.invalidate(profileProvider);
       // Sync FCM token on successful login
       ref.read(fcmServiceProvider).initialize().catchError((e) {
         debugPrint('[AuthNotifier] FCM login sync error: $e');
