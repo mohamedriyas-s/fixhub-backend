@@ -52,7 +52,7 @@ class _ServiceAreaNotCoveredScreenState
   Future<void> _handleNotifyMe(String currentPincode) async {
     final authState = ref.read(authProvider);
     final user = authState.user;
-    final phone = (user?.phone ?? authState.phone ?? '').trim();
+    final phone = (user?.phone ?? '').trim();
 
     // If phone number is not available, open the sheet so the user can enter details
     if (phone.isEmpty) {
@@ -97,7 +97,7 @@ class _ServiceAreaNotCoveredScreenState
     final currentPincode = locationState.currentPincode ?? '';
     final isNotified = _notifiedPincodes.contains(currentPincode);
     final authState = ref.watch(authProvider);
-    final phone = authState.user?.phone ?? authState.phone;
+    final phone = authState.user?.phone;
 
     return PopScope(
       canPop: false,
@@ -330,7 +330,7 @@ class _NotifyMeSheetState extends ConsumerState<_NotifyMeSheet> {
     final authState = ref.read(authProvider);
     final user = authState.user;
     _nameController = TextEditingController(text: user?.name ?? '');
-    _phoneController = TextEditingController(text: user?.phone ?? authState.phone ?? '');
+    _phoneController = TextEditingController(text: user?.phone ?? '');
     _emailController = TextEditingController(text: user?.email ?? '');
   }
 

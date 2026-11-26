@@ -37,18 +37,20 @@ export class TechnicianRepository {
   async updateProfile(userId: string, data: {
     name?: string;
     email?: string;
+    phone?: string;
     profilePictureUrl?: string;
     latitude?: number;
     longitude?: number;
   }) {
     return this.prisma.$transaction(async (tx) => {
       // Update User-level fields
-      if (data.name !== undefined || data.email !== undefined) {
+      if (data.name !== undefined || data.email !== undefined || data.phone !== undefined) {
         await tx.user.update({
           where: { id: userId },
           data: {
             ...(data.name !== undefined && { name: data.name }),
             ...(data.email !== undefined && { email: data.email }),
+            ...(data.phone !== undefined && { phone: data.phone }),
           },
         });
       }

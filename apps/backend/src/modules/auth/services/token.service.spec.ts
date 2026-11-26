@@ -17,6 +17,7 @@ describe('TokenService', () => {
   const mockUser = {
     id: 'user-uuid-1',
     phone: '+919876543210',
+    loginEmail: null,
     name: null,
     email: null,
     password: null,

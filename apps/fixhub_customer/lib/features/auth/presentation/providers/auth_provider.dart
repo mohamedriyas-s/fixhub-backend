@@ -33,14 +33,14 @@ class AuthState {
   final AuthStatus status;
   final String? errorMessage;
   final UserModel? user;
-  final String? phone;
+  final String? email;
   final String? devOtp;
 
   const AuthState({
     this.status = AuthStatus.initial,
     this.errorMessage,
     this.user,
-    this.phone,
+    this.email,
     this.devOtp,
   });
 
@@ -48,7 +48,7 @@ class AuthState {
     AuthStatus? status,
     String? errorMessage,
     UserModel? user,
-    String? phone,
+    String? email,
     String? devOtp,
     bool clearDevOtp = false,
   }) {
@@ -56,7 +56,7 @@ class AuthState {
       status: status ?? this.status,
       errorMessage: errorMessage,
       user: user ?? this.user,
-      phone: phone ?? this.phone,
+      email: email ?? this.email,
       devOtp: clearDevOtp ? null : (devOtp ?? this.devOtp),
     );
   }
@@ -138,15 +138,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Send OTP to phone number.
-  Future<void> sendOtp(String phone) async {
+  /// Send OTP to email address.
+  Future<void> sendOtp(String email) async {
     state = state.copyWith(
       status: AuthStatus.loading,
-      phone: phone,
+      email: email,
       clearDevOtp: true,
     );
     try {
-      final devOtp = await _repository.sendOtp(phone);
+      final devOtp = await _repository.sendOtp(email);
       state = state.copyWith(status: AuthStatus.otpSent, devOtp: devOtp);
     } on Failure catch (e) {
       state = state.copyWith(
@@ -172,13 +172,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Verify OTP and authenticate.
   Future<void> verifyOtp({
-    required String phone,
+    required String email,
     required String otp,
   }) async {
     state = state.copyWith(status: AuthStatus.verifying);
     try {
       _resetUserSession();
-      final response = await _repository.verifyOtp(phone: phone, otp: otp);
+      final response = await _repository.verifyOtp(email: email, otp: otp);
 
       // If location is not yet valid, restore from existing saved addresses in DB or GPS
       final currentLocation = _ref.read(locationProvider);
@@ -235,9 +235,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Resend OTP (resets to otpSent state).
   Future<void> resendOtp() async {
-    final phone = state.phone;
-    if (phone == null) return;
-    await sendOtp(phone);
+    final email = state.email;
+    if (email == null) return;
+    await sendOtp(email);
   }
 
   /// Fetch profile from API.

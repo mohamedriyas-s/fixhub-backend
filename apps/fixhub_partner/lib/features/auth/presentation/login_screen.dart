@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/config/theme/app_colors.dart';
@@ -16,23 +15,18 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   String? _errorMessage;
 
   @override
   void dispose() {
-    _phoneController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 
-  String get _formattedPhone {
-    final raw = _phoneController.text.trim().replaceAll(RegExp(r'\s+'), '');
-    if (raw.startsWith('+91')) return raw;
-    if (raw.startsWith('91') && raw.length == 12) return '+$raw';
-    return '+91$raw';
-  }
+  String get _email => _emailController.text.trim();
 
   Future<void> _sendOtp() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
@@ -45,10 +39,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       final result = await ref
           .read(authProvider.notifier)
-          .sendOtp(_formattedPhone);
+          .sendOtp(_email);
       if (!mounted) return;
       final devOtp = result['devOtp'] as String?;
-      context.push('/otp', extra: {'phone': _formattedPhone, 'devOtp': devOtp});
+      context.push('/otp', extra: {'email': _email, 'devOtp': devOtp});
     } catch (e) {
       setState(() => _errorMessage = _humanizeError(e));
     } finally {
@@ -58,8 +52,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   String _humanizeError(Object e) {
     final msg = e.toString().toLowerCase();
-    if (msg.contains('phone'))
-      return 'Please enter a valid Indian phone number.';
+    if (msg.contains('valid email'))
+      return 'Please enter a valid email address.';
     if (msg.contains('network') || msg.contains('internet')) {
       return 'No internet connection. Please try again.';
     }
@@ -113,9 +107,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: AppSpacing.xxxl),
 
-                // Phone field label
+                // Email field label
                 Text(
-                  'Mobile Number',
+                  'Email Address',
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w600,
@@ -123,57 +117,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: AppSpacing.sm),
 
-                // Phone input
                 TextFormField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(10),
-                  ],
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 2,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: '98765 43210',
-                    hintStyle: const TextStyle(
-                      letterSpacing: 1,
-                      color: AppColors.textDisabled,
-                    ),
-                    prefixIcon: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      margin: const EdgeInsets.only(right: 8),
-                      decoration: const BoxDecoration(
-                        border: Border(
-                          right: BorderSide(color: AppColors.border),
-                        ),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('🇮🇳', style: TextStyle(fontSize: 18)),
-                          SizedBox(width: 6),
-                          Text(
-                            '+91',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  validator: (v) {
-                    final val = v?.trim() ?? '';
-                    if (val.isEmpty) return 'Please enter your phone number';
-                    if (val.length != 10)
-                      return 'Enter a valid 10-digit number';
-                    if (!RegExp(r'^[6-9]\d{9}$').hasMatch(val)) {
-                      return 'Enter a valid Indian mobile number';
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  autofillHints: const [AutofillHints.email],
+                  decoration: const InputDecoration(hintText: 'you@example.com'),
+                  validator: (value) {
+                    final email = value?.trim() ?? '';
+                    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+                      return 'Enter a valid email address';
                     }
                     return null;
                   },

@@ -12,10 +12,10 @@ import '../domain/auth_state.dart';
 import '../../profile/data/profile_repository.dart';
 
 class OtpScreen extends ConsumerStatefulWidget {
-  final String phone;
+  final String email;
   final String? devOtp;
 
-  const OtpScreen({super.key, required this.phone, this.devOtp});
+  const OtpScreen({super.key, required this.email, this.devOtp});
 
   @override
   ConsumerState<OtpScreen> createState() => _OtpScreenState();
@@ -77,7 +77,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     });
 
     try {
-      await ref.read(authProvider.notifier).verifyOtp(widget.phone, otp);
+      await ref.read(authProvider.notifier).verifyOtp(widget.email, otp);
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -95,7 +95,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       _errorMessage = null;
     });
     try {
-      final res = await ref.read(authProvider.notifier).sendOtp(widget.phone);
+      final res = await ref.read(authProvider.notifier).sendOtp(widget.email);
       _startCountdown();
       if (mounted) {
         final devOtp = res['devOtp'] as String?;
@@ -205,7 +205,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                   ),
                   children: [
                     TextSpan(
-                      text: widget.phone,
+                      text: widget.email,
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,

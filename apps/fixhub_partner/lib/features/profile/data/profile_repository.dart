@@ -97,12 +97,14 @@ class ProfileRepository {
     String? name,
     String? email,
     String? profilePictureUrl,
+    String? phone,
   }) async {
     final response = await _dio.put(
       ApiEndpoints.technicianProfile,
       data: {
         if (name != null) 'name': name,
         if (email != null) 'email': email,
+        if (phone != null) 'phone': phone,
         if (profilePictureUrl != null) 'profilePictureUrl': profilePictureUrl,
       },
     );

@@ -50,6 +50,10 @@ export class UsersService {
         userData.name = dto.name;
       }
 
+      if (dto.phone != null) {
+        userData.phone = dto.phone;
+      }
+
       if (dto.email !== undefined) {
         userData.email = dto.email;
       }

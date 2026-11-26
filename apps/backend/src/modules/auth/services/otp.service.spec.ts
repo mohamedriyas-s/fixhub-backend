@@ -8,6 +8,7 @@ import { OtpService } from './otp.service';
 describe('OtpService', () => {
   let otpService: OtpService;
   let redisService: jest.Mocked<RedisService>;
+  let config: Record<string, unknown>;
 
   const mockPipeline = {
     set: jest.fn().mockReturnThis(),
@@ -21,25 +22,26 @@ describe('OtpService', () => {
   };
 
   const mockRedisClient = {
+    eval: jest.fn().mockResolvedValue(1),
     ttl: jest.fn(),
     pipeline: jest.fn(() => mockPipeline),
   };
 
   beforeEach(async () => {
+    mockPipeline.set.mockClear();
+    mockRedisClient.ttl.mockResolvedValue(-2);
+    config = {
+      'otp.expirationSeconds': 300,
+      'otp.length': 6,
+      nodeEnv: 'test',
+    };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OtpService,
         {
           provide: ConfigService,
           useValue: {
-            get: jest.fn((key: string, defaultValue?: unknown) => {
-              const config: Record<string, unknown> = {
-                'otp.expirationSeconds': 300,
-                'otp.length': 6,
-                nodeEnv: 'test',
-              };
-              return config[key] ?? defaultValue;
-            }),
+            get: jest.fn((key: string, defaultValue?: unknown) => config[key] ?? defaultValue),
           },
         },
         {
@@ -65,6 +67,32 @@ describe('OtpService', () => {
     expect(otpService).toBeDefined();
   });
 
+  describe('dev OTP exposure', () => {
+    it.each(['configured-key', undefined])(
+      'keeps production OTPs private with Resend key %s',
+      async (apiKey) => {
+        config.nodeEnv = 'production';
+        config.RESEND_API_KEY = apiKey;
+        const phone = 'customer@example.com';
+
+        await otpService.generateAndStore(phone);
+        await expect(otpService.getDevOtp(phone)).resolves.toBeNull();
+
+        expect(mockPipeline.set.mock.calls.map(([key]) => key)).not.toContain(`dev_otp:${phone}`);
+        expect(redisService.get).not.toHaveBeenCalled();
+      },
+    );
+
+    it('preserves dev OTP access in test mode without an email provider', async () => {
+      const phone = 'customer@example.com';
+      const { otp } = await otpService.generateAndStore(phone);
+      expect(mockPipeline.set).toHaveBeenCalledWith(`dev_otp:${phone}`, otp, 'EX', 300);
+
+      redisService.get.mockResolvedValue(otp);
+      await expect(otpService.getDevOtp(phone)).resolves.toBe(otp);
+    });
+  });
+
   // ── generateAndStore ──────────────────────────────────
 
   describe('generateAndStore', () => {
@@ -73,19 +101,24 @@ describe('OtpService', () => {
       redisService.set.mockResolvedValue(undefined);
       redisService.del.mockResolvedValue(undefined);
 
-      const result = await otpService.generateAndStore('+919876543210');
+      const result = await otpService.generateAndStore('customer@example.com');
 
       expect(result.otp).toHaveLength(6);
       expect(result.otp).toMatch(/^\d{6}$/);
       expect(result.expiresInSeconds).toBe(300);
       expect(mockPipeline.set).toHaveBeenCalledWith(
-        'otp:+919876543210',
+        'otp:customer@example.com',
         expect.any(String),
         'EX',
         300,
       );
-      expect(mockPipeline.del).toHaveBeenCalledWith('otp_attempts:+919876543210');
-      expect(mockPipeline.set).toHaveBeenCalledWith('otp_cooldown:+919876543210', '1', 'EX', 60);
+      expect(mockPipeline.del).toHaveBeenCalledWith('otp_attempts:customer@example.com');
+      expect(mockPipeline.set).toHaveBeenCalledWith(
+        'otp_cooldown:customer@example.com',
+        '1',
+        'EX',
+        60,
+      );
     });
 
     it('should return empty OTP when on cooldown', async () => {
@@ -95,7 +128,7 @@ describe('OtpService', () => {
         return 45;
       });
 
-      const result = await otpService.generateAndStore('+919876543210');
+      const result = await otpService.generateAndStore('customer@example.com');
 
       expect(result.otp).toBe('');
       expect(result.expiresInSeconds).toBe(45);
@@ -113,13 +146,18 @@ describe('OtpService', () => {
       redisService.get.mockResolvedValue(hash);
       redisService.del.mockResolvedValue(undefined);
 
-      const result = await otpService.verify('+919876543210', '123456');
+      const result = await otpService.verify('customer@example.com', '123456');
 
       expect(result.valid).toBe(true);
-      // Should cleanup keys
-      expect(redisService.del).toHaveBeenCalledWith('otp:+919876543210');
-      expect(redisService.del).toHaveBeenCalledWith('otp_attempts:+919876543210');
-      expect(redisService.del).toHaveBeenCalledWith('otp_cooldown:+919876543210');
+      expect(mockRedisClient.eval).toHaveBeenCalledWith(
+        expect.any(String),
+        4,
+        'otp:customer@example.com',
+        'otp_attempts:customer@example.com',
+        'otp_cooldown:customer@example.com',
+        'dev_otp:customer@example.com',
+        hash,
+      );
     });
 
     it('should return INVALID for wrong OTP', async () => {
@@ -128,7 +166,7 @@ describe('OtpService', () => {
       const hash = crypto.createHash('sha256').update('123456').digest('hex');
       redisService.get.mockResolvedValue(hash);
 
-      const result = await otpService.verify('+919876543210', '999999');
+      const result = await otpService.verify('customer@example.com', '999999');
 
       expect(result.valid).toBe(false);
       expect(result.reason).toBe('INVALID');
@@ -140,7 +178,7 @@ describe('OtpService', () => {
       redisService.expire.mockResolvedValue(undefined);
       redisService.get.mockResolvedValue(null);
 
-      const result = await otpService.verify('+919876543210', '123456');
+      const result = await otpService.verify('customer@example.com', '123456');
 
       expect(result.valid).toBe(false);
       expect(result.reason).toBe('EXPIRED');
@@ -154,7 +192,7 @@ describe('OtpService', () => {
       redisService.set.mockResolvedValue(undefined);
       redisService.del.mockResolvedValue(undefined);
 
-      const result = await otpService.verify('+919876543210', '123456');
+      const result = await otpService.verify('customer@example.com', '123456');
 
       expect(result.valid).toBe(false);
       expect(result.reason).toBe('MAX_ATTEMPTS');
@@ -171,7 +209,7 @@ describe('OtpService', () => {
       ]);
       redisService.get.mockResolvedValue(hash);
 
-      const r1 = await otpService.verify('+919876543210', '111111');
+      const r1 = await otpService.verify('customer@example.com', '111111');
       expect(r1.valid).toBe(false);
       expect(r1.remainingAttempts).toBe(4);
 
@@ -182,7 +220,7 @@ describe('OtpService', () => {
       ]);
       redisService.del.mockResolvedValue(undefined);
 
-      const r2 = await otpService.verify('+919876543210', '123456');
+      const r2 = await otpService.verify('customer@example.com', '123456');
       expect(r2.valid).toBe(true);
     });
   });
@@ -193,13 +231,13 @@ describe('OtpService', () => {
     it('should delete all OTP-related keys', async () => {
       redisService.del.mockResolvedValue(undefined);
 
-      await otpService.cleanup('+919876543210');
+      await otpService.cleanup('customer@example.com');
 
       expect(redisService.del).toHaveBeenCalledTimes(4);
-      expect(redisService.del).toHaveBeenCalledWith('otp:+919876543210');
-      expect(redisService.del).toHaveBeenCalledWith('otp_attempts:+919876543210');
-      expect(redisService.del).toHaveBeenCalledWith('otp_cooldown:+919876543210');
-      expect(redisService.del).toHaveBeenCalledWith('dev_otp:+919876543210');
+      expect(redisService.del).toHaveBeenCalledWith('otp:customer@example.com');
+      expect(redisService.del).toHaveBeenCalledWith('otp_attempts:customer@example.com');
+      expect(redisService.del).toHaveBeenCalledWith('otp_cooldown:customer@example.com');
+      expect(redisService.del).toHaveBeenCalledWith('dev_otp:customer@example.com');
     });
   });
 });

@@ -158,7 +158,10 @@ export class NotificationService {
             data: payload,
           })
         : channel === NotificationChannel.SMS
-          ? await this.smsChannel.send({ phone: profile.phone, body: notification.body })
+          ? await this.smsChannel.send({
+              phone: profile.phone ?? undefined,
+              body: notification.body,
+            })
           : await this.emailChannel.send({
               email: profile.email,
               subject: notification.title,

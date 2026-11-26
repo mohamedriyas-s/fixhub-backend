@@ -50,6 +50,7 @@ export class TechnicianService {
     const result = await this.technicianRepository.updateProfile(userId, {
       name: dto.name,
       email: dto.email,
+      phone: dto.phone ?? undefined,
       profilePictureUrl: dto.profilePictureUrl,
       latitude: dto.latitude,
       longitude: dto.longitude,

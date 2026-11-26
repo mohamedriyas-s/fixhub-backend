@@ -83,11 +83,12 @@ class ProfileNotifier extends AsyncNotifier<TechnicianProfile?> {
     }
   }
 
-  Future<TechnicianProfile> updateProfile({String? name, String? email, String? profilePictureUrl}) async {
+  Future<TechnicianProfile> updateProfile({String? name, String? email, String? profilePictureUrl, String? phone}) async {
     try {
       final updated = await _repository.updateProfile(
         name: name,
         email: email,
+        phone: phone,
         profilePictureUrl: profilePictureUrl,
       );
       state = AsyncValue.data(updated);

@@ -1,8 +1,10 @@
+import { Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
   IsEmail,
+  IsPhoneNumber,
   IsLatitude,
   IsLongitude,
   IsOptional,
@@ -10,6 +12,8 @@ import {
   MaxLength,
   ValidateNested,
 } from 'class-validator';
+
+import { normalizePhone } from '../../../common/utils/helpers.util';
 
 export class UpdateTechnicianProfileDto {
   @ApiPropertyOptional({ example: true })
@@ -42,6 +46,12 @@ export class UpdateUserProfileDto {
   @IsEmail()
   @MaxLength(255)
   email?: string;
+
+  @ApiPropertyOptional({ example: '+919876543210', description: 'Booking contact number' })
+  @IsOptional()
+  @IsPhoneNumber('IN')
+  @Transform(({ value }) => (typeof value === 'string' ? normalizePhone(value) : value))
+  phone?: string;
 
   @ApiPropertyOptional({ type: UpdateTechnicianProfileDto })
   @IsOptional()

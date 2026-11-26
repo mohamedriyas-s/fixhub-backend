@@ -282,5 +282,15 @@ export function validateConfig(config: Record<string, unknown>): AppConfig {
     throw new Error(`Invalid environment configuration: ${messages}`);
   }
 
+  if (
+    validatedConfig.NODE_ENV === 'production' &&
+    (!cleanEnvString(config.RESEND_API_KEY as string) ||
+      !cleanEnvString(config.OTP_EMAIL_FROM as string))
+  ) {
+    throw new Error(
+      'Invalid environment configuration: production requires RESEND_API_KEY and OTP_EMAIL_FROM',
+    );
+  }
+
   return validatedConfig;
 }

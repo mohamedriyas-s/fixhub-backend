@@ -22,6 +22,7 @@ class ProfileScreen extends ConsumerStatefulWidget {
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   bool _isEditing = false;
   bool _isSaving = false;
 
@@ -29,6 +30,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -60,6 +62,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 if (p != null) {
                   _nameController.text = p.name ?? '';
                   _emailController.text = p.email ?? '';
+                  _phoneController.text = p.phone ?? '';
                 }
                 setState(() => _isEditing = true);
               },
@@ -201,6 +204,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   _EditForm(
                     nameController: _nameController,
                     emailController: _emailController,
+                    phoneController: _phoneController,
                     isSaving: _isSaving,
                     onSave: () async {
                       setState(() => _isSaving = true);
@@ -209,6 +213,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           name: _nameController.text.trim().isNotEmpty
                               ? _nameController.text.trim()
                               : null,
+                          phone: _phoneController.text.trim().isEmpty
+                              ? null : _phoneController.text.trim(),
                           email: _emailController.text.trim().isNotEmpty
                               ? _emailController.text.trim()
                               : null,
@@ -497,12 +503,14 @@ class _InfoRow extends StatelessWidget {
 class _EditForm extends StatelessWidget {
   final TextEditingController nameController;
   final TextEditingController emailController;
+  final TextEditingController phoneController;
   final bool isSaving;
   final VoidCallback onSave;
 
   const _EditForm({
     required this.nameController,
     required this.emailController,
+    required this.phoneController,
     required this.isSaving,
     required this.onSave,
   });
@@ -526,6 +534,12 @@ class _EditForm extends StatelessWidget {
             labelText: 'Email Address',
             prefixIcon: Icon(Icons.email_outlined),
           ),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        TextFormField(
+          controller: phoneController,
+          keyboardType: TextInputType.phone,
+          decoration: const InputDecoration(labelText: 'Booking Contact Number'),
         ),
         const SizedBox(height: AppSpacing.xl),
         FpButton(label: 'Save Changes', isLoading: isSaving, onPressed: onSave),
