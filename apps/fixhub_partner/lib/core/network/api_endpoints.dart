@@ -1,4 +1,4 @@
-/// FixHub Partner API Endpoint Constants
+/// HelpTab Partner API Endpoint Constants
 ///
 /// All paths are relative to the base URL: http://10.0.2.2:3000/api/v1
 class ApiEndpoints {

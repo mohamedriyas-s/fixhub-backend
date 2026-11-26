@@ -218,8 +218,8 @@ class _ServiceAreaNotCoveredScreenState
                       Text(
                         isNotified
                             ? (phone != null && phone.isNotEmpty
-                                ? "You're on the waitlist! We will notify you at $phone as soon as FixHub launches in your area."
-                                : "You're on the waitlist! We will notify you as soon as FixHub launches in your area.")
+                                ? "You're on the waitlist! We will notify you at $phone as soon as HelpTab launches in your area."
+                                : "You're on the waitlist! We will notify you as soon as HelpTab launches in your area.")
                             : "Sorry, we don't provide services in your area right now.",
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(

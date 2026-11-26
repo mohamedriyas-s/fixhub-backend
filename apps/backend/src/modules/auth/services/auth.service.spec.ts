@@ -127,7 +127,7 @@ describe('AuthService', () => {
         expect(fetchMock).toHaveBeenCalledWith(
           'https://api.resend.com/emails',
           expect.objectContaining({
-            body: expect.stringContaining('Your HelpTap sign-in code'),
+            body: expect.stringContaining('Your HelpTab sign-in code'),
           }),
         );
       } finally {

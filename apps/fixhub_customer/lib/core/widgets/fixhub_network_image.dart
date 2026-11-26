@@ -9,7 +9,7 @@ import '../config/theme/app_colors.dart';
 /// Caches based on the original URL to prevent redundant API calls.
 final presignedUrlProvider = FutureProvider.family<String, String>((ref, originalUrl) async {
   if (!originalUrl.contains('fixhub-uploads.s3')) {
-    // If it's not a FixHub S3 URL, just return it as is.
+    // If it's not a HelpTab S3 URL, just return it as is.
     return originalUrl;
   }
   

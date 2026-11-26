@@ -1,4 +1,4 @@
-# FixHub
+# HelpTab
 
 > Hyperlocal Electrical & Home Appliance Repair Platform
 

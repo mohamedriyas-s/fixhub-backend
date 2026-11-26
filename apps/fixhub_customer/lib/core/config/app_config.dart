@@ -4,7 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class AppConfig {
   AppConfig._();
 
-  static const String appName = 'FixHub';
+  static const String appName = 'HelpTab';
   static const String appVersion = '1.0.0';
 
   /// API base URL — falls back to Render backend.

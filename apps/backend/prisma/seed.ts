@@ -17,7 +17,7 @@ const prisma = new PrismaClient();
 // ============================================================
 
 async function main() {
-  console.log('🌱 Starting FixHub database seed...\n');
+  console.log('🌱 Starting HelpTab database seed...\n');
 
   // ── Layer 1: Permissions ──────────────────────────────────
 
@@ -139,7 +139,7 @@ async function main() {
     adminUser = await prisma.user.create({
       data: {
         phone: '+919999999999',
-        name: 'FixHub Admin',
+        name: 'HelpTab Admin',
         email: 'admin@fixhub.in',
         password: adminPassword,
         role: Role.ADMIN,

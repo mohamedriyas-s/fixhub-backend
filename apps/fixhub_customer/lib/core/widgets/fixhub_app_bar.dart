@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../config/theme/app_colors.dart';
 import '../config/theme/app_spacing.dart';
 
-/// Clean app bar matching the FixHub design system.
+/// Clean app bar matching the HelpTab design system.
 /// Flat, no elevation, warm background.
 class FixHubAppBar extends StatelessWidget implements PreferredSizeWidget {
   const FixHubAppBar({

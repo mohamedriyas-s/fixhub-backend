@@ -234,7 +234,7 @@ class ProfileScreen extends ConsumerWidget {
           _MenuItem(
             icon: Icons.info_outline_rounded,
             iconColor: AppColors.textSecondary,
-            title: 'About FixHub',
+            title: 'About HelpTab',
             onTap: () {},
           ),
 
@@ -272,7 +272,7 @@ class ProfileScreen extends ConsumerWidget {
           // Version
           Center(
             child: Text(
-              'FixHub v1.0.0',
+              'HelpTab v1.0.0',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppColors.textDisabled,
                   ),

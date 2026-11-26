@@ -4,7 +4,7 @@ import '../config/theme/app_colors.dart';
 import '../config/theme/app_radius.dart';
 import '../config/theme/app_spacing.dart';
 
-/// FixHub Premium Swipe Slider Component
+/// HelpTab Premium Swipe Slider Component
 ///
 /// Designed per Soft Neutral Material 3 guidelines.
 /// Replaces accidental tap buttons with an intentional, tactile swipe action.

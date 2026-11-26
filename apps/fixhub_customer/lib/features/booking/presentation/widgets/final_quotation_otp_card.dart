@@ -82,7 +82,7 @@ class _FinalQuotationOtpCardState extends ConsumerState<FinalQuotationOtpCard> {
         'amount': amount,
         'currency': 'INR',
         'order_id': orderId,
-        'name': 'FixHub',
+        'name': 'HelpTab',
         'description': 'Additional Work Charge - Booking #${widget.booking.bookingNumber}',
         'timeout': 300,
         'prefill': {

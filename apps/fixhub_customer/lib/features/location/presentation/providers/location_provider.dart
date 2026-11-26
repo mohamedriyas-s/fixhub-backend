@@ -272,7 +272,7 @@ class LocationNotifier extends StateNotifier<LocationState> {
     final lat = addressData?['latitude'] != null ? double.tryParse(addressData!['latitude']!) : null;
     final lng = addressData?['longitude'] != null ? double.tryParse(addressData!['longitude']!) : null;
 
-    // 2. Validate against FixHub service areas
+    // 2. Validate against HelpTab service areas
     await validateArea(pincode, lat: lat, lng: lng, city: city);
   }
 

@@ -3,7 +3,7 @@ import '../config/theme/app_colors.dart';
 import '../config/theme/app_radius.dart';
 import '../config/theme/app_spacing.dart';
 
-/// Primary, Secondary, and Ghost buttons following the FixHub design system.
+/// Primary, Secondary, and Ghost buttons following the HelpTab design system.
 ///
 /// Usage:
 /// ```dart

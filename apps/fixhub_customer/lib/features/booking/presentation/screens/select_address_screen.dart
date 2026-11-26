@@ -40,7 +40,7 @@ class _SelectAddressScreenState extends ConsumerState<SelectAddressScreen> {
     setState(() => _isChecking = true);
     final pincode = _selectedAddress!.pincode.trim();
 
-    // 1. Validate if this address pincode is within an active FixHub service area
+    // 1. Validate if this address pincode is within an active HelpTab service area
     final serviceAreaCheck = await ref
         .read(locationRepositoryProvider)
         .validateServiceArea(pincode, lat: _selectedAddress!.latitude, lng: _selectedAddress!.longitude);
@@ -111,7 +111,7 @@ class _SelectAddressScreenState extends ConsumerState<SelectAddressScreen> {
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'FixHub does not currently serve pincode $pincode. Please select an address within our serviceable areas or add a new address.',
+              'HelpTab does not currently serve pincode $pincode. Please select an address within our serviceable areas or add a new address.',
               style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
               textAlign: TextAlign.center,
             ),

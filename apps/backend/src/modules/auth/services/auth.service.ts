@@ -54,8 +54,8 @@ export class AuthService {
           body: JSON.stringify({
             from,
             to: [dto.email],
-            subject: 'Your HelpTap sign-in code',
-            text: `Your HelpTap sign-in code is ${otp}. It expires in ${Math.ceil(expiresInSeconds / 60)} minutes.`,
+            subject: 'Your HelpTab sign-in code',
+            text: `Your HelpTab sign-in code is ${otp}. It expires in ${Math.ceil(expiresInSeconds / 60)} minutes.`,
           }),
           signal: AbortSignal.timeout(5000),
         });

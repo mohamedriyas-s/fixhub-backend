@@ -68,7 +68,7 @@ async function bootstrap() {
 
   // Swagger
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('FixHub API')
+    .setTitle('HelpTab API')
     .setDescription('Hyperlocal Electrical & Home Appliance Repair Platform API')
     .setVersion('1.0')
     .addBearerAuth()
@@ -108,7 +108,7 @@ async function bootstrap() {
   await app.listen(port);
 
   const logger = new Logger('Bootstrap');
-  logger.log(`🚀 FixHub API running on http://localhost:${port}/${apiPrefix}/${apiVersion}`);
+  logger.log(`🚀 HelpTab API running on http://localhost:${port}/${apiPrefix}/${apiVersion}`);
   logger.log(`📚 Swagger docs at http://localhost:${port}/${apiPrefix}/docs`);
 }
 

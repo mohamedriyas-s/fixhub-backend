@@ -101,7 +101,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
               ),
               const SizedBox(height: AppSpacing.xl),
               Text(
-                'FixHub Partner',
+                'HelpTab Partner',
                 style: Theme.of(context).textTheme.displayMedium?.copyWith(
                   color: AppColors.textPrimary,
                   fontWeight: FontWeight.w700,

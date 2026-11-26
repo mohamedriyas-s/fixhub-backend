@@ -11,7 +11,7 @@ class FixHubApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: 'FixHub',
+      title: 'HelpTab',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       // Forcing light mode for MVP per implementation plan

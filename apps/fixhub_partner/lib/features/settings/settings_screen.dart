@@ -84,7 +84,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       color: AppColors.primary,
                     ),
                     title: const Text(
-                      'About FixHub Partner',
+                      'About HelpTab Partner',
                       style: TextStyle(fontWeight: FontWeight.w500),
                     ),
                     trailing: const Icon(

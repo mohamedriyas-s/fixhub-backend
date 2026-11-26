@@ -36,8 +36,8 @@ const AUDIENCE_OPTIONS = [
 
 const TEMPLATES = [
   { label: 'Promo — 20% Off', title: '🎉 Special Offer!', body: 'Get 20% off on your next service booking. Use code FIXHUB20.' },
-  { label: 'System Maintenance', title: '🔧 Scheduled Maintenance', body: 'FixHub will be unavailable on Sunday 2–4 AM for system maintenance.' },
-  { label: 'New Area Launch', title: '📍 We\'re Now in Your Area!', body: 'FixHub services are now available in your locality. Book now!' },
+  { label: 'System Maintenance', title: '🔧 Scheduled Maintenance', body: 'HelpTab will be unavailable on Sunday 2–4 AM for system maintenance.' },
+  { label: 'New Area Launch', title: '📍 We\'re Now in Your Area!', body: 'HelpTab services are now available in your locality. Book now!' },
 ];
 
 export default function NotificationsPage() {

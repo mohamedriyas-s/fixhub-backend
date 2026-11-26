@@ -83,7 +83,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         'amount': amount,
         'currency': 'INR',
         'order_id': orderId,
-        'name': 'FixHub',
+        'name': 'HelpTab',
         'description': flowState.selectedService?.name ?? 'Service Booking',
         'timeout': 300,  // 5 minutes
         'prefill': {

@@ -1,4 +1,4 @@
-/// FixHub Asset Path Constants
+/// HelpTab Asset Path Constants
 ///
 /// Centralized reference for all image and animation assets.
 /// Use these constants instead of hardcoding paths.

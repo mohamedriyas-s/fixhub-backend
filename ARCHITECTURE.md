@@ -1,8 +1,8 @@
-# FixHub Architecture Document
+# HelpTab Architecture Document
 
 ## Overview
 
-FixHub is a hyperlocal home services platform built as a monorepo with four independently deployable applications sharing common contracts.
+HelpTab is a hyperlocal home services platform built as a monorepo with four independently deployable applications sharing common contracts.
 
 ## System Architecture
 

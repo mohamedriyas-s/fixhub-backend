@@ -65,7 +65,7 @@ class FcmService {
         final notification = message.notification;
         final bookingId = message.data['bookingId']?.toString();
         _showForegroundBanner(
-          title: notification?.title ?? message.data['title']?.toString() ?? 'FixHub',
+          title: notification?.title ?? message.data['title']?.toString() ?? 'HelpTab',
           body: notification?.body ?? message.data['body']?.toString() ?? '',
           bookingId: bookingId,
         );

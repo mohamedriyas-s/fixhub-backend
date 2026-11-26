@@ -1,6 +1,6 @@
 # fixhub_customer
 
-FixHub Customer App
+HelpTab Customer App
 
 ## Getting Started
 

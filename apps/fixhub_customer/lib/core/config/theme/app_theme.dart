@@ -6,7 +6,7 @@ import 'app_radius.dart';
 import 'app_spacing.dart';
 import 'app_typography.dart';
 
-/// FixHub Design System — Material 3 Theme
+/// HelpTab Design System — Material 3 Theme
 ///
 /// Soft neutral design. Minimal, elegant, professional.
 /// Premium spacing. Rounded components. Subtle borders.

@@ -1,4 +1,4 @@
-/// 8-point spacing grid for FixHub Partner.
+/// 8-point spacing grid for HelpTab Partner.
 /// All spacing values must come from this class — no arbitrary values.
 class AppSpacing {
   AppSpacing._();

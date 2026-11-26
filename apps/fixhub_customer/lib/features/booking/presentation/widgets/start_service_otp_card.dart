@@ -7,7 +7,7 @@ import '../../../../core/widgets/fixhub_card.dart';
 import '../../../../core/widgets/fixhub_snackbar.dart';
 
 /// Prominent, clean OTP card displayed to the customer to start the service.
-/// Adheres strictly to the FixHub Soft Neutral Design System.
+/// Adheres strictly to the HelpTab Soft Neutral Design System.
 class StartServiceOtpCard extends StatelessWidget {
   const StartServiceOtpCard({
     super.key,

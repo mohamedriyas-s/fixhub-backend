@@ -91,7 +91,7 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
           if (mounted) {
             FixHubSnackbar.error(
               context,
-              'FixHub does not serve pincode $pincode yet. Please enter an address within our active service areas.',
+              'HelpTab does not serve pincode $pincode yet. Please enter an address within our active service areas.',
             );
           }
           return;

@@ -70,7 +70,7 @@ export class SmsNotificationProcessor extends WorkerHost {
       if (job.name === 'send-otp' || job.data?.phone) {
         await this.smsChannel.send({
           phone: job.data.phone,
-          body: job.data.message || `Your FixHub OTP is: ${job.data.otp}`,
+          body: job.data.message || `Your HelpTab OTP is: ${job.data.otp}`,
         });
         return;
       }

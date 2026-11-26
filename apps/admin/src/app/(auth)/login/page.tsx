@@ -61,7 +61,7 @@ export default function LoginPage() {
               <Zap className="h-6 w-6 text-white" />
             </div>
             <div className="text-center">
-              <h1 className="text-xl font-bold text-[#111827]">FixHub Admin</h1>
+              <h1 className="text-xl font-bold text-[#111827]">HelpTab Admin</h1>
               <p className="mt-0.5 text-sm text-[#9CA3AF]">Operations Console</p>
             </div>
           </div>
@@ -92,7 +92,7 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-6 text-center text-xs text-[#9CA3AF]">
-          FixHub Admin Panel · Restricted access
+          HelpTab Admin Panel · Restricted access
         </p>
       </div>
     </div>

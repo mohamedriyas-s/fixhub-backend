@@ -32,7 +32,7 @@ function Breadcrumb() {
   }
 
   const crumbs: { label: string; href: string }[] = [
-    { label: 'FixHub', href: '/' },
+    { label: 'HelpTab', href: '/' },
   ];
 
   let acc = '';

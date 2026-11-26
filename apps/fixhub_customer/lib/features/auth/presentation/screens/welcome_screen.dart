@@ -134,7 +134,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                               ),
                               const SizedBox(width: AppSpacing.xs),
                               Text(
-                                'FixHub',
+                                'HelpTab',
                                 style: Theme.of(context)
                                     .textTheme
                                     .titleMedium

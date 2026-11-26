@@ -40,7 +40,7 @@ export class CustomerService {
     const serviceArea = await this.customerRepository.findActiveServiceAreaByPincode(pincode);
     if (!serviceArea) {
       throw new BadRequestException({
-        message: `FixHub services are not currently available in pincode ${pincode.trim()}. Please enter an address in our active service area.`,
+        message: `HelpTab services are not currently available in pincode ${pincode.trim()}. Please enter an address in our active service area.`,
         errorCode: ErrorCodes.SERVICE_AREA_NOT_FOUND,
       });
     }
@@ -61,7 +61,7 @@ export class CustomerService {
       const serviceArea = await this.customerRepository.findActiveServiceAreaByPincode(pincode);
       if (!serviceArea) {
         throw new BadRequestException({
-          message: `FixHub services are not currently available in pincode ${pincode.trim()}. Please enter an address in our active service area.`,
+          message: `HelpTab services are not currently available in pincode ${pincode.trim()}. Please enter an address in our active service area.`,
           errorCode: ErrorCodes.SERVICE_AREA_NOT_FOUND,
         });
       }

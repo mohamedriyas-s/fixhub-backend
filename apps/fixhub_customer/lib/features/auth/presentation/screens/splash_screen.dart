@@ -8,7 +8,7 @@ import '../../../../core/router/route_names.dart';
 import '../providers/auth_provider.dart';
 
 /// Splash screen — checks auth state and navigates accordingly.
-/// Shows the FixHub logo with a premium fade + scale animation.
+/// Shows the HelpTab logo with a premium fade + scale animation.
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
@@ -137,7 +137,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                         ),
                         const SizedBox(height: AppSpacing.lg),
                         Text(
-                          'FixHub',
+                          'HelpTab',
                           style: Theme.of(context)
                               .textTheme
                               .displayLarge

@@ -1,4 +1,4 @@
-/// FixHub API Endpoint Constants
+/// HelpTab API Endpoint Constants
 ///
 /// All paths are relative to the base URL configured in AppConfig.
 /// Base URL: http://localhost:3000/api/v1

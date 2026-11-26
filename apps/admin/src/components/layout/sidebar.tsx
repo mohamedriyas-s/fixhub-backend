@@ -119,7 +119,7 @@ export function Sidebar() {
           </div>
           {!collapsed && (
             <div>
-              <span className="text-sm font-bold text-[#111827] tracking-tight">FixHub</span>
+              <span className="text-sm font-bold text-[#111827] tracking-tight">HelpTab</span>
               <span className="ml-1 text-[10px] font-medium text-[#9CA3AF] uppercase tracking-wider">
                 Admin
               </span>

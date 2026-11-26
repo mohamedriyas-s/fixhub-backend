@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Border radius tokens for FixHub Partner.
+/// Border radius tokens for HelpTab Partner.
 class AppRadius {
   AppRadius._();
 

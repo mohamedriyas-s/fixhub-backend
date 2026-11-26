@@ -75,7 +75,7 @@ export default function SettingsPage() {
           <CardHeader><CardTitle>Business Information</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <Input label="Business Name" value={settings.business_name || 'FixHub'} onChange={(e) => handleChange('business_name', e.target.value)} />
+              <Input label="Business Name" value={settings.business_name || 'HelpTab'} onChange={(e) => handleChange('business_name', e.target.value)} />
               <Input label="Support Phone" value={settings.support_phone || ''} onChange={(e) => handleChange('support_phone', e.target.value)} />
               <Input label="Support Email" type="email" value={settings.support_email || ''} onChange={(e) => handleChange('support_email', e.target.value)} />
               <Input label="GST Number" value={settings.gst_number || ''} onChange={(e) => handleChange('gst_number', e.target.value)} />

@@ -1,4 +1,4 @@
-/// FixHub Design System — Shared UI Components
+/// HelpTab Design System — Shared UI Components
 ///
 /// Import this file to access all shared components.
 library;

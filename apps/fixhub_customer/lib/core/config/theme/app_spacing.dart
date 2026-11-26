@@ -1,4 +1,4 @@
-/// FixHub Design System — Spacing Tokens
+/// HelpTab Design System — Spacing Tokens
 ///
 /// 8-point grid system with predefined spacing values.
 /// Never use arbitrary spacing — always use these tokens.

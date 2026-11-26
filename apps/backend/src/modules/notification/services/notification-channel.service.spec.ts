@@ -5,7 +5,7 @@ import { SmsNotificationChannel } from './notification-channel.service';
 
 describe('Fast2SMS delivery', () => {
   const phone = '8190899870';
-  const body = 'Your FixHub verification code is: 123456.';
+  const body = 'Your HelpTab verification code is: 123456.';
   const channel = new SmsNotificationChannel(
     new ConfigService({ nodeEnv: 'production', sms: { provider: 'FAST2SMS', apiKey: 'mock-key' } }),
   );

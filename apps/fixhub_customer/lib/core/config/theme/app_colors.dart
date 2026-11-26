@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// FixHub Design System — Color Tokens
+/// HelpTab Design System — Color Tokens
 ///
 /// Warm neutral palette. Minimal, elegant, professional.
 /// Matches the finalized design system specification.

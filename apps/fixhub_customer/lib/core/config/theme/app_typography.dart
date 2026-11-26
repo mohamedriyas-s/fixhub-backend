@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// FixHub Design System — Typography Tokens
+/// HelpTab Design System — Typography Tokens
 ///
 /// Uses Inter font via google_fonts for a modern, clean look.
 /// Hierarchy follows the design system specification.

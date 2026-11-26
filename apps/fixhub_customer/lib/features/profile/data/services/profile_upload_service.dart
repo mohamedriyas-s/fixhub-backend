@@ -8,7 +8,7 @@ final profileUploadServiceProvider = Provider<ProfileUploadService>((ref) {
   return ProfileUploadService(ref.read(dioProvider));
 });
 
-/// Handles the full profile media flow for FixHub:
+/// Handles the full profile media flow for HelpTab:
 ///
 /// Profile avatar upload (two-step presigned S3 flow):
 ///   1. POST /users/profile-image { fileName, contentType } → { uploadUrl, key }
@@ -94,7 +94,7 @@ class ProfileUploadService {
         _ => 'image/jpeg',
       };
 
-  // The S3 bucket for FixHub is "fixhub-uploads" (from StorageService config)
+  // The S3 bucket for HelpTab is "fixhub-uploads" (from StorageService config)
   String _buildPublicUrl(String s3Key) =>
       'https://fixhub-uploads.s3.ap-south-1.amazonaws.com/$s3Key';
 

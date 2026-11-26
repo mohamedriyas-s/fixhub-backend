@@ -222,7 +222,7 @@ export class NotificationService {
   private async render(dto: SendNotificationDto) {
     if (!dto.templateKey) {
       return {
-        title: dto.title ?? 'FixHub',
+        title: dto.title ?? 'HelpTab',
         body: dto.body ?? '',
       };
     }

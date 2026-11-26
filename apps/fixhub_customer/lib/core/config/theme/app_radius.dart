@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// FixHub Design System — Border Radius Tokens
+/// HelpTab Design System — Border Radius Tokens
 class AppRadius {
   AppRadius._();
 

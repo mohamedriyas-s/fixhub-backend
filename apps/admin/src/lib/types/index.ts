@@ -1,5 +1,5 @@
 // ============================================================
-// FixHub Admin — Complete Type Definitions
+// HelpTab Admin — Complete Type Definitions
 // Aligned with backend Prisma schema & API responses
 // ============================================================
 

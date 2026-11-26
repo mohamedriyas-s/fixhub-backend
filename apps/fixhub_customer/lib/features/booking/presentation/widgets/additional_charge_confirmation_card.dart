@@ -10,9 +10,9 @@ import '../../../../core/widgets/fixhub_snackbar.dart';
 import '../../data/models/booking_model.dart';
 import '../providers/booking_provider.dart';
 
-/// FixHub Additional Charge Confirmation Card
+/// HelpTab Additional Charge Confirmation Card
 ///
-/// Follows FixHub Design System (Soft Neutral Design).
+/// Follows HelpTab Design System (Soft Neutral Design).
 /// Displays:
 ///   - Original base price (already paid)
 ///   - Additional charge requested by technician
