@@ -373,17 +373,6 @@ export class BookingRepository {
     });
   }
 
-  async markExtraChargePaid(bookingId: string, actorUserId: string) {
-    return this.prisma.booking.update({
-      where: { id: bookingId },
-      data: {
-        extraChargePaidAt: new Date(),
-        updatedBy: actorUserId,
-      },
-      include: this.bookingInclude(),
-    });
-  }
-
   async updateLifecycleStatus(
     tx: PrismaTx,
     id: string,

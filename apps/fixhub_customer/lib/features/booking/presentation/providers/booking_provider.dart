@@ -124,17 +124,4 @@ class BookingActionNotifier extends StateNotifier<AsyncValue<void>> {
       rethrow;
     }
   }
-
-  Future<void> payExtraCharge(String bookingId) async {
-    try {
-      state = const AsyncValue.loading();
-      await _dataSource.payExtraCharge(bookingId);
-      state = const AsyncValue.data(null);
-      _ref.invalidate(bookingDetailProvider(bookingId));
-      _ref.invalidate(bookingsProvider);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      rethrow;
-    }
-  }
 }

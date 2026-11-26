@@ -54,6 +54,7 @@ describe('PaymentService', () => {
           provide: PaymentRepository,
           useValue: {
             findBookingForPayment: jest.fn(),
+            recordExtraChargePayment: jest.fn(),
             findPaymentByOrderId: jest.fn(),
             findPaymentById: jest.fn(),
             findPaymentByRazorpayPaymentId: jest.fn(),
@@ -76,6 +77,7 @@ describe('PaymentService', () => {
             verifyWebhookSignature: jest.fn(),
             getKeyId: jest.fn(),
             fetchPayment: jest.fn(),
+            fetchOrder: jest.fn(),
             capturePayment: jest.fn(),
             refundPayment: jest.fn(),
             fetchInvoicesByPayment: jest.fn(),
@@ -112,6 +114,94 @@ describe('PaymentService', () => {
     repository = module.get(PaymentRepository);
     gateway = module.get(RazorpayGatewayService);
     redisService = module.get(RedisService);
+  });
+
+  describe('verifyExtraChargePayment', () => {
+    const dto = {
+      bookingId: booking.id,
+      razorpayOrderId: 'order_extra',
+      razorpayPaymentId: 'pay_extra',
+      razorpaySignature: 'signed',
+    };
+    const captured = {
+      id: dto.razorpayPaymentId,
+      order_id: dto.razorpayOrderId,
+      amount: 10000,
+      currency: 'INR',
+      status: 'captured',
+      amount_refunded: 0,
+    };
+    const order = {
+      id: dto.razorpayOrderId,
+      notes: { bookingId: booking.id, type: 'final_extra_charge' },
+      amount: 10000,
+      currency: 'INR',
+    };
+
+    beforeEach(() => {
+      repository.findBookingForPayment.mockResolvedValue({
+        ...booking,
+        status: BookingStatus.PENDING_COLLECTION,
+        finalAdditionalAmount: 100,
+        extraChargePaymentMethod: 'ONLINE',
+        extraChargePaidAt: null,
+      } as any);
+      gateway.verifyCheckoutSignature.mockReturnValue(true);
+      gateway.fetchOrder.mockResolvedValue(order);
+      gateway.fetchPayment.mockResolvedValue(captured);
+    });
+
+    it('records a captured payment belonging to the approved charge', async () => {
+      repository.recordExtraChargePayment.mockResolvedValue({
+        booking: { ...booking, completionOtp: '1234' },
+        recorded: true,
+      } as any);
+
+      await expect(
+        service.verifyExtraChargePayment(booking.customer.userId, dto),
+      ).resolves.toMatchObject({ success: true, completionOtp: '1234' });
+      expect(repository.recordExtraChargePayment).toHaveBeenCalledWith(
+        booking.id,
+        expect.objectContaining({ amount: 100, razorpayPaymentId: captured.id }),
+      );
+    });
+
+    it.each([
+      { amount: 9999 },
+      { currency: 'USD' },
+      { order_id: 'order_other' },
+      { status: 'failed' },
+      { amount_refunded: 10000 },
+    ])('rejects an invalid gateway payment %j', async (invalid) => {
+      gateway.fetchPayment.mockResolvedValue({ ...captured, ...invalid });
+
+      await expect(
+        service.verifyExtraChargePayment(booking.customer.userId, dto),
+      ).rejects.toThrow();
+      expect(repository.recordExtraChargePayment).not.toHaveBeenCalled();
+    });
+
+    it('rejects an order belonging to a different booking', async () => {
+      gateway.fetchOrder.mockResolvedValue({
+        ...order,
+        notes: { ...order.notes, bookingId: 'another-booking' },
+      });
+      await expect(
+        service.verifyExtraChargePayment(booking.customer.userId, dto),
+      ).rejects.toThrow();
+      expect(repository.recordExtraChargePayment).not.toHaveBeenCalled();
+    });
+
+    it('records an authorized payment only after Razorpay confirms capture', async () => {
+      gateway.fetchPayment.mockResolvedValue({ ...captured, status: 'authorized' });
+      gateway.capturePayment.mockResolvedValue({ ...captured, status: 'authorized' });
+
+      await expect(service.verifyExtraChargePayment(booking.customer.userId, dto)).rejects.toThrow(
+        'has not been captured',
+      );
+      expect(gateway.capturePayment).toHaveBeenCalledWith(captured.id, 10000, 'INR');
+      expect(repository.recordExtraChargePayment).not.toHaveBeenCalled();
+    });
   });
 
   it('creates a Razorpay order and stores payment transactionally', async () => {

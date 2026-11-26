@@ -296,19 +296,6 @@ export class BookingController {
     return this.bookingService.finalizeAmount(user, id, dto);
   }
 
-  @Post(':id/pay-extra-charge')
-  @ApiOperation({
-    summary: 'Customer pays additional charge online, unlocking Completion OTP',
-  })
-  @ApiParam({ name: 'id', description: 'Booking id' })
-  @ApiResponse({
-    status: 201,
-    description: 'Extra charge payment recorded and Completion OTP unlocked',
-  })
-  async payExtraCharge(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.bookingService.payExtraCharge(user, id);
-  }
-
   @Post(':id/depart-next-slot')
   @ApiOperation({
     summary: 'Technician leaves for next scheduled slot before customer pays online',

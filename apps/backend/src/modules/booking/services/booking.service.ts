@@ -836,85 +836,8 @@ export class BookingService {
       }
     }
 
-    return updated;
-  }
-
-  async payExtraCharge(user: AuthenticatedUser, bookingId: string) {
-    const customer = await this.validateCustomer(user);
-    const booking = await this.bookingRepository.findById(bookingId);
-
-    if (!booking || booking.customerId !== customer.id) {
-      throw new NotFoundException({
-        message: 'Booking not found',
-        errorCode: ErrorCodes.BOOKING_NOT_FOUND,
-      });
-    }
-
-    if (
-      booking.status !== BookingStatus.AWAITING_COMPLETION_VERIFICATION &&
-      booking.status !== BookingStatus.PENDING_COLLECTION
-    ) {
-      throw new BadRequestException({
-        message: 'Booking is not awaiting payment verification',
-        errorCode: ErrorCodes.BOOKING_INVALID_STATUS,
-      });
-    }
-
-    if (booking.extraChargePaidAt) {
-      return booking;
-    }
-
-    const updated = await this.bookingRepository.transaction(async (tx) => {
-      const b = await tx.booking.update({
-        where: { id: bookingId },
-        data: {
-          extraChargePaidAt: new Date(),
-          updatedBy: user.userId,
-        },
-      });
-
-      await this.bookingRepository.createTimelineEntry(tx, {
-        bookingId,
-        status: booking.status,
-        changedByUserId: user.userId,
-        note: `Additional charge of ₹${Number(booking.finalAdditionalAmount ?? 0).toFixed(0)} paid online by customer. Completion OTP unlocked.`,
-      });
-
-      return b;
-    });
-
-    await this.bookingQueryCacheService.invalidate();
-
-    if (this.trackingGateway) {
-      try {
-        this.trackingGateway.broadcastStatusUpdate(bookingId, booking.status);
-      } catch (err: any) {
-        this.logger.warn(`WS broadcast failed for booking ${bookingId}: ${err?.message}`);
-      }
-    }
-
-    const techUserId = booking.technician?.userId;
-    if (techUserId && this.notificationService) {
-      try {
-        await this.notificationService.sendPushNotification({
-          userId: techUserId,
-          title: 'Payment Received ✅',
-          body: `Customer paid the additional charge of ₹${Number(booking.finalAdditionalAmount ?? 0).toFixed(0)}. Please request the Completion OTP from customer.`,
-          type: NotificationType.BOOKING_UPDATE,
-          payload: {
-            bookingId: booking.id,
-            screen: 'job_detail',
-            subType: 'EXTRA_CHARGE_PAID',
-          },
-        });
-      } catch (err: unknown) {
-        this.logger.error(
-          `Failed to notify technician for extra charge payment: ${(err as Error)?.message ?? String(err)}`,
-        );
-      }
-    }
-
-    return updated;
+    const { completionOtp: _completionOtp, ...finalized } = updated;
+    return finalized;
   }
 
   async departNextSlot(user: AuthenticatedUser, bookingId: string) {

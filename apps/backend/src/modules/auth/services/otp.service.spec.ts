@@ -28,7 +28,7 @@ describe('OtpService', () => {
   };
 
   beforeEach(async () => {
-    mockPipeline.set.mockClear();
+    mockRedisClient.eval.mockClear().mockResolvedValue(1);
     mockRedisClient.ttl.mockResolvedValue(-2);
     config = {
       'otp.expirationSeconds': 300,
@@ -74,19 +74,21 @@ describe('OtpService', () => {
         config.nodeEnv = 'production';
         config.RESEND_API_KEY = apiKey;
         const phone = 'customer@example.com';
+        mockRedisClient.eval.mockResolvedValueOnce(0);
 
         await otpService.generateAndStore(phone);
         await expect(otpService.getDevOtp(phone)).resolves.toBeNull();
 
-        expect(mockPipeline.set.mock.calls.map(([key]) => key)).not.toContain(`dev_otp:${phone}`);
+        expect(mockRedisClient.eval.mock.calls[0].slice(-1)).toEqual(['']);
         expect(redisService.get).not.toHaveBeenCalled();
       },
     );
 
     it('preserves dev OTP access in test mode without an email provider', async () => {
       const phone = 'customer@example.com';
+      mockRedisClient.eval.mockResolvedValueOnce(0);
       const { otp } = await otpService.generateAndStore(phone);
-      expect(mockPipeline.set).toHaveBeenCalledWith(`dev_otp:${phone}`, otp, 'EX', 300);
+      expect(mockRedisClient.eval.mock.calls[0].slice(-1)).toEqual([otp]);
 
       redisService.get.mockResolvedValue(otp);
       await expect(otpService.getDevOtp(phone)).resolves.toBe(otp);
@@ -96,42 +98,25 @@ describe('OtpService', () => {
   // ── generateAndStore ──────────────────────────────────
 
   describe('generateAndStore', () => {
-    it('should generate and store OTP when no cooldown', async () => {
-      redisService.exists.mockResolvedValue(false);
-      redisService.set.mockResolvedValue(undefined);
-      redisService.del.mockResolvedValue(undefined);
+    it('sends only the code reserved by Redis when requests overlap', async () => {
+      mockRedisClient.eval.mockResolvedValueOnce(0).mockResolvedValueOnce(60);
 
-      const result = await otpService.generateAndStore('customer@example.com');
+      const [first, second] = await Promise.all([
+        otpService.generateAndStore('customer@example.com'),
+        otpService.generateAndStore('customer@example.com'),
+      ]);
 
-      expect(result.otp).toHaveLength(6);
-      expect(result.otp).toMatch(/^\d{6}$/);
-      expect(result.expiresInSeconds).toBe(300);
-      expect(mockPipeline.set).toHaveBeenCalledWith(
-        'otp:customer@example.com',
-        expect.any(String),
-        'EX',
-        300,
-      );
-      expect(mockPipeline.del).toHaveBeenCalledWith('otp_attempts:customer@example.com');
-      expect(mockPipeline.set).toHaveBeenCalledWith(
-        'otp_cooldown:customer@example.com',
-        '1',
-        'EX',
-        60,
-      );
+      expect(first.otp).toMatch(/^\d{6}$/);
+      expect(first.expiresInSeconds).toBe(300);
+      expect(second).toEqual({ otp: '', expiresInSeconds: 60, isResend: false });
+      expect(mockRedisClient.eval).toHaveBeenCalledTimes(2);
     });
 
-    it('should return empty OTP when on cooldown', async () => {
-      redisService.exists.mockResolvedValue(true);
-      mockRedisClient.ttl.mockImplementation(async (key: string) => {
-        if (key.includes('lockout')) return -2;
-        return 45;
-      });
-
-      const result = await otpService.generateAndStore('customer@example.com');
-
-      expect(result.otp).toBe('');
-      expect(result.expiresInSeconds).toBe(45);
+    it('rejects issuance while Redis reports a lockout', async () => {
+      mockRedisClient.eval.mockResolvedValueOnce(-60);
+      await expect(otpService.generateAndStore('customer@example.com')).rejects.toThrow(
+        'Too many attempts',
+      );
     });
   });
 

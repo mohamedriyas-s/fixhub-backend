@@ -35,7 +35,6 @@ class ApiEndpoints {
   static String bookingReview(String id) => '/bookings/$id/review';
   static String bookingApproveRevision(String id) => '/bookings/$id/approve-revision';
   static String bookingRejectRevision(String id) => '/bookings/$id/reject-revision';
-  static String bookingPayExtraCharge(String id) => '/bookings/$id/pay-extra-charge';
 
   // ── Service Catalog ─────────────────────────────────────────
   // Backend CatalogController is registered under @Controller('catalog')

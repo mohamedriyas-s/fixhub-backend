@@ -348,6 +348,7 @@ class _JobDetailsBodyState extends ConsumerState<_JobDetailsBody> {
 
   Future<void> _callCustomer() async {
     final phone = widget.job.customer.phone;
+    if (phone == null || phone.isEmpty) return;
     final uri = Uri.parse('tel:$phone');
     if (await canLaunchUrl(uri)) launchUrl(uri);
   }
@@ -675,7 +676,7 @@ class _JobDetailsBodyState extends ConsumerState<_JobDetailsBody> {
                 _Section(
                   title: 'Customer',
                   trailing: IconButton(
-                    onPressed: _callCustomer,
+                    onPressed: job.customer.phone?.isNotEmpty == true ? _callCustomer : null,
                     icon: const Icon(
                       Icons.call_rounded,
                       size: 20,
@@ -696,7 +697,7 @@ class _JobDetailsBodyState extends ConsumerState<_JobDetailsBody> {
                       _DetailRow(
                         icon: Icons.phone_outlined,
                         label: 'Phone',
-                        value: job.customer.phone,
+                        value: job.customer.phone ?? 'Unavailable',
                       ),
                     ],
                   ),

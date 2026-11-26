@@ -48,7 +48,7 @@ class JobAddress {
 class JobCustomer {
   final String id;
   final String? name;
-  final String phone;
+  final String? phone;
   final String? email;
 
   const JobCustomer({
@@ -63,12 +63,12 @@ class JobCustomer {
     return JobCustomer(
       id: (user?['id'] ?? json['id']) as String,
       name: (user?['name'] ?? json['name']) as String?,
-      phone: (user?['phone'] ?? json['phone']) as String,
+      phone: (user?['phone'] ?? json['phone']) as String?,
       email: (user?['email'] ?? json['email']) as String?,
     );
   }
 
-  String get displayName => name ?? phone;
+  String get displayName => name ?? email ?? phone ?? 'Customer';
 }
 
 class JobSubService {

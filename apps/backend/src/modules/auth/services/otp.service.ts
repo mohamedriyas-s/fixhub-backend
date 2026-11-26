@@ -56,53 +56,44 @@ export class OtpService {
     expiresInSeconds: number;
     isResend: boolean;
   }> {
-    // Check lockout
-    const lockoutKey = `${OTP_LOCKOUT_PREFIX}${email}`;
-    const lockoutTtl = await this.redisService.getClient().ttl(lockoutKey);
-    if (lockoutTtl > 0) {
+    const otp = generateOtp(this.otpLength);
+    const result = await this.redisService.getClient().eval(
+      `local lockout = redis.call('TTL', KEYS[1])
+       if lockout > 0 then return -lockout end
+
+       local cooldown = redis.call('TTL', KEYS[2])
+       if cooldown > 0 and redis.call('EXISTS', KEYS[3]) == 1 then return cooldown end
+
+       redis.call('SET', KEYS[3], ARGV[1], 'EX', ARGV[2])
+       redis.call('DEL', KEYS[4])
+       redis.call('SET', KEYS[2], '1', 'EX', ARGV[3])
+       if ARGV[4] ~= '' then
+         redis.call('SET', KEYS[5], ARGV[4], 'EX', ARGV[2])
+       else
+         redis.call('DEL', KEYS[5])
+       end
+       return 0`,
+      5,
+      `${OTP_LOCKOUT_PREFIX}${email}`,
+      `${OTP_COOLDOWN_PREFIX}${email}`,
+      `${OTP_PREFIX}${email}`,
+      `${OTP_ATTEMPTS_PREFIX}${email}`,
+      `dev_otp:${email}`,
+      hashString(otp),
+      this.otpExpiration,
+      this.cooldownSeconds,
+      this.isSimulationMode() ? otp : '',
+    );
+
+    if (typeof result !== 'number') throw new Error('Invalid OTP reservation result');
+    if (result < 0) {
       throw new ForbiddenException(
-        `Too many attempts. Please try again after ${Math.ceil(lockoutTtl / 60)} minutes.`,
+        `Too many attempts. Please try again after ${Math.ceil(-result / 60)} minutes.`,
       );
     }
-
-    // Check resend cooldown
-    const cooldownKey = `${OTP_COOLDOWN_PREFIX}${email}`;
-    const isOnCooldown = await this.redisService.exists(cooldownKey);
-
-    const otpKey = `${OTP_PREFIX}${email}`;
-    const attemptsKey = `${OTP_ATTEMPTS_PREFIX}${email}`;
-
-    // If on cooldown, check if there's an existing OTP still valid
-    if (isOnCooldown) {
-      const otpExists = await this.redisService.exists(otpKey);
-      if (otpExists) {
-        const ttl = await this.redisService.getClient().ttl(cooldownKey);
-        return {
-          otp: '', // Don't regenerate — existing OTP is still valid
-          expiresInSeconds: ttl > 0 ? ttl : this.cooldownSeconds,
-          isResend: false,
-        };
-      }
-      // If OTP does not exist in Redis (expired or cleaned up),
-      // clear the orphaned cooldown and proceed to generate a fresh OTP!
-      await this.redisService.del(cooldownKey);
+    if (result > 0) {
+      return { otp: '', expiresInSeconds: result, isResend: false };
     }
-
-    // Generate new OTP
-    const otp = generateOtp(this.otpLength);
-    const hashedOtp = hashString(otp);
-
-    // Atomic pipeline to set OTP, reset attempts, set cooldown, and store dev OTP if in simulation
-    const client = this.redisService.getClient();
-    const pipeline = client.pipeline();
-    pipeline.set(otpKey, hashedOtp, 'EX', this.otpExpiration);
-    pipeline.del(attemptsKey);
-    pipeline.set(cooldownKey, '1', 'EX', this.cooldownSeconds);
-
-    if (this.isSimulationMode()) {
-      pipeline.set(`dev_otp:${email}`, otp, 'EX', this.otpExpiration);
-    }
-    await pipeline.exec();
 
     return {
       otp,

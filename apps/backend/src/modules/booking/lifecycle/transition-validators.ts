@@ -119,6 +119,14 @@ export class CompletionOtpValidator implements BookingTransitionValidator {
       return;
     }
 
+    if (
+      booking.extraChargePaymentMethod === 'ONLINE' &&
+      Number(booking.finalAdditionalAmount) > 0 &&
+      !booking.extraChargePaidAt
+    ) {
+      throw new BadRequestException('Customer payment must be verified before completing this booking');
+    }
+
     if (!booking.completionOtp) {
       return;
     }

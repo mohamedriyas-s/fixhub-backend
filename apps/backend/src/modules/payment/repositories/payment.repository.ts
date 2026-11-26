@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import {
   BookingStatus,
   PaymentMethod,
@@ -56,36 +56,44 @@ export class PaymentRepository {
 
   async recordExtraChargePayment(
     bookingId: string,
-    params: {
-      razorpayOrderId: string;
-      razorpayPaymentId: string;
-      razorpaySignature: string;
-      amount: number;
-    },
+    params: { razorpayPaymentId: string; amount: number; statuses: BookingStatus[] },
   ) {
     return this.prisma.$transaction(async (tx) => {
-      const booking = await tx.booking.update({
-        where: { id: bookingId },
-        data: {
-          extraChargePaidAt: new Date(),
+      const { count } = await tx.booking.updateMany({
+        where: {
+          id: bookingId,
+          status: { in: params.statuses },
+          finalAdditionalAmount: params.amount,
           extraChargePaymentMethod: 'ONLINE',
+          extraChargePaidAt: null,
         },
-        include: {
-          customer: true,
-          technician: true,
-        },
+        data: { extraChargePaidAt: new Date() },
       });
 
-      await tx.bookingTimeline.create({
-        data: {
-          bookingId,
-          changedByUserId: booking.customerId,
-          status: booking.status,
-          note: `Additional charge of ₹${params.amount.toFixed(0)} paid via Razorpay (${params.razorpayPaymentId}). Completion OTP unlocked.`,
-        },
+      const booking = await tx.booking.findUniqueOrThrow({
+        where: { id: bookingId },
+        include: { customer: true, technician: true },
       });
+      if (
+        !booking.extraChargePaidAt ||
+        booking.extraChargePaymentMethod !== 'ONLINE' ||
+        Number(booking.finalAdditionalAmount) !== params.amount
+      ) {
+        throw new ConflictException('Additional charge changed before payment could be recorded');
+      }
 
-      return booking;
+      if (count) {
+        await tx.bookingTimeline.create({
+          data: {
+            bookingId,
+            changedByUserId: booking.customer.userId,
+            status: booking.status,
+            note: `Additional charge paid via Razorpay (${params.razorpayPaymentId}). Completion OTP unlocked.`,
+          },
+        });
+      }
+
+      return { booking, recorded: count === 1 };
     });
   }
 

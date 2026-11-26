@@ -45,6 +45,6 @@ import { BookingQueryCacheService } from './services/booking-query-cache.service
     // a circular dependency: TechnicianModule → BookingModule → TechnicianModule
     JobOfferRepository,
   ],
-  exports: [BookingService, BookingLifecycleService, BookingDispatchService],
+  exports: [BookingService, BookingLifecycleService, BookingDispatchService, BookingQueryCacheService],
 })
 export class BookingModule {}

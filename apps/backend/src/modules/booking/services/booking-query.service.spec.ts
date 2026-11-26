@@ -60,7 +60,7 @@ describe('BookingQueryService', () => {
     cacheService.get.mockResolvedValue(null);
     repository.listBookings.mockResolvedValue(result as any);
 
-    await expect(service.listForActor(customerActor, {} as any)).resolves.toBe(result);
+    await expect(service.listForActor(customerActor, {} as any)).resolves.toEqual(result);
 
     expect(repository.listBookings).toHaveBeenCalledWith(
       {},
@@ -87,8 +87,28 @@ describe('BookingQueryService', () => {
 
     const result = await service.listForActor(customerActor, {} as any);
 
-    expect(result).toBe(cached);
+    expect(result).toEqual(cached);
     expect(repository.listBookings).not.toHaveBeenCalled();
+  });
+
+  it('hides unpaid online completion codes in the customer list and detail', async () => {
+    const unpaid = {
+      ...booking,
+      status: BookingStatus.PENDING_COLLECTION,
+      extraChargePaymentMethod: 'ONLINE',
+      finalAdditionalAmount: 100,
+      extraChargePaidAt: null,
+      completionOtp: '1234',
+    };
+    repository.listBookings.mockResolvedValue({ items: [unpaid], meta: { total: 1 } } as any);
+    repository.findBookingDetails.mockResolvedValue(unpaid as any);
+
+    await expect(service.listForActor(customerActor, {} as any)).resolves.toMatchObject({
+      items: [{ completionOtp: null }],
+    });
+    await expect(service.getDetailsForActor(customerActor, booking.id)).resolves.toMatchObject({
+      completionOtp: null,
+    });
   });
 
   it('uses admin list query without actor scope', async () => {

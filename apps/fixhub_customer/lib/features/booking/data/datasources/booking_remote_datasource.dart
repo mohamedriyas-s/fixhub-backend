@@ -107,11 +107,6 @@ class BookingRemoteDataSource {
     return _extractData(response.data);
   }
 
-  Future<Map<String, dynamic>> payExtraCharge(String bookingId) async {
-    final response = await _dio.post(ApiEndpoints.bookingPayExtraCharge(bookingId));
-    return _extractData(response.data);
-  }
-
   Future<List<String>> getAvailableSlots(String subServiceId, String pincode, String date) async {
     final response = await _dio.get(
       ApiEndpoints.availableSlots,

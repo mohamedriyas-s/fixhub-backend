@@ -87,7 +87,8 @@ class _EnRouteScreenState extends ConsumerState<EnRouteScreen> {
     }
   }
 
-  Future<void> _callCustomer(String phone) async {
+  Future<void> _callCustomer(String? phone) async {
+    if (phone == null || phone.isEmpty) return;
     final uri = Uri.parse('tel:$phone');
     if (await canLaunchUrl(uri)) await launchUrl(uri);
   }
@@ -258,7 +259,9 @@ class _EnRouteScreenState extends ConsumerState<EnRouteScreen> {
                                     ),
                               ),
                               IconButton(
-                                onPressed: () => _callCustomer(job.customer.phone),
+                                onPressed: job.customer.phone?.isNotEmpty == true
+                                    ? () => _callCustomer(job.customer.phone)
+                                    : null,
                                 icon: const Icon(
                                   Icons.call_rounded,
                                   size: 20,

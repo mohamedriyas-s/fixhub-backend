@@ -21,23 +21,17 @@ export class BookingQueryService {
       () => this.bookingRepository.listBookings(query, scope),
     );
 
-    if (actor.role === Role.TECHNICIAN && result && Array.isArray((result as any).data)) {
-      return {
-        ...result,
-        data: (result as any).data.map(
-          ({ startOtp: _startOtp, startOtpAttempts: _startOtpAttempts, ...rest }: any) => rest,
-        ),
-      };
-    }
-
-    return result;
+    return { ...result, items: result.items.map((booking) => this.sanitize(actor, booking)) };
   }
 
   async listHistoryForActor(actor: AuthenticatedUser, query: BookingQueryDto) {
     const scope = this.scopeForActor(actor);
-    return this.cached(`history:${actor.role}:${actor.userId}:${this.queryKey(query)}`, () =>
-      this.bookingRepository.listBookingHistory(query, scope),
+    const result = await this.cached(
+      `history:${actor.role}:${actor.userId}:${this.queryKey(query)}`,
+      () => this.bookingRepository.listBookingHistory(query, scope),
     );
+
+    return { ...result, items: result.items.map((booking) => this.sanitize(actor, booking)) };
   }
 
   async listAdmin(query: BookingQueryDto) {
@@ -66,31 +60,38 @@ export class BookingQueryService {
 
     this.ensureCanRead(actor, booking);
 
-    if (actor.role === Role.TECHNICIAN && booking) {
+    return this.sanitize(actor, booking);
+  }
+
+  private sanitize<
+    T extends {
+      startOtp: string | null;
+      startOtpAttempts: number;
+      completionOtp: string | null;
+      completionOtpAttempts: number;
+      extraChargePaymentMethod: string | null;
+      finalAdditionalAmount: unknown;
+      extraChargePaidAt: Date | null;
+    },
+  >(actor: AuthenticatedUser, booking: T) {
+    if (actor.role === Role.TECHNICIAN) {
       const {
         startOtp: _startOtp,
         startOtpAttempts: _startOtpAttempts,
         completionOtp: _completionOtp,
         completionOtpAttempts: _completionOtpAttempts,
         ...sanitized
-      } = booking as any;
+      } = booking;
       return sanitized;
     }
 
-    if (actor.role === Role.CUSTOMER && booking) {
-      const b = booking as any;
-      const isOnlineUnpaid =
-        b.status === BookingStatus.AWAITING_COMPLETION_VERIFICATION &&
-        b.extraChargePaymentMethod === 'ONLINE' &&
-        Number(b.finalAdditionalAmount || 0) > 0 &&
-        !b.extraChargePaidAt;
-
-      if (isOnlineUnpaid) {
-        return {
-          ...b,
-          completionOtp: null, // Gated until customer completes payment!
-        };
-      }
+    if (
+      actor.role === Role.CUSTOMER &&
+      booking.extraChargePaymentMethod === 'ONLINE' &&
+      Number(booking.finalAdditionalAmount) > 0 &&
+      !booking.extraChargePaidAt
+    ) {
+      return { ...booking, completionOtp: null };
     }
 
     return booking;

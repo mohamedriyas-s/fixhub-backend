@@ -27,6 +27,7 @@ import {
   AdminNotificationService,
   AdminNotifType,
 } from '../../admin/services/admin-notification.service';
+import { BookingQueryCacheService } from '../../booking/services/booking-query-cache.service';
 import { BookingDispatchService } from '../../booking/services/booking-dispatch.service';
 import { NotificationService } from '../../notification/services/notification.service';
 import { TrackingGateway } from '../../tracking/tracking.gateway';
@@ -41,6 +42,10 @@ import { PaymentRepository } from '../repositories/payment.repository';
 import { RazorpayGatewayService } from './razorpay-gateway.service';
 
 const CURRENCY = 'INR';
+const EXTRA_CHARGE_STATUSES: BookingStatus[] = [
+  BookingStatus.AWAITING_COMPLETION_VERIFICATION,
+  BookingStatus.PENDING_COLLECTION,
+];
 const IDEMPOTENCY_TTL_SECONDS = 10 * 60;
 
 @Injectable()
@@ -57,6 +62,7 @@ export class PaymentService {
     private readonly webhookQueue: Queue,
     @Optional() private readonly adminNotifService?: AdminNotificationService,
     @Optional() private readonly trackingGateway?: TrackingGateway,
+    @Optional() private readonly bookingQueryCache?: BookingQueryCacheService,
   ) {}
 
   async createOrder(bookingId: string, userId: string, dto: CreatePaymentOrderDto = {}) {
@@ -281,8 +287,13 @@ export class PaymentService {
       });
     }
 
-    const extraAmount = Number((booking as any).finalAdditionalAmount ?? 0);
-    if (extraAmount <= 0) {
+    const extraAmount = Number(booking.finalAdditionalAmount);
+    if (
+      !EXTRA_CHARGE_STATUSES.includes(booking.status) ||
+      booking.extraChargePaymentMethod !== 'ONLINE' ||
+      booking.extraChargePaidAt ||
+      extraAmount <= 0
+    ) {
       throw new BadRequestException({
         message: 'No additional charge pending for this booking',
         errorCode: ErrorCodes.PAYMENT_AMOUNT_MISMATCH,
@@ -294,7 +305,7 @@ export class PaymentService {
     const razorpayOrder = await this.razorpayGateway.createOrder({
       amountInPaise,
       currency: CURRENCY,
-      receipt: `${(booking as any).bookingNumber ?? booking.id}-EXTRA`,
+      receipt: `${booking.bookingNumber}-EXTRA`,
       notes: { bookingId, type: 'final_extra_charge' },
     });
 
@@ -335,13 +346,54 @@ export class PaymentService {
       });
     }
 
-    const amount = Number((booking as any).finalAdditionalAmount ?? 0);
-    const updated = await this.paymentRepository.recordExtraChargePayment(dto.bookingId, {
-      razorpayOrderId: dto.razorpayOrderId,
-      razorpayPaymentId: dto.razorpayPaymentId,
-      razorpaySignature: dto.razorpaySignature,
-      amount,
-    });
+    const amount = Number(booking.finalAdditionalAmount);
+    if (
+      booking.extraChargePaymentMethod !== 'ONLINE' ||
+      amount <= 0 ||
+      (!booking.extraChargePaidAt && !EXTRA_CHARGE_STATUSES.includes(booking.status))
+    ) {
+      throw new ConflictException('Booking is not awaiting an online additional charge');
+    }
+
+    const amountInPaise = this.toPaise(amount);
+    const [order, payment] = await Promise.all([
+      this.razorpayGateway.fetchOrder(dto.razorpayOrderId),
+      this.razorpayGateway.fetchPayment(dto.razorpayPaymentId),
+    ]);
+    const matchesCharge = (candidate: typeof payment) =>
+      candidate.id === dto.razorpayPaymentId &&
+      candidate.order_id === dto.razorpayOrderId &&
+      candidate.amount === amountInPaise &&
+      candidate.currency === CURRENCY &&
+      !candidate.amount_refunded;
+
+    if (
+      order.id !== dto.razorpayOrderId ||
+      order.notes?.bookingId !== booking.id ||
+      order.notes?.type !== 'final_extra_charge' ||
+      order.amount !== amountInPaise ||
+      order.currency !== CURRENCY ||
+      !matchesCharge(payment)
+    ) {
+      throw new BadRequestException('Razorpay payment does not match this additional charge');
+    }
+
+    const captured =
+      payment.status === 'authorized' && !booking.extraChargePaidAt
+        ? await this.razorpayGateway.capturePayment(payment.id, amountInPaise, CURRENCY)
+        : payment;
+    if (captured.status !== 'captured' || !matchesCharge(captured)) {
+      throw new ConflictException('Additional charge payment has not been captured');
+    }
+
+    const { booking: updated, recorded } = await this.paymentRepository.recordExtraChargePayment(
+      dto.bookingId,
+      { razorpayPaymentId: captured.id, amount, statuses: EXTRA_CHARGE_STATUSES },
+    );
+    await this.bookingQueryCache?.invalidate();
+    if (!recorded) {
+      return { success: true, booking: updated, completionOtp: updated.completionOtp };
+    }
 
     if (this.trackingGateway) {
       try {
@@ -375,7 +427,7 @@ export class PaymentService {
     return {
       success: true,
       booking: updated,
-      completionOtp: (updated as any).completionOtp,
+      completionOtp: updated.completionOtp,
     };
   }
 
