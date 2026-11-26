@@ -71,6 +71,7 @@ describe('BookingDispatchService', () => {
     prisma = {
       booking: {
         findUnique: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
         count: jest.fn(),
         update: jest.fn(),
       },
@@ -227,6 +228,56 @@ describe('BookingDispatchService', () => {
         where: { id: mockBooking.id },
         data: {
           technicianId: 'tech-1',
+          status: BookingStatus.ASSIGNED,
+        },
+      });
+    });
+
+    it('should prefer fewer weekly jobs when daily workload is equal', async () => {
+      prisma.booking.findUnique.mockResolvedValue(mockBooking);
+      prisma.technician.findMany.mockResolvedValue([mockTech1, mockTech2]);
+
+      prisma.booking.count.mockImplementation(async ({ where }: any) => {
+        if (where.scheduledDate) return 0; // Equal daily jobs
+        // Weekly jobs: tech-1 has 3, tech-2 has 1
+        if (where.technicianId === 'tech-1') return 3;
+        if (where.technicianId === 'tech-2') return 1;
+        return 0;
+      });
+
+      await service.dispatch('booking-uuid-1');
+
+      expect(prisma.booking.update).toHaveBeenCalledWith({
+        where: { id: mockBooking.id },
+        data: {
+          technicianId: 'tech-2',
+          status: BookingStatus.ASSIGNED,
+        },
+      });
+    });
+
+    it('should prefer technician waiting longest since last assignment when daily and weekly counts tie', async () => {
+      prisma.booking.findUnique.mockResolvedValue(mockBooking);
+      prisma.technician.findMany.mockResolvedValue([mockTech1, mockTech2]);
+      prisma.booking.count.mockResolvedValue(0);
+
+      prisma.booking.findFirst.mockImplementation(async ({ where }: any) => {
+        if (where.technicianId === 'tech-1') {
+          return { createdAt: new Date('2026-11-19T10:00:00Z') };
+        }
+        if (where.technicianId === 'tech-2') {
+          return { createdAt: new Date('2026-11-15T10:00:00Z') };
+        }
+        return null;
+      });
+
+      await service.dispatch('booking-uuid-1');
+
+      // Tech 2 waited longer (Nov 15 vs Nov 19), even though Tech 1 has higher rating
+      expect(prisma.booking.update).toHaveBeenCalledWith({
+        where: { id: mockBooking.id },
+        data: {
+          technicianId: 'tech-2',
           status: BookingStatus.ASSIGNED,
         },
       });

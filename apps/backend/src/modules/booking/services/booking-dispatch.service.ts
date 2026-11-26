@@ -74,38 +74,67 @@ export class BookingDispatchService {
       return;
     }
 
-    // Rank candidates: workload balancing (fewer daily jobs) then rating DESC
+    // Rank candidates:
+    // 1. Fewest jobs on scheduledDate (active + completed)
+    // 2. Fewest jobs in the last 7 days
+    // 3. Longest time since last assignment (never-assigned first)
+    // 4. Highest rating
+    const workloadStatuses: BookingStatus[] = [
+      BookingStatus.ASSIGNED,
+      BookingStatus.ACCEPTED,
+      BookingStatus.EN_ROUTE,
+      BookingStatus.ARRIVED,
+      BookingStatus.IN_PROGRESS,
+      BookingStatus.COMPLETED,
+    ];
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
     const scoredTechs = await Promise.all(
       eligibleTechnicians.map(async (tech) => {
-        const dailyJobsCount = await this.prisma.booking.count({
-          where: {
-            technicianId: tech.id,
-            scheduledDate: booking.scheduledDate,
-            status: {
-              in: [
-                BookingStatus.ASSIGNED,
-                BookingStatus.ACCEPTED,
-                BookingStatus.EN_ROUTE,
-                BookingStatus.ARRIVED,
-                BookingStatus.IN_PROGRESS,
-              ],
+        const [dailyJobsCount, weeklyJobsCount, lastAssignment] = await Promise.all([
+          this.prisma.booking.count({
+            where: {
+              technicianId: tech.id,
+              scheduledDate: booking.scheduledDate,
+              status: { in: workloadStatuses },
             },
-          },
-        });
+          }),
+          this.prisma.booking.count({
+            where: {
+              technicianId: tech.id,
+              createdAt: { gte: sevenDaysAgo },
+              status: { in: workloadStatuses },
+            },
+          }),
+          this.prisma.booking.findFirst({
+            where: {
+              technicianId: tech.id,
+              status: { in: workloadStatuses },
+            },
+            orderBy: { createdAt: 'desc' },
+            select: { createdAt: true },
+          }),
+        ]);
         return {
           tech,
           dailyJobsCount,
+          weeklyJobsCount,
+          lastAssignedAtMs: lastAssignment?.createdAt?.getTime() ?? 0,
           rating: Number(tech.rating ?? 0),
         };
       }),
     );
 
     scoredTechs.sort((a, b) => {
-      // 1. Prioritize technicians with fewer bookings on that date
       if (a.dailyJobsCount !== b.dailyJobsCount) {
         return a.dailyJobsCount - b.dailyJobsCount;
       }
-      // 2. Tie-break: highest rating
+      if (a.weeklyJobsCount !== b.weeklyJobsCount) {
+        return a.weeklyJobsCount - b.weeklyJobsCount;
+      }
+      if (a.lastAssignedAtMs !== b.lastAssignedAtMs) {
+        return a.lastAssignedAtMs - b.lastAssignedAtMs;
+      }
       return b.rating - a.rating;
     });
 
