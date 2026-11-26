@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/config/theme/app_colors.dart';
 import '../../../core/config/theme/app_spacing.dart';
 import '../../../core/widgets/fp_app_bar.dart';
@@ -91,7 +92,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       Icons.arrow_forward_ios_rounded,
                       size: 14,
                     ),
-                    onTap: () {},
+                    onTap: () => context.push('/about'),
                   ),
                   const Divider(height: 1, indent: 56),
                   ListTile(
@@ -107,7 +108,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       Icons.arrow_forward_ios_rounded,
                       size: 14,
                     ),
-                    onTap: () {},
+                    onTap: () => context.push('/about'),
                   ),
                   const Divider(height: 1, indent: 56),
                   ListTile(
@@ -123,7 +124,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       Icons.arrow_forward_ios_rounded,
                       size: 14,
                     ),
-                    onTap: () {},
+                    onTap: () => context.push('/about'),
                   ),
                 ],
               ),

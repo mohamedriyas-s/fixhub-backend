@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/config/theme/app_colors.dart';
 import '../../../../core/config/theme/app_spacing.dart';
-import '../../../../core/config/theme/app_radius.dart';
 import '../../../../core/widgets/fixhub_button.dart';
 import '../../../../core/widgets/fixhub_dialog.dart';
 import '../../../../core/widgets/fixhub_network_image.dart';
@@ -235,7 +234,7 @@ class ProfileScreen extends ConsumerWidget {
             icon: Icons.info_outline_rounded,
             iconColor: AppColors.textSecondary,
             title: 'About FixHub',
-            onTap: () {},
+            onTap: () => context.push(RouteNames.about),
           ),
 
           const SizedBox(height: AppSpacing.xxl),

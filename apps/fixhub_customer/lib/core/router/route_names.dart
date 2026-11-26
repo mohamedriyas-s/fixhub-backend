@@ -36,4 +36,5 @@ class RouteNames {
   // Profile Routes
   static const editProfile = '/profile/edit';
   static const savedAddresses = '/profile/addresses';
+  static const about = '/about';
 }

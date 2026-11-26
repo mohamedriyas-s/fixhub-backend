@@ -18,6 +18,7 @@ import '../../features/profile/presentation/edit_specializations_screen.dart';
 import '../../features/profile/presentation/edit_service_areas_screen.dart';
 import '../../features/onboarding/presentation/setup_wizard_screen.dart';
 import '../../features/settings/settings_screen.dart';
+import '../../features/settings/about_partner_screen.dart';
 import '../../features/navigation/presentation/app_navigation.dart';
 
 // ── Route Name Constants ──────────────────────────────────────────
@@ -36,6 +37,7 @@ class RouteNames {
   static const offers = 'offers';
   static const notifications = 'notifications';
   static const settings = 'settings';
+  static const about = 'about';
   static const editSpecializations = 'edit-specializations';
   static const editServiceAreas = 'edit-service-areas';
 }
@@ -199,6 +201,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: RouteNames.settings,
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/about',
+        name: RouteNames.about,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const AboutPartnerScreen(),
       ),
       GoRoute(
         path: '/edit-specializations',

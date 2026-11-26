@@ -11,6 +11,7 @@ import '../../features/booking/presentation/screens/bookings_list_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/profile/presentation/screens/saved_addresses_screen.dart';
+import '../../features/profile/presentation/screens/about_screen.dart';
 import '../../features/profile/presentation/screens/add_address_screen.dart';
 import '../../features/profile/presentation/screens/edit_profile_screen.dart';
 import '../../features/notifications/presentation/screens/notifications_screen.dart';
@@ -22,6 +23,7 @@ import '../../features/location/presentation/screens/set_location_screen.dart';
 import '../../features/location/presentation/screens/service_area_not_covered_screen.dart';
 import '../../features/location/presentation/providers/location_provider.dart';
 import '../../features/booking/presentation/screens/select_address_screen.dart';
+import '../../features/booking/data/models/address_model.dart';
 import '../../features/booking/presentation/screens/select_slot_screen.dart';
 import '../../features/booking/presentation/screens/booking_summary_screen.dart';
 import '../../features/booking/presentation/screens/payment_screen.dart';
@@ -34,7 +36,6 @@ import 'route_names.dart';
 import 'scaffold_with_nav_bar.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
-final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
 class _RouterNotifier extends ChangeNotifier {
   _RouterNotifier(Ref ref) {
@@ -276,12 +277,20 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/add-address',
         name: 'addAddress',
-        builder: (context, state) => const AddAddressScreen(),
+        builder: (context, state) {
+          final address = state.extra as AddressModel?;
+          return AddAddressScreen(initialAddress: address);
+        },
       ),
       GoRoute(
         path: RouteNames.editProfile,
         name: 'editProfile',
         builder: (context, state) => const EditProfileScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.about,
+        name: 'about',
+        builder: (context, state) => const AboutScreen(),
       ),
     ],
   );
