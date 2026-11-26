@@ -73,7 +73,16 @@ class _AppNavigationState extends ConsumerState<AppNavigation> {
           _handleBack();
         },
         child: Scaffold(
-        body: widget.navigationShell,
+        body: NotificationListener<NavigationNotification>(
+          onNotification: (notification) {
+            if (!canPop && !notification.canHandlePop) {
+              const NavigationNotification(canHandlePop: true).dispatch(context);
+              return true;
+            }
+            return false;
+          },
+          child: widget.navigationShell,
+        ),
         bottomNavigationBar: Container(
           decoration: const BoxDecoration(
             border: Border(top: BorderSide(color: AppColors.border, width: 1)),

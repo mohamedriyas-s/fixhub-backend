@@ -91,7 +91,16 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
           _handleBack();
         },
         child: Scaffold(
-        body: widget.navigationShell,
+        body: NotificationListener<NavigationNotification>(
+          onNotification: (notification) {
+            if (!canPop && !notification.canHandlePop) {
+              const NavigationNotification(canHandlePop: true).dispatch(context);
+              return true;
+            }
+            return false;
+          },
+          child: widget.navigationShell,
+        ),
         bottomNavigationBar: NavigationBar(
           selectedIndex: widget.navigationShell.currentIndex,
           onDestinationSelected: _onDestinationSelected,
