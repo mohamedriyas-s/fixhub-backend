@@ -42,4 +42,15 @@ class AddressRemoteDataSource {
   Future<void> deleteAddress(String id) async {
     await _dio.delete(ApiEndpoints.customerAddress(id));
   }
+
+  Future<Map<String, dynamic>> setDefaultAddress(String id) async {
+    final response = await _dio.patch(ApiEndpoints.customerAddressDefault(id));
+    final raw = response.data;
+    if (raw is Map && raw['data'] is Map) {
+      return Map<String, dynamic>.from(raw['data'] as Map);
+    } else if (raw is Map) {
+      return Map<String, dynamic>.from(raw);
+    }
+    return <String, dynamic>{};
+  }
 }

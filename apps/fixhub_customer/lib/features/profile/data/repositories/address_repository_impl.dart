@@ -17,8 +17,8 @@ class AddressRepositoryImpl implements AddressRepository {
     return {
       'label': address.label,
       'line1': address.line1,
-      'line2': address.line2,
-      'landmark': address.landmark,
+      if (address.line2 != null && address.line2!.isNotEmpty) 'line2': address.line2,
+      if (address.landmark != null && address.landmark!.isNotEmpty) 'landmark': address.landmark,
       'city': address.city,
       'state': address.state,
       'pincode': address.pincode,
@@ -37,6 +37,12 @@ class AddressRepositoryImpl implements AddressRepository {
   @override
   Future<AddressModel> updateAddress(String id, AddressModel address) async {
     final data = await _remoteDataSource.updateAddress(id, _toPayload(address));
+    return AddressModel.fromJson(Map<String, dynamic>.from(data));
+  }
+
+  @override
+  Future<AddressModel> setDefaultAddress(String id) async {
+    final data = await _remoteDataSource.setDefaultAddress(id);
     return AddressModel.fromJson(Map<String, dynamic>.from(data));
   }
 

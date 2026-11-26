@@ -200,22 +200,47 @@ class _PinpointLocationScreenState
 
       if (placemarks.isNotEmpty && mounted) {
         final p = placemarks.first;
+        final subThoroughfare = p.subThoroughfare?.trim();
+        final thoroughfare = p.thoroughfare?.trim();
         final street = p.street?.trim();
         final subLocality = p.subLocality?.trim();
-        final thoroughfare = p.thoroughfare?.trim();
         final name = p.name?.trim();
         final locality = p.locality?.trim();
 
-        final line1 = (street != null && street.isNotEmpty && street != subLocality)
-            ? street
-            : (name != null && name.isNotEmpty && name != subLocality && name != locality)
-                ? name
+        // Solution 2: Only extract house/building number for line1 if distinct & specific.
+        final isGenericName = name == null ||
+            name.isEmpty ||
+            name == street ||
+            name == thoroughfare ||
+            name == subLocality ||
+            name == locality ||
+            name.toLowerCase() == 'unnamed road';
+
+        final line1 = (subThoroughfare != null && subThoroughfare.isNotEmpty)
+            ? subThoroughfare
+            : (!isGenericName ? name : null);
+
+        // Build Street / Area / Locality (line2) cleanly without duplicating line1.
+        final roadPart = (thoroughfare != null &&
+                thoroughfare.isNotEmpty &&
+                thoroughfare.toLowerCase() != 'unnamed road')
+            ? thoroughfare
+            : (street != null &&
+                    street.isNotEmpty &&
+                    street.toLowerCase() != 'unnamed road' &&
+                    street != line1)
+                ? street
                 : null;
-        final line2 = (subLocality != null && subLocality.isNotEmpty && subLocality != line1)
-            ? subLocality
-            : (thoroughfare != null && thoroughfare.isNotEmpty && thoroughfare != line1)
-                ? thoroughfare
-                : null;
+
+        final line2Parts = <String>[
+          if (roadPart != null && roadPart != line1) roadPart,
+          if (subLocality != null &&
+              subLocality.isNotEmpty &&
+              subLocality != line1 &&
+              subLocality != roadPart)
+            subLocality,
+        ];
+        final line2 = line2Parts.isNotEmpty ? line2Parts.join(', ') : null;
 
         final titleParts = [
           if (line1 != null && line1.isNotEmpty) line1,
@@ -371,10 +396,56 @@ class _PinpointLocationScreenState
       final target = LatLng(lat, lon);
       _mapController.move(target, 16.5);
       _currentCenter = target;
-      setState(() {
-        _searchResults = [];
-        _searchController.text = item['display_name'] ?? '';
-      });
+
+      final addr = item['address'];
+      if (addr is Map) {
+        final house = (addr['house_number'] ?? addr['building'])?.toString().trim();
+        final road = addr['road']?.toString().trim();
+        final area = (addr['neighbourhood'] ?? addr['suburb'] ?? addr['residential'])
+            ?.toString()
+            .trim();
+        final city = (addr['city'] ?? addr['town'] ?? addr['village'] ?? addr['county'])
+            ?.toString()
+            .trim();
+        final state = addr['state']?.toString().trim();
+        final postcode = addr['postcode']?.toString().trim();
+
+        final line2Parts = <String>[
+          if (road != null && road.isNotEmpty) road,
+          if (area != null && area.isNotEmpty && area != road) area,
+        ];
+        final line2 = line2Parts.isNotEmpty ? line2Parts.join(', ') : null;
+        final titleParts = [
+          if (house != null && house.isNotEmpty) house,
+          if (line2 != null && line2.isNotEmpty) line2,
+        ];
+
+        setState(() {
+          _searchResults = [];
+          _searchController.text = item['display_name'] ?? '';
+          _detectedLine1 = (house != null && house.isNotEmpty) ? house : null;
+          _detectedLine2 = line2;
+          _detectedCity = city;
+          _detectedState = state;
+          _detectedPincode = postcode;
+          if (titleParts.isNotEmpty) {
+            _resolvedTitle = titleParts.join(', ');
+          }
+          _resolvedSubtitle = [
+            if (city != null && city.isNotEmpty) city,
+            if (state != null && state.isNotEmpty) state,
+            if (postcode != null && postcode.isNotEmpty) postcode,
+          ].join(', ');
+        });
+        if (line2 != null && city != null && postcode != null) {
+          return;
+        }
+      } else {
+        setState(() {
+          _searchResults = [];
+          _searchController.text = item['display_name'] ?? '';
+        });
+      }
       _reverseGeocode(target);
     }
   }

@@ -28,6 +28,20 @@ class _SelectAddressScreenState extends ConsumerState<SelectAddressScreen> {
   AddressModel? _selectedAddress;
   bool _isChecking = false;
 
+  Future<void> _setDefault(AddressModel address) async {
+    if (address.isDefault) return;
+    try {
+      await ref.read(addressesProvider.notifier).setDefaultAddress(address.id);
+      if (mounted) {
+        FixHubSnackbar.success(context, '"${address.label}" set as default address');
+      }
+    } catch (e) {
+      if (mounted) {
+        FixHubSnackbar.error(context, 'Failed to set default address');
+      }
+    }
+  }
+
   void _confirmDelete(AddressModel address) {
     showDialog(
       context: context,
@@ -332,7 +346,7 @@ class _SelectAddressScreenState extends ConsumerState<SelectAddressScreen> {
                                             vertical: 2,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: AppColors.surface,
+                                            color: AppColors.buttonPrimary,
                                             borderRadius: BorderRadius.circular(4),
                                           ),
                                           child: Text(
@@ -341,9 +355,38 @@ class _SelectAddressScreenState extends ConsumerState<SelectAddressScreen> {
                                                 .textTheme
                                                 .bodySmall
                                                 ?.copyWith(
-                                                  color: AppColors.textSecondary,
+                                                  color: Colors.white,
                                                   fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
                                                 ),
+                                          ),
+                                        ),
+                                      ] else ...[
+                                        const SizedBox(width: AppSpacing.sm),
+                                        InkWell(
+                                          onTap: () => _setDefault(address),
+                                          borderRadius: BorderRadius.circular(4),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: AppSpacing.xs,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.surface,
+                                              borderRadius: BorderRadius.circular(4),
+                                              border: Border.all(color: AppColors.border),
+                                            ),
+                                            child: Text(
+                                              'Set Default',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.copyWith(
+                                                    color: AppColors.textSecondary,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                            ),
                                           ),
                                         ),
                                       ],

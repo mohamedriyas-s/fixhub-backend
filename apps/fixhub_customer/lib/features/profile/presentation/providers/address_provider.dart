@@ -65,6 +65,22 @@ class AddressNotifier extends StateNotifier<AsyncValue<List<AddressModel>>> {
     }
   }
 
+  Future<void> setDefaultAddress(String id) async {
+    try {
+      final updated = await _repository.setDefaultAddress(id);
+      if (state.hasValue) {
+        state = AsyncValue.data(
+          state.value!.map((a) {
+            if (a.id == id) return updated;
+            return a.copyWith(isDefault: false);
+          }).toList(),
+        );
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   Future<void> deleteAddress(String id) async {
     try {
       await _repository.deleteAddress(id);

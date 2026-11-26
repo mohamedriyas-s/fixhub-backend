@@ -15,6 +15,20 @@ import '../providers/address_provider.dart';
 class SavedAddressesScreen extends ConsumerWidget {
   const SavedAddressesScreen({super.key});
 
+  Future<void> _setDefault(BuildContext context, WidgetRef ref, AddressModel address) async {
+    if (address.isDefault) return;
+    try {
+      await ref.read(addressesProvider.notifier).setDefaultAddress(address.id);
+      if (context.mounted) {
+        FixHubSnackbar.success(context, '"${address.label}" set as default address');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        FixHubSnackbar.error(context, 'Failed to set default address');
+      }
+    }
+  }
+
   void _confirmDelete(BuildContext context, WidgetRef ref, AddressModel address) {
     showDialog(
       context: context,
@@ -87,6 +101,8 @@ class SavedAddressesScreen extends ConsumerWidget {
             itemBuilder: (context, index) {
               final address = addresses[index];
               return FixHubCard(
+                borderColor: address.isDefault ? AppColors.buttonPrimary : null,
+                onTap: address.isDefault ? null : () => _setDefault(context, ref, address),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -124,9 +140,8 @@ class SavedAddressesScreen extends ConsumerWidget {
                                     vertical: 2,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: AppColors.surface,
+                                    color: AppColors.buttonPrimary,
                                     borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(color: AppColors.border),
                                   ),
                                   child: Text(
                                     'Default',
@@ -134,10 +149,38 @@ class SavedAddressesScreen extends ConsumerWidget {
                                         .textTheme
                                         .bodySmall
                                         ?.copyWith(
-                                          color: AppColors.textSecondary,
+                                          color: Colors.white,
                                           fontSize: 10,
                                           fontWeight: FontWeight.bold,
                                         ),
+                                  ),
+                                ),
+                              ] else ...[
+                                const SizedBox(width: AppSpacing.sm),
+                                InkWell(
+                                  onTap: () => _setDefault(context, ref, address),
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.xs,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.surface,
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: AppColors.border),
+                                    ),
+                                    child: Text(
+                                      'Set Default',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
                                   ),
                                 ),
                               ],

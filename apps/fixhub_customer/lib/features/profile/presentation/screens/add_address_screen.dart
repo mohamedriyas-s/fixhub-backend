@@ -106,11 +106,15 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
       setState(() {
         _latitude = selected.latitude;
         _longitude = selected.longitude;
-        if (selected.line1.isNotEmpty) {
-          _addressLine1Controller.text = selected.line1;
-        }
+        // Solution 2: Auto-fill Street / Area / Locality (line2), city, state, pincode;
+        // only fill Flat / House No. / Building (line1) when a specific house/building was detected.
         if (selected.line2 != null && selected.line2!.isNotEmpty) {
           _addressLine2Controller.text = selected.line2!;
+          if (selected.line1.isNotEmpty) {
+            _addressLine1Controller.text = selected.line1;
+          }
+        } else if (selected.line1.isNotEmpty) {
+          _addressLine2Controller.text = selected.line1;
         }
         if (selected.city.isNotEmpty) {
           _cityController.text = selected.city;
@@ -356,25 +360,6 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
                 if (value.length != 6 || int.tryParse(value) == null) return 'Must be 6 digits';
                 return null;
               },
-            ),
-            const SizedBox(height: AppSpacing.md),
-            SwitchListTile(
-              title: Text(
-                'Set as Default Address',
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-              subtitle: Text(
-                'Use this as primary address for future bookings',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-              ),
-              value: _isDefault,
-              onChanged: (val) {
-                setState(() {
-                  _isDefault = val;
-                });
-              },
-              contentPadding: EdgeInsets.zero,
-              activeThumbColor: AppColors.buttonPrimary,
             ),
             const SizedBox(height: AppSpacing.xl),
           ],
