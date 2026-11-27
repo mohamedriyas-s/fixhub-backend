@@ -82,8 +82,14 @@ class _SetLocationScreenState extends ConsumerState<SetLocationScreen> {
     final locationState = ref.watch(locationProvider);
 
     ref.listen<LocationState>(locationProvider, (previous, next) {
+      if (!(ModalRoute.of(context)?.isCurrent ?? false)) return;
       if (next.status == LocationStatus.valid) {
-        if (context.canPop()) {
+        final hasHomeInStack = GoRouter.of(context)
+            .routerDelegate
+            .currentConfiguration
+            .matches
+            .any((m) => m.matchedLocation == RouteNames.home);
+        if (hasHomeInStack && context.canPop()) {
           context.pop();
         } else {
           context.go(RouteNames.home);

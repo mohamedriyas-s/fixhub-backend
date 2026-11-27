@@ -91,6 +91,12 @@ final routerProvider = Provider<GoRouter>((ref) {
             !isLocationRoute) {
           return RouteNames.locationAccess;
         }
+
+        if (locationStatus == LocationStatus.valid &&
+            (state.matchedLocation == RouteNames.locationAccess ||
+                state.matchedLocation == RouteNames.serviceAreaNotCovered)) {
+          return RouteNames.home;
+        }
       }
 
       return null;
