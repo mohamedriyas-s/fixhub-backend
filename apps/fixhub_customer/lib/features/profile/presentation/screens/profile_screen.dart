@@ -134,7 +134,9 @@ class ProfileScreen extends ConsumerWidget {
                             ),
                             const SizedBox(height: AppSpacing.xxs),
                             Text(
-                              user?.phone ?? '',
+                              (user?.phone.isNotEmpty == true)
+                                  ? user!.phone
+                                  : (user?.email ?? ''),
                               style: Theme.of(context)
                                   .textTheme
                                   .bodyMedium
@@ -251,7 +253,7 @@ class ProfileScreen extends ConsumerWidget {
                   context: context,
                   title: 'Log out?',
                   message:
-                      "You'll need to verify your phone number again to log back in.",
+                      "You'll need to verify your email again to log back in.",
                   confirmLabel: 'Log Out',
                   cancelLabel: 'Cancel',
                 );

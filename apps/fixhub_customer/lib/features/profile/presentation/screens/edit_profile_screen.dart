@@ -286,6 +286,15 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               controller: _phoneController,
               keyboardType: TextInputType.phone,
               decoration: _inputDecoration(hint: '+91 98765 43210'),
+              validator: (v) {
+                final raw = (v ?? '').trim();
+                if (raw.isEmpty) return null;
+                final digits = raw.replaceAll(RegExp(r'[\s\-]'), '');
+                if (!RegExp(r'^(\+91|91|0)?[6-9]\d{9}$').hasMatch(digits)) {
+                  return 'Enter a valid 10-digit Indian phone number';
+                }
+                return null;
+              },
             ),
 
             const SizedBox(height: AppSpacing.xxl),

@@ -76,12 +76,15 @@ class ProfileUploadService {
     return publicUrl;
   }
 
-  /// Updates the user's name and/or email via PATCH /users/me.
+  /// Updates the user's name, email, and/or booking contact phone via PATCH /users/me.
   Future<void> updateProfile({String? name, String? email, String? phone}) async {
     final data = <String, dynamic>{};
     if (name != null && name.trim().isNotEmpty) data['name'] = name.trim();
     if (email != null && email.trim().isNotEmpty) data['email'] = email.trim();
-    if (phone != null && phone.trim().isNotEmpty) data['phone'] = phone.trim();
+    if (phone != null) {
+      final trimmedPhone = phone.trim();
+      data['phone'] = trimmedPhone.isEmpty ? null : trimmedPhone;
+    }
     if (data.isEmpty) return;
 
     await _dio.patch('/users/me', data: data);

@@ -11,6 +11,7 @@ import '../../../../core/widgets/fixhub_card.dart';
 import '../../../../core/widgets/fixhub_snackbar.dart';
 import '../../data/datasources/booking_remote_datasource.dart';
 import '../../data/models/booking_model.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/booking_provider.dart';
 
 /// Final Quotation and Gated Completion OTP Card for Customer.
@@ -77,6 +78,8 @@ class _FinalQuotationOtpCardState extends ConsumerState<FinalQuotationOtpCard> {
 
       _pendingOrderId = orderId;
 
+      final user = ref.read(authProvider).user;
+
       final options = {
         'key': keyId,
         'amount': amount,
@@ -86,8 +89,8 @@ class _FinalQuotationOtpCardState extends ConsumerState<FinalQuotationOtpCard> {
         'description': 'Additional Work Charge - Booking #${widget.booking.bookingNumber}',
         'timeout': 300,
         'prefill': {
-          'contact': '',
-          'email': '',
+          'contact': user?.phone ?? '',
+          'email': user?.email ?? '',
         },
         'theme': {
           'color': '#1F1F1F',

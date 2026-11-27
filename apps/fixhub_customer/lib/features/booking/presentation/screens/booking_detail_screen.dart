@@ -301,33 +301,38 @@ class BookingDetailScreen extends ConsumerWidget {
                                   style: Theme.of(context).textTheme.titleMedium,
                                 ),
                                 const SizedBox(height: AppSpacing.xxs),
-                                Text(
-                                  booking.technician!['user']?['phone'] ?? '',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                        color: AppColors.textSecondary,
-                                      ),
-                                ),
+                                if ((booking.technician!['user']?['phone'] as String? ?? '').isNotEmpty ||
+                                    (booking.technician!['user']?['email'] as String? ?? '').isNotEmpty)
+                                  Text(
+                                    (booking.technician!['user']?['phone'] as String? ?? '').isNotEmpty
+                                        ? booking.technician!['user']!['phone'] as String
+                                        : (booking.technician!['user']?['email'] as String? ?? ''),
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          color: AppColors.textSecondary,
+                                        ),
+                                  ),
                               ],
                             ),
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.phone, color: AppColors.buttonPrimary),
-                            onPressed: () async {
-                              final phone = booking.technician!['user']?['phone'];
-                              if (phone != null && phone.isNotEmpty) {
-                                final uri = Uri.parse('tel:$phone');
-                                if (await canLaunchUrl(uri)) {
-                                  await launchUrl(uri);
-                                } else {
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Could not launch dialer')),
-                                    );
+                          if ((booking.technician!['user']?['phone'] as String? ?? '').isNotEmpty)
+                            IconButton(
+                              icon: const Icon(Icons.phone, color: AppColors.buttonPrimary),
+                              onPressed: () async {
+                                final phone = booking.technician!['user']?['phone'];
+                                if (phone != null && phone.isNotEmpty) {
+                                  final uri = Uri.parse('tel:$phone');
+                                  if (await canLaunchUrl(uri)) {
+                                    await launchUrl(uri);
+                                  } else {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Could not launch dialer')),
+                                      );
+                                    }
                                   }
                                 }
-                              }
-                            },
-                          ),
+                              },
+                            ),
                         ],
                       ),
                     ],

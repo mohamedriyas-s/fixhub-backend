@@ -10,6 +10,7 @@ import '../../../../core/widgets/fixhub_button.dart';
 import '../../../../core/router/route_names.dart';
 import '../providers/booking_flow_provider.dart';
 import '../providers/booking_provider.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/widgets/fixhub_snackbar.dart';
 
 class PaymentScreen extends ConsumerStatefulWidget {
@@ -77,6 +78,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         throw Exception('Invalid payment order response');
       }
 
+      final user = ref.read(authProvider).user;
+
       // 2. Open Razorpay checkout
       final options = {
         'key': keyId,
@@ -87,8 +90,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         'description': flowState.selectedService?.name ?? 'Service Booking',
         'timeout': 300,  // 5 minutes
         'prefill': {
-          'contact': '',
-          'email': '',
+          'contact': user?.phone ?? '',
+          'email': user?.email ?? '',
         },
         'theme': {
           'color': '#1F1F1F',
