@@ -1,4 +1,6 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/config/theme/app_colors.dart';
@@ -49,17 +51,23 @@ class _EditServiceAreasScreenState
     final serviceAreas = profileState.value?.serviceAreas;
     if (serviceAreas != null) {
       final List<Map<String, String>> areas = [];
-      for (var a in serviceAreas) {
-        if (a is Map<String, dynamic>) {
+      for (final raw in serviceAreas) {
+        if (raw is Map) {
+          final a = Map<String, dynamic>.from(raw);
           // Backend returns: { "serviceArea": { "name": ..., "pincode": ... } }
-          final sa = a['serviceArea'] as Map<String, dynamic>?;
-          final name = (sa?['name'] ?? a['name']) as String?;
-          final pincode = (sa?['pincode'] ?? a['pincode']) as String?;
-          if (pincode != null && name != null) {
-             areas.add({
-               'name': name,
-               'pincode': pincode,
-             });
+          final sa = a['serviceArea'] is Map
+              ? Map<String, dynamic>.from(a['serviceArea'] as Map)
+              : null;
+          final name = (sa?['name'] ?? a['name'])?.toString().trim();
+          final pincode = (sa?['pincode'] ?? a['pincode'])?.toString().trim();
+          if (pincode != null &&
+              pincode.isNotEmpty &&
+              name != null &&
+              name.isNotEmpty) {
+            areas.add({
+              'name': name,
+              'pincode': pincode,
+            });
           }
         }
       }
@@ -69,18 +77,46 @@ class _EditServiceAreasScreenState
     }
   }
 
-  void _addArea() {
+  static final _indianPincodeRegex = RegExp(r'^[1-9]\d{5}$');
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.error,
+      ),
+    );
+  }
+
+  bool _addArea({bool silentIfEmpty = false}) {
     final name = _nameController.text.trim();
     final pincode = _pincodeController.text.trim();
-    if (name.isNotEmpty && pincode.isNotEmpty) {
-      if (!_customAreas.any((a) => a['pincode'] == pincode)) {
-        setState(() {
-          _customAreas.add({'name': name, 'pincode': pincode});
-        });
+
+    if (name.isEmpty && pincode.isEmpty) {
+      if (!silentIfEmpty) {
+        _showError('Please enter both area/city name and 6-digit pincode');
       }
-      _nameController.clear();
-      _pincodeController.clear();
+      return true;
     }
+    if (name.length < 2) {
+      _showError('Area/city name must be at least 2 characters');
+      return false;
+    }
+    if (!_indianPincodeRegex.hasMatch(pincode)) {
+      _showError('Please enter a valid 6-digit pincode');
+      return false;
+    }
+    if (_customAreas.any((a) => a['pincode'] == pincode)) {
+      _showError('Pincode $pincode is already added');
+      return false;
+    }
+
+    setState(() {
+      _customAreas.add({'name': name, 'pincode': pincode});
+    });
+    _nameController.clear();
+    _pincodeController.clear();
+    return true;
   }
 
   void _removeArea(String pincode) {
@@ -89,14 +125,26 @@ class _EditServiceAreasScreenState
     });
   }
 
+  String _extractErrorMessage(Object e) {
+    if (e is DioException) {
+      final data = e.response?.data;
+      if (data is Map && data['message'] != null) {
+        final msg = data['message'];
+        if (msg is List && msg.isNotEmpty) return msg.first.toString();
+        return msg.toString();
+      }
+    }
+    return 'Failed to update service areas. Please try again.';
+  }
+
   Future<void> _save() async {
+    // Include pending valid text in inputs even if the user didn't tap '+'
+    if (!_addArea(silentIfEmpty: true)) {
+      return;
+    }
+
     if (_customAreas.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select at least one service area'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      _showError('Please add at least one service area');
       return;
     }
 
@@ -117,12 +165,7 @@ class _EditServiceAreasScreenState
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to update service areas. Please try again.'),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        _showError(_extractErrorMessage(e));
       }
     } finally {
       if (mounted) {
@@ -244,8 +287,11 @@ class _EditServiceAreasScreenState
                       child: TextField(
                         controller: _pincodeController,
                         keyboardType: TextInputType.number,
+                        maxLength: 6,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         decoration: const InputDecoration(
                           hintText: 'Pincode',
+                          counterText: '',
                           isDense: true,
                           border: OutlineInputBorder(),
                         ),

@@ -24,22 +24,34 @@ export class TechnicianServiceAreaService {
 
     const finalServiceAreaIds = new Set<string>(dto.serviceAreaIds || []);
 
-    // Create or find custom areas based on pincode
+    // Create or find/reactivate custom areas based on pincode
     if (dto.customAreas && dto.customAreas.length > 0) {
       for (const customArea of dto.customAreas) {
+        const name = customArea.name.trim();
+        const pincode = customArea.pincode.trim();
+
         let area = await this.prisma.serviceArea.findUnique({
-          where: { pincode: customArea.pincode },
+          where: { pincode },
         });
 
         if (!area) {
-          // Create new service area dynamically if it doesn't exist
+          // Create new service area dynamically with Tamil Nadu as default state
           area = await this.prisma.serviceArea.create({
             data: {
-              name: customArea.name,
-              pincode: customArea.pincode,
-              city: customArea.name, // Fallback to name as city if unknown
-              state: 'Unknown',
+              name,
+              pincode,
+              city: name,
+              state: 'Tamil Nadu',
               isActive: true,
+            },
+          });
+        } else if (!area.isActive || area.deletedAt !== null) {
+          area = await this.prisma.serviceArea.update({
+            where: { id: area.id },
+            data: {
+              isActive: true,
+              deletedAt: null,
+              ...(area.state === 'Unknown' && { state: 'Tamil Nadu' }),
             },
           });
         }
