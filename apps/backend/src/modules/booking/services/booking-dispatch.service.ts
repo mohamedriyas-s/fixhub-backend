@@ -281,22 +281,29 @@ export class BookingDispatchService {
     );
   }
 
+  private static readonly ORPHANED_NOTIFIED_NOTE = 'ORPHANED_NOTIFIED';
+
   /**
-   * Checks for CONFIRMED bookings that have no PENDING or ACCEPTED job offers
-   * (meaning all offers have expired or been rejected) and:
-   *  1. Notifies the customer that we are working on finding a technician.
-   *  2. Auto-cancels and marks for refund bookings that have been orphaned for > 2 hours.
+   * Checks for unassigned CONFIRMED bookings that have no PENDING or ACCEPTED
+   * job offers and haven't been notified yet:
+   *  1. Notifies the customer once that we are working on finding a technician.
+   *  2. Alerts admins once so they can manually assign from the Admin Panel.
+   *  3. Marks the booking in BookingTimeline so subsequent runs do not spam.
    * Called periodically by the job scheduler.
    */
   async checkOrphanedBookings(): Promise<number> {
-    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-
     const orphanedBookings = await this.prisma.booking.findMany({
       where: {
         status: BookingStatus.CONFIRMED,
+        technicianId: null,
         jobOffers: {
           none: {
             status: { in: ['PENDING', 'ACCEPTED'] },
+          },
+        },
+        timeline: {
+          none: {
+            note: BookingDispatchService.ORPHANED_NOTIFIED_NOTE,
           },
         },
       },
@@ -306,73 +313,42 @@ export class BookingDispatchService {
       },
     });
 
-    let autoCancelledCount = 0;
-
     for (const booking of orphanedBookings) {
-      const isLongOrphaned = booking.updatedAt < twoHoursAgo;
+      this.logger.warn(
+        `Booking ${booking.bookingNumber} is unassigned — notifying customer once and alerting admins.`,
+      );
 
-      if (isLongOrphaned) {
-        // ── Auto-cancel after 2 hours with no technician ────────────────────
-        this.logger.warn(
-          `Auto-cancelling booking ${booking.bookingNumber} — orphaned for >2 hours.`,
-        );
+      if (booking.customer?.userId) {
+        await this.notificationService
+          .sendPushNotification({
+            userId: booking.customer.userId,
+            title: '🔍 Finding You a Technician',
+            body: `We're still looking for the best technician for booking ${booking.bookingNumber}. We'll notify you as soon as one is assigned. Sorry for the wait!`,
+            type: NotificationType.BOOKING_UPDATE,
+            payload: { bookingId: booking.id, screen: 'booking_detail' },
+          })
+          .catch((err) =>
+            this.logger.warn(
+              `Failed to notify customer ${booking.customer.userId}: ${err.message}`,
+            ),
+          );
+      }
 
-        await this.prisma.booking.update({
-          where: { id: booking.id },
+      await this.alertAdminNoTechnicians(booking);
+
+      if (booking.customer?.userId) {
+        await this.prisma.bookingTimeline.create({
           data: {
-            status: BookingStatus.FAILED,
-            failedAt: new Date(),
-            failureReason: 'No available technician found in your area. Booking auto-cancelled.',
+            bookingId: booking.id,
+            status: BookingStatus.CONFIRMED,
+            changedByUserId: booking.customer.userId,
+            note: BookingDispatchService.ORPHANED_NOTIFIED_NOTE,
           },
         });
-
-        // Notify customer with apology + refund promise
-        if (booking.customer?.userId) {
-          await this.notificationService
-            .sendPushNotification({
-              userId: booking.customer.userId,
-              title: '❌ Booking Cancelled — Refund Initiated',
-              body: `We're sorry! We couldn't find a technician for booking ${booking.bookingNumber}. Your payment will be refunded within 3–5 business days.`,
-              type: NotificationType.BOOKING_UPDATE,
-              payload: { bookingId: booking.id, screen: 'booking_detail' },
-            })
-            .catch((err) =>
-              this.logger.warn(
-                `Failed to notify customer ${booking.customer.userId}: ${err.message}`,
-              ),
-            );
-        }
-
-        autoCancelledCount++;
-      } else {
-        // ── Still within tolerance — notify customer we're working on it ────
-        this.logger.warn(
-          `Booking ${booking.bookingNumber} is orphaned — notifying customer and alerting admins.`,
-        );
-
-        if (booking.customer?.userId) {
-          await this.notificationService
-            .sendPushNotification({
-              userId: booking.customer.userId,
-              title: '🔍 Finding You a Technician',
-              body: `We're still looking for the best technician for booking ${booking.bookingNumber}. We'll notify you as soon as one is assigned. Sorry for the wait!`,
-              type: NotificationType.BOOKING_UPDATE,
-              payload: { bookingId: booking.id, screen: 'booking_detail' },
-            })
-            .catch((err) =>
-              this.logger.warn(
-                `Failed to notify customer ${booking.customer.userId}: ${err.message}`,
-              ),
-            );
-        }
-
-        await this.alertAdminNoTechnicians(booking);
       }
     }
 
-    this.logger.log(
-      `Orphaned booking check: ${orphanedBookings.length} found, ${autoCancelledCount} auto-cancelled.`,
-    );
+    this.logger.log(`Orphaned booking check: ${orphanedBookings.length} newly notified.`);
     return orphanedBookings.length;
   }
 }

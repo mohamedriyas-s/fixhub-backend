@@ -72,6 +72,7 @@ describe('BookingDispatchService', () => {
       booking: {
         findUnique: jest.fn(),
         findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
         count: jest.fn(),
         update: jest.fn(),
       },
@@ -281,6 +282,68 @@ describe('BookingDispatchService', () => {
           status: BookingStatus.ASSIGNED,
         },
       });
+    });
+  });
+
+  describe('checkOrphanedBookings', () => {
+    it('should notify customer once, alert admins once, record timeline marker, and not auto-cancel', async () => {
+      prisma.booking.findMany.mockResolvedValue([
+        {
+          id: 'booking-orphan-1',
+          bookingNumber: 'FH-20261120-0002',
+          status: BookingStatus.CONFIRMED,
+          technicianId: null,
+          updatedAt: new Date(Date.now() - 3 * 60 * 60 * 1000), // > 2 hours old
+          address: { pincode: '600001' },
+          subServiceId: 'sub-service-uuid-1',
+          customer: { userId: 'cust-user-2' },
+        },
+      ]);
+      prisma.user.findMany.mockResolvedValue([{ id: 'admin-1' }]);
+
+      const count = await service.checkOrphanedBookings();
+
+      expect(count).toBe(1);
+      expect(prisma.booking.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: BookingStatus.CONFIRMED,
+            technicianId: null,
+            timeline: { none: { note: 'ORPHANED_NOTIFIED' } },
+          }),
+        }),
+      );
+      expect(prisma.booking.update).not.toHaveBeenCalled();
+      expect(notificationService.sendPushNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'cust-user-2',
+          title: '🔍 Finding You a Technician',
+        }),
+      );
+      expect(notificationService.sendPushNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'admin-1',
+          type: NotificationType.SYSTEM,
+        }),
+      );
+      expect(prisma.bookingTimeline.create).toHaveBeenCalledWith({
+        data: {
+          bookingId: 'booking-orphan-1',
+          status: BookingStatus.CONFIRMED,
+          changedByUserId: 'cust-user-2',
+          note: 'ORPHANED_NOTIFIED',
+        },
+      });
+    });
+
+    it('should return 0 when all orphaned bookings have already been notified', async () => {
+      prisma.booking.findMany.mockResolvedValue([]);
+
+      const count = await service.checkOrphanedBookings();
+
+      expect(count).toBe(0);
+      expect(notificationService.sendPushNotification).not.toHaveBeenCalled();
+      expect(prisma.bookingTimeline.create).not.toHaveBeenCalled();
     });
   });
 });
