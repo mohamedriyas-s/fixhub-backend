@@ -146,14 +146,6 @@ class JobRepository {
     return Job.fromJson(_unwrapMap(response.data));
   }
 
-  /// POST /technicians/jobs/:id/depart-next-slot
-  Future<Job> departNextSlot(String id) async {
-    final response = await _dio.post(
-      ApiEndpoints.technicianJobDepartNextSlot(id),
-    );
-    return Job.fromJson(_unwrapMap(response.data));
-  }
-
   /// POST /bookings/:id/verify-completion-otp
   Future<Job> verifyCompletionOtp(String id, String otp) async {
     final response = await _dio.post(

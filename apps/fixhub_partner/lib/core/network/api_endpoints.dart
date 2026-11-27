@@ -46,8 +46,6 @@ class ApiEndpoints {
       '/technicians/jobs/$id/additional-charge';
   static String technicianJobFinalizeAmount(String id) =>
       '/technicians/jobs/$id/finalize-amount';
-  static String technicianJobDepartNextSlot(String id) =>
-      '/technicians/jobs/$id/depart-next-slot';
   static String technicianJobVerifyCompletionOtp(String id) =>
       '/bookings/$id/verify-completion-otp';
 

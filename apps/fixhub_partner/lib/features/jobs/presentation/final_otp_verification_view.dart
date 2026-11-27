@@ -28,7 +28,6 @@ class _FinalOtpVerificationViewState
     extends ConsumerState<FinalOtpVerificationView> {
   final _otpCtrl = TextEditingController();
   bool _isVerifying = false;
-  bool _isDeparting = false;
   bool _isRefreshing = false;
   String? _errorText;
   Timer? _pollTimer;
@@ -111,62 +110,6 @@ class _FinalOtpVerificationViewState
       }
     } finally {
       if (mounted) setState(() => _isVerifying = false);
-    }
-  }
-
-  Future<void> _handleDepartNextSlot() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: const RoundedRectangleBorder(borderRadius: AppRadius.dialog),
-        title: const Text('Depart for Next Slot?'),
-        content: const Text(
-          'If your next appointment has arrived, you can depart. This job will remain in Pending Collection until the customer pays and shares the completion OTP.',
-          style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(c, false),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(c, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.textOnPrimary,
-              shape: const RoundedRectangleBorder(borderRadius: AppRadius.button),
-            ),
-            child: const Text('Confirm Departure'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true || !mounted) return;
-
-    setState(() => _isDeparting = true);
-    try {
-      await ref.read(activeJobProvider.notifier).departNextSlot(widget.job.id);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Departed for next slot. Job moved to Pending Collection.'),
-            backgroundColor: AppColors.info,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to update departure: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isDeparting = false);
     }
   }
 
@@ -350,16 +293,6 @@ class _FinalOtpVerificationViewState
               variant: FpButtonVariant.secondary,
               isLoading: _isRefreshing,
               onPressed: _isRefreshing ? null : () => _refreshPaymentStatus(),
-            ),
-          ],
-
-          if (!isPaid && isOnline && !widget.job.isPendingCollection) ...[
-            const SizedBox(height: AppSpacing.md),
-            FpButton(
-              label: '⏰ Depart for Next Slot',
-              variant: FpButtonVariant.secondary,
-              isLoading: _isDeparting,
-              onPressed: _isDeparting ? null : _handleDepartNextSlot,
             ),
           ],
         ],

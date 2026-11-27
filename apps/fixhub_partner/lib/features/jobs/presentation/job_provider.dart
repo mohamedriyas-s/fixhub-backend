@@ -165,20 +165,6 @@ class ActiveJobNotifier extends AsyncNotifier<Job?> {
     return state.value;
   }
 
-  Future<Job?> departNextSlot(String id) async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      final job = await _repository.departNextSlot(id);
-      ref.invalidate(jobDetailsProvider(id));
-      _invalidateRelatedProviders();
-      return job;
-    });
-    if (state.hasError) {
-      throw state.error!;
-    }
-    return state.value;
-  }
-
   Future<Job?> verifyCompletionOtp(String id, String otp) async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {

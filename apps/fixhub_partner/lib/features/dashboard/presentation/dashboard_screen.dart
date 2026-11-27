@@ -19,6 +19,7 @@ import '../../earnings/presentation/earnings_provider.dart';
 import '../../notifications/presentation/notification_provider.dart';
 import '../../../core/services/fcm_service.dart';
 import '../../../core/services/location_tracker.dart';
+import '../../../core/storage/local_storage.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -31,6 +32,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     with WidgetsBindingObserver {
   bool _isTogglingAvailability = false;
   Timer? _pollTimer;
+  final Set<String> _shownBannerJobIds = <String>{};
 
   @override
   void initState() {
@@ -130,35 +132,65 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             ? user.phone.trim()
             : '');
 
-    // Listen for newly assigned jobs and notify the technician immediately with an in-app banner
-    ref.listen<int>(assignedJobsCountProvider, (previous, current) {
-      if ((previous == null || previous == 0) && current > 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.work_rounded, color: Colors.white, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    '🔧 $current new job${current > 1 ? 's' : ''} assigned! Tap to view.',
-                    style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
-                  ),
+    // Listen for newly assigned jobs and notify the technician only for unacknowledged ones
+    ref.listen<AsyncValue<PaginatedJobs>>(myJobsProvider(null), (_, next) async {
+      final jobs = next.value?.items;
+      if (jobs == null || !mounted) return;
+      final assignedJobs =
+          jobs.where((j) => j.status.toUpperCase() == 'ASSIGNED').toList();
+      if (assignedJobs.isEmpty) return;
+
+      final messenger = ScaffoldMessenger.of(context);
+      final storage = ref.read(localStorageProvider);
+      final dismissedIds = await storage.getDismissedAssignedJobIds();
+      if (!mounted) return;
+
+      final unseenJobs = assignedJobs
+          .where((j) =>
+              !dismissedIds.contains(j.id) &&
+              !_shownBannerJobIds.contains(j.id))
+          .toList();
+      if (unseenJobs.isEmpty) return;
+
+      final unseenIds = unseenJobs.map((j) => j.id).toList();
+      _shownBannerJobIds.addAll(unseenIds);
+
+      final count = unseenJobs.length;
+      final controller = messenger.showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.work_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '🔧 $count new job${count > 1 ? 's' : ''} assigned! Tap to view.',
+                  style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
                 ),
-              ],
-            ),
-            backgroundColor: const Color(0xFF1F1F1F),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            duration: const Duration(seconds: 6),
-            action: SnackBarAction(
-              label: 'View',
-              textColor: Colors.white,
-              onPressed: () => context.go('/jobs'),
-            ),
+              ),
+            ],
           ),
-        );
-      }
+          backgroundColor: const Color(0xFF1F1F1F),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(seconds: 6),
+          action: SnackBarAction(
+            label: 'View',
+            textColor: Colors.white,
+            onPressed: () {
+              storage.addDismissedAssignedJobIds(unseenIds);
+              context.go('/jobs');
+            },
+          ),
+        ),
+      );
+      controller.closed.then((reason) {
+        if (reason == SnackBarClosedReason.action ||
+            reason == SnackBarClosedReason.swipe ||
+            reason == SnackBarClosedReason.dismiss) {
+          storage.addDismissedAssignedJobIds(unseenIds);
+        }
+      });
     });
 
     // Listen for newly received unread notifications and pop up a notification banner
@@ -196,7 +228,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
               action: SnackBarAction(
                 label: 'Open',
                 textColor: Colors.white,
-                onPressed: () => context.push('/notifications'),
+                onPressed: () {
+                  ref.read(notificationsProvider.notifier).markAsRead(latest.id);
+                  context.push('/notifications');
+                },
               ),
             ),
           );
