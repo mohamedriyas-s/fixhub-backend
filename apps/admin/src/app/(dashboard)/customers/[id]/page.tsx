@@ -1,13 +1,28 @@
 'use client';
 
-import * as React from 'react';
-import Link from 'next/link';
 import { ArrowLeft, MapPin } from 'lucide-react';
+import Link from 'next/link';
+import * as React from 'react';
 import { toast } from 'sonner';
 
-import { useCustomer, useUpdateCustomerStatus, useUpdateCustomerDetails, useNotifyCustomerProfile } from '@/lib/api/queries/use-customers';
+import {
+  Avatar,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Dialog,
+  Skeleton,
+} from '@/components/ui';
+import {
+  useCustomer,
+  useNotifyCustomerProfile,
+  useUpdateCustomerDetails,
+  useUpdateCustomerStatus,
+} from '@/lib/api/queries/use-customers';
 import { formatDate } from '@/lib/utils';
-import { Avatar, Badge, Button, Card, CardContent, CardHeader, CardTitle, Skeleton, Dialog } from '@/components/ui';
 
 function ActionDialog({
   open,
@@ -43,9 +58,7 @@ function ActionDialog({
     <Dialog open={open} onClose={onClose} title={title}>
       <div className="space-y-4">
         <div>
-          <label className="text-sm font-medium text-[#374151] mb-1 block">
-            Reason (Required)
-          </label>
+          <label className="text-sm font-medium text-[#374151] mb-1 block">Reason (Required)</label>
           <textarea
             className="w-full resize-none rounded-lg border border-[#E5E7EB] bg-[#F8F8F7] px-3 py-2 text-sm text-[#374151] focus:outline-none focus:ring-2 focus:ring-[#6F7F5F33]"
             rows={3}
@@ -55,10 +68,12 @@ function ActionDialog({
           />
         </div>
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button 
-            variant={isDanger ? 'danger' : 'primary'} 
-            onClick={handleConfirm} 
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant={isDanger ? 'danger' : 'primary'}
+            onClick={handleConfirm}
             loading={loading}
             disabled={!note.trim()}
           >
@@ -99,7 +114,7 @@ function EditCustomerDialog({
           onClose();
         },
         onError: () => toast.error('Failed to update details'),
-      }
+      },
     );
   };
 
@@ -125,7 +140,9 @@ function EditCustomerDialog({
           />
         </div>
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
           <Button variant="primary" onClick={handleSave} loading={updateMutation.isPending}>
             Save Changes
           </Button>
@@ -140,7 +157,7 @@ export default function CustomerProfilePage({ params }: { params: Promise<{ id: 
   const { data: customer, isLoading } = useCustomer(resolvedParams.id);
   const statusMutation = useUpdateCustomerStatus();
   const notifyMutation = useNotifyCustomerProfile();
-  
+
   const [actionState, setActionState] = React.useState<{
     open: boolean;
     type: 'block' | 'activate' | null;
@@ -152,7 +169,9 @@ export default function CustomerProfilePage({ params }: { params: Promise<{ id: 
       <div className="space-y-4">
         <Skeleton className="h-8 w-48" />
         <div className="grid gap-4 lg:grid-cols-3">
-          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-xl" />)}
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-48 rounded-xl" />
+          ))}
         </div>
       </div>
     );
@@ -181,21 +200,24 @@ export default function CustomerProfilePage({ params }: { params: Promise<{ id: 
               </Badge>
             </div>
             <p className="text-sm text-[#6B7280]">
-              {customer.user?.phone} · Joined {formatDate(customer.createdAt)}
+              {[
+                customer.user?.phone || customer.user?.email,
+                `Joined ${formatDate(customer.createdAt)}`,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </p>
           </div>
           <div className="ml-auto flex gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setEditDialogOpen(true)}
-            >
+            <Button variant="secondary" size="sm" onClick={() => setEditDialogOpen(true)}>
               Edit Details
             </Button>
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => setActionState({ open: true, type: customer.user?.isActive ? 'block' : 'activate' })}
+              onClick={() =>
+                setActionState({ open: true, type: customer.user?.isActive ? 'block' : 'activate' })
+              }
             >
               {customer.user?.isActive ? 'Block' : 'Activate'}
             </Button>
@@ -206,7 +228,9 @@ export default function CustomerProfilePage({ params }: { params: Promise<{ id: 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Personal Details */}
         <Card className="lg:col-span-2">
-          <CardHeader><CardTitle>Personal Details</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Personal Details</CardTitle>
+          </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4">
               {[
@@ -223,16 +247,20 @@ export default function CustomerProfilePage({ params }: { params: Promise<{ id: 
                 </div>
               ))}
             </div>
-            
+
             {(!customer.user?.name || !customer.user?.email) && (
               <div className="mt-6 flex items-center justify-between rounded-lg bg-[#FFFBEB] px-4 py-3 border border-[#FEF3C7]">
                 <span className="text-sm text-[#92400E]">Customer profile is incomplete</span>
-                <Button 
-                  size="sm" 
-                  onClick={() => 
+                <Button
+                  size="sm"
+                  onClick={() =>
                     notifyMutation.mutate(
-                      { id: customer.id, message: "Please complete your profile to enjoy 25% OFF on your first booking!" },
-                      { onSuccess: () => toast.success('Notification sent to customer') }
+                      {
+                        id: customer.id,
+                        message:
+                          'Please complete your profile to enjoy 25% OFF on your first booking!',
+                      },
+                      { onSuccess: () => toast.success('Notification sent to customer') },
                     )
                   }
                   loading={notifyMutation.isPending}
@@ -246,7 +274,9 @@ export default function CustomerProfilePage({ params }: { params: Promise<{ id: 
 
         {/* Saved Addresses */}
         <Card>
-          <CardHeader><CardTitle>Saved Addresses</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Saved Addresses</CardTitle>
+          </CardHeader>
           <CardContent>
             {customer.addresses && customer.addresses.length > 0 ? (
               <div className="space-y-3">
@@ -272,26 +302,25 @@ export default function CustomerProfilePage({ params }: { params: Promise<{ id: 
       <ActionDialog
         open={actionState.open}
         onClose={() => setActionState({ open: false, type: null })}
-        title={
-          actionState.type === 'block' ? 'Block Customer' : 'Activate Customer'
-        }
-        actionLabel={
-          actionState.type === 'block' ? 'Block' : 'Activate'
-        }
+        title={actionState.type === 'block' ? 'Block Customer' : 'Activate Customer'}
+        actionLabel={actionState.type === 'block' ? 'Block' : 'Activate'}
         isDanger={actionState.type === 'block'}
         loading={statusMutation.isPending}
         onConfirm={(note) => {
           if (!customer) return;
           statusMutation.mutate(
             { userId: customer.userId, isActive: actionState.type === 'activate' },
-            { 
-              onSuccess: () => { toast.success(`Account ${actionState.type}d`); setActionState({ open: false, type: null }); }
-            }
+            {
+              onSuccess: () => {
+                toast.success(`Account ${actionState.type}d`);
+                setActionState({ open: false, type: null });
+              },
+            },
           );
         }}
       />
 
-      <EditCustomerDialog 
+      <EditCustomerDialog
         open={editDialogOpen}
         onClose={() => setEditDialogOpen(false)}
         customer={customer}

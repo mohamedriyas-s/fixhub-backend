@@ -19,12 +19,7 @@ export type BookingStatus =
   | 'FAILED';
 
 export type PaymentStatus =
-  | 'PENDING'
-  | 'AUTHORIZED'
-  | 'CAPTURED'
-  | 'FAILED'
-  | 'REFUNDED'
-  | 'PARTIALLY_REFUNDED';
+  'PENDING' | 'AUTHORIZED' | 'CAPTURED' | 'FAILED' | 'REFUNDED' | 'PARTIALLY_REFUNDED';
 
 export type PaymentMethod = 'UPI' | 'CARD' | 'NETBANKING' | 'WALLET' | 'COD';
 
@@ -32,31 +27,21 @@ export type PaymentTransactionType = 'AUTHORIZE' | 'CAPTURE' | 'REFUND' | 'FAILU
 
 export type VerificationStatus = 'PENDING' | 'UNDER_REVIEW' | 'VERIFIED' | 'REJECTED';
 
-export type DocumentType =
-  | 'AADHAAR'
-  | 'PAN'
-  | 'DRIVING_LICENSE'
-  | 'CERTIFICATE'
-  | 'OTHER';
+export type DocumentType = 'AADHAAR' | 'PAN' | 'DRIVING_LICENSE' | 'CERTIFICATE' | 'OTHER';
 
 export type MediaType = 'IMAGE' | 'VIDEO' | 'DOCUMENT';
 
 export type MediaUploadPhase = 'BEFORE_SERVICE' | 'DURING_SERVICE' | 'AFTER_SERVICE';
 
 export type NotificationType =
-  | 'BOOKING_UPDATE'
-  | 'PAYMENT_UPDATE'
-  | 'ASSIGNMENT'
-  | 'REVIEW'
-  | 'SYSTEM'
-  | 'PROMOTIONAL';
+  'BOOKING_UPDATE' | 'PAYMENT_UPDATE' | 'ASSIGNMENT' | 'REVIEW' | 'SYSTEM' | 'PROMOTIONAL';
 
 export type CancellationActor = 'CUSTOMER' | 'TECHNICIAN' | 'ADMIN' | 'SYSTEM';
 
 // ─── User ─────────────────────────────────────────────────
 export interface User {
   id: string;
-  phone: string;
+  phone?: string | null;
   email?: string | null;
   name?: string | null;
   role: Role;
@@ -351,7 +336,7 @@ export interface AuditLog {
   ipAddress?: string | null;
   userAgent?: string | null;
   createdAt: string;
-  user?: Pick<User, 'id' | 'name' | 'phone'> | null;
+  user?: Pick<User, 'id' | 'name' | 'phone' | 'email'> | null;
 }
 
 // ─── Dashboard ────────────────────────────────────────────

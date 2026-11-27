@@ -87,7 +87,9 @@ export class TechnicianJobRepository {
         technicianId,
       },
       include: {
-        customer: { include: { user: { select: { name: true, phone: true } } } },
+        customer: {
+          include: { user: { select: { id: true, name: true, phone: true, email: true } } },
+        },
         technician: true,
         subService: { include: { category: true } },
         address: true,
@@ -133,7 +135,9 @@ export class TechnicianJobRepository {
 
   private jobListInclude(): Prisma.BookingInclude {
     return {
-      customer: { include: { user: { select: { id: true, name: true, phone: true } } } },
+      customer: {
+        include: { user: { select: { id: true, name: true, phone: true, email: true } } },
+      },
       subService: {
         select: {
           id: true,

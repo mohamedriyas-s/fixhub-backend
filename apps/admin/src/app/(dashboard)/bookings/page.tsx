@@ -1,15 +1,21 @@
 'use client';
 
-import * as React from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useRouter } from 'next/navigation';
+import * as React from 'react';
 
+import { BookingDrawer } from '@/components/bookings/booking-drawer';
+import { DataTable, SortableHeader } from '@/components/data-table/data-table';
+import { Avatar, Badge, Button, Select, Tabs } from '@/components/ui';
 import { useBookings } from '@/lib/api/queries/use-bookings';
 import type { Booking, BookingStatus } from '@/lib/types';
-import { bookingStatusLabel, bookingStatusVariant, formatCurrency, formatDate, formatDateTime } from '@/lib/utils';
-import { Avatar, Badge, Button, Select, Tabs } from '@/components/ui';
-import { DataTable, SortableHeader } from '@/components/data-table/data-table';
-import { BookingDrawer } from '@/components/bookings/booking-drawer';
+import {
+  bookingStatusLabel,
+  bookingStatusVariant,
+  formatCurrency,
+  formatDate,
+  formatDateTime,
+} from '@/lib/utils';
 
 const STATUS_OPTIONS = [
   { label: 'All Status', value: '' },
@@ -24,11 +30,7 @@ const STATUS_OPTIONS = [
 ];
 
 function BookingStatusBadge({ status }: { status: BookingStatus }) {
-  return (
-    <Badge variant={bookingStatusVariant(status)}>
-      {bookingStatusLabel(status)}
-    </Badge>
-  );
+  return <Badge variant={bookingStatusVariant(status)}>{bookingStatusLabel(status)}</Badge>;
 }
 
 export default function BookingsPage() {
@@ -64,13 +66,13 @@ export default function BookingsPage() {
       header: 'Customer',
       cell: ({ row }) => {
         const name = row.original.customer?.user?.name;
-        const phone = row.original.customer?.user?.phone;
+        const contact = row.original.customer?.user?.phone || row.original.customer?.user?.email;
         return (
           <div className="flex items-center gap-2.5">
             <Avatar name={name} size="sm" />
             <div>
               <div className="text-xs font-medium text-[#111827]">{name ?? '—'}</div>
-              <div className="text-[11px] text-[#9CA3AF]">{phone}</div>
+              <div className="text-[11px] text-[#9CA3AF]">{contact ?? '—'}</div>
             </div>
           </div>
         );
@@ -149,9 +151,7 @@ export default function BookingsPage() {
     },
   ];
 
-  const pageCount = data?.meta
-    ? Math.ceil(data.meta.total / limit)
-    : 1;
+  const pageCount = data?.meta ? Math.ceil(data.meta.total / limit) : 1;
 
   return (
     <div className="space-y-4 fade-in">
@@ -160,7 +160,9 @@ export default function BookingsPage() {
         <div>
           <h1 className="text-xl font-bold text-[#111827]">Bookings</h1>
           <p className="mt-0.5 text-sm text-[#6B7280]">
-            {data?.meta?.total ? `${data.meta.total.toLocaleString()} total bookings` : 'Loading...'}
+            {data?.meta?.total
+              ? `${data.meta.total.toLocaleString()} total bookings`
+              : 'Loading...'}
           </p>
         </div>
       </div>
@@ -172,7 +174,11 @@ export default function BookingsPage() {
           { id: 'history', label: 'Booking History' },
         ]}
         activeTab={tab}
-        onChange={(newTab) => { setTab(newTab); setPage(1); setStatusFilter(''); }}
+        onChange={(newTab) => {
+          setTab(newTab);
+          setPage(1);
+          setStatusFilter('');
+        }}
       />
 
       {/* Table */}
@@ -193,7 +199,10 @@ export default function BookingsPage() {
           <Select
             options={STATUS_OPTIONS}
             value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value as BookingStatus | ''); setPage(1); }}
+            onChange={(e) => {
+              setStatusFilter(e.target.value as BookingStatus | '');
+              setPage(1);
+            }}
             className="w-[160px]"
             placeholder=""
           />

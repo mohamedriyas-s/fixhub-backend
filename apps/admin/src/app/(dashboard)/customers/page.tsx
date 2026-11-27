@@ -1,18 +1,16 @@
 'use client';
 
-import * as React from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { useCustomers, useUpdateCustomerStatus } from '@/lib/api/queries/use-customers';
-import type { Customer } from '@/lib/types';
-import { formatDate, formatCurrency } from '@/lib/utils';
-import { Avatar, Badge, Button, Drawer, Separator } from '@/components/ui';
-import { DataTable, SortableHeader } from '@/components/data-table/data-table';
-import { toast } from 'sonner';
 import { MapPin } from 'lucide-react';
-
 import { useRouter } from 'next/navigation';
-import { useCreateCustomer } from '@/lib/api/queries/use-customers';
-import { Dialog } from '@/components/ui';
+import * as React from 'react';
+import { toast } from 'sonner';
+
+import { DataTable, SortableHeader } from '@/components/data-table/data-table';
+import { Avatar, Badge, Button, Dialog,Drawer, Separator  } from '@/components/ui';
+import { useCreateCustomer,useCustomers, useUpdateCustomerStatus  } from '@/lib/api/queries/use-customers';
+import type { Customer } from '@/lib/types';
+import { formatCurrency,formatDate } from '@/lib/utils';
 
 function CreateCustomerDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [name, setName] = React.useState('');
@@ -29,18 +27,22 @@ function CreateCustomerDialog({ open, onClose }: { open: boolean; onClose: () =>
   }, [open]);
 
   const handleCreate = () => {
-    if (!name.trim() || !phone.trim()) {
-      return toast.error('Name and phone are required');
+    if (!name.trim() || (!email.trim() && !phone.trim())) {
+      return toast.error('Name and email (or phone) are required');
     }
     createMutation.mutate(
-      { name: name.trim(), phone: phone.trim(), email: email.trim() || undefined },
+      {
+        name: name.trim(),
+        email: email.trim() || undefined,
+        phone: phone.trim() || undefined,
+      },
       {
         onSuccess: () => {
           toast.success('Customer created successfully');
           onClose();
         },
         onError: () => toast.error('Failed to create customer'),
-      }
+      },
     );
   };
 
@@ -58,17 +60,7 @@ function CreateCustomerDialog({ open, onClose }: { open: boolean; onClose: () =>
           />
         </div>
         <div>
-          <label className="text-sm font-medium text-[#374151] mb-1 block">Phone Number</label>
-          <input
-            type="text"
-            className="w-full rounded-lg border border-[#E5E7EB] bg-[#F8F8F7] px-3 py-2 text-sm text-[#374151] focus:outline-none focus:ring-2 focus:ring-[#6F7F5F33]"
-            placeholder="+919876543210"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="text-sm font-medium text-[#374151] mb-1 block">Email (Optional)</label>
+          <label className="text-sm font-medium text-[#374151] mb-1 block">Email Address</label>
           <input
             type="email"
             className="w-full rounded-lg border border-[#E5E7EB] bg-[#F8F8F7] px-3 py-2 text-sm text-[#374151] focus:outline-none focus:ring-2 focus:ring-[#6F7F5F33]"
@@ -77,9 +69,28 @@ function CreateCustomerDialog({ open, onClose }: { open: boolean; onClose: () =>
             onChange={(e) => setEmail(e.target.value)}
           />
         </div>
+        <div>
+          <label className="text-sm font-medium text-[#374151] mb-1 block">
+            Phone Number (Optional)
+          </label>
+          <input
+            type="text"
+            className="w-full rounded-lg border border-[#E5E7EB] bg-[#F8F8F7] px-3 py-2 text-sm text-[#374151] focus:outline-none focus:ring-2 focus:ring-[#6F7F5F33]"
+            placeholder="+919876543210"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
+        </div>
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" onClick={handleCreate} loading={createMutation.isPending} disabled={!name.trim() || !phone.trim()}>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleCreate}
+            loading={createMutation.isPending}
+            disabled={!name.trim() || (!email.trim() && !phone.trim())}
+          >
             Create Customer
           </Button>
         </div>
@@ -107,7 +118,7 @@ export default function CustomersPage() {
             <Avatar name={c.user?.name} size="sm" />
             <div>
               <div className="text-sm font-medium text-[#111827]">{c.user?.name ?? '—'}</div>
-              <div className="text-xs text-[#9CA3AF]">{c.user?.phone}</div>
+              <div className="text-xs text-[#9CA3AF]">{c.user?.phone || c.user?.email || '—'}</div>
             </div>
           </div>
         );
@@ -126,7 +137,9 @@ export default function CustomersPage() {
       id: 'bookings',
       header: ({ column }) => <SortableHeader column={column}>Bookings</SortableHeader>,
       cell: ({ row }) => (
-        <span className="text-sm font-medium text-[#374151]">{row.original._count?.bookings ?? 0}</span>
+        <span className="text-sm font-medium text-[#374151]">
+          {row.original._count?.bookings ?? 0}
+        </span>
       ),
       size: 100,
     },
@@ -162,7 +175,10 @@ export default function CustomersPage() {
               onClick={() =>
                 updateStatus.mutate(
                   { userId: c.userId, isActive: !c.user?.isActive },
-                  { onSuccess: () => toast.success(c.user?.isActive ? 'Customer blocked' : 'Customer activated') },
+                  {
+                    onSuccess: () =>
+                      toast.success(c.user?.isActive ? 'Customer blocked' : 'Customer activated'),
+                  },
                 )
               }
             >
@@ -203,11 +219,8 @@ export default function CustomersPage() {
         onRowClick={(c) => router.push(`/customers/${c.id}`)}
         emptyTitle="No customers found"
       />
-      
-      <CreateCustomerDialog 
-        open={createDialogOpen} 
-        onClose={() => setCreateDialogOpen(false)} 
-      />
+
+      <CreateCustomerDialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} />
     </div>
   );
 }

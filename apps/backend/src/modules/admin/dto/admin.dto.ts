@@ -92,9 +92,10 @@ export class CreateTechnicianDto {
   @MaxLength(100)
   name!: string;
 
-  @ApiProperty({ example: '9876543210' })
+  @ApiPropertyOptional({ example: '9876543210' })
+  @IsOptional()
   @IsString()
-  phone!: string;
+  phone?: string;
 
   @ApiPropertyOptional({ example: 'ravi@example.com' })
   @IsOptional()
@@ -145,9 +146,10 @@ export class CreateCustomerDto {
   @MaxLength(100)
   name!: string;
 
-  @ApiProperty({ example: '9123456789' })
+  @ApiPropertyOptional({ example: '9123456789' })
+  @IsOptional()
   @IsString()
-  phone!: string;
+  phone?: string;
 
   @ApiPropertyOptional({ example: 'priya@example.com' })
   @IsOptional()

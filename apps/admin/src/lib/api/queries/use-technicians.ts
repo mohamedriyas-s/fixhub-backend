@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import type { PaginatedResponse, Technician, TechnicianQueryParams, VerificationStatus } from '@/lib/types';
+import type {
+  PaginatedResponse,
+  Technician,
+  TechnicianQueryParams,
+  VerificationStatus,
+} from '@/lib/types';
 
 import { apiClient } from '../client';
 import { endpoints } from '../endpoints';
@@ -22,9 +27,7 @@ export function useTechnician(id: string) {
   return useQuery({
     queryKey: ['technician', id],
     queryFn: async () => {
-      const { data } = await apiClient.get<{ data: Technician }>(
-        endpoints.admin.technician(id),
-      );
+      const { data } = await apiClient.get<{ data: Technician }>(endpoints.admin.technician(id));
       return data.data;
     },
     enabled: !!id,
@@ -35,7 +38,9 @@ export function useUpdateTechnicianStatus() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ userId, isActive }: { userId: string; isActive: boolean }) => {
-      const { data } = await apiClient.patch(endpoints.admin.technicianStatus(userId), { isActive });
+      const { data } = await apiClient.patch(endpoints.admin.technicianStatus(userId), {
+        isActive,
+      });
       return data;
     },
     onSuccess: () => {
@@ -86,7 +91,7 @@ export function useEligibleTechnicians(subServiceId?: string, pincode?: string) 
 export function useCreateTechnician() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { name: string; phone: string; email?: string }) => {
+    mutationFn: async (payload: { name: string; phone?: string; email?: string }) => {
       const { data } = await apiClient.post(endpoints.admin.technicians, payload);
       return data;
     },
@@ -99,7 +104,13 @@ export function useCreateTechnician() {
 export function useUpdateTechnicianDetails() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, payload }: { id: string; payload: { name?: string; email?: string } }) => {
+    mutationFn: async ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: { name?: string; email?: string };
+    }) => {
       const { data } = await apiClient.patch(endpoints.admin.technicianDetails(id), payload);
       return data;
     },
@@ -113,8 +124,17 @@ export function useUpdateTechnicianDetails() {
 export function useAddSpecialization() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ technicianId, subServiceId }: { technicianId: string; subServiceId: string }) => {
-      const { data } = await apiClient.post(endpoints.admin.technicianSpecializations(technicianId), { subServiceId });
+    mutationFn: async ({
+      technicianId,
+      subServiceId,
+    }: {
+      technicianId: string;
+      subServiceId: string;
+    }) => {
+      const { data } = await apiClient.post(
+        endpoints.admin.technicianSpecializations(technicianId),
+        { subServiceId },
+      );
       return data;
     },
     onSuccess: (_, { technicianId }) => {
@@ -126,8 +146,16 @@ export function useAddSpecialization() {
 export function useRemoveSpecialization() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ technicianId, subServiceId }: { technicianId: string; subServiceId: string }) => {
-      const { data } = await apiClient.delete(endpoints.admin.technicianSpecialization(technicianId, subServiceId));
+    mutationFn: async ({
+      technicianId,
+      subServiceId,
+    }: {
+      technicianId: string;
+      subServiceId: string;
+    }) => {
+      const { data } = await apiClient.delete(
+        endpoints.admin.technicianSpecialization(technicianId, subServiceId),
+      );
       return data;
     },
     onSuccess: (_, { technicianId }) => {
@@ -139,8 +167,16 @@ export function useRemoveSpecialization() {
 export function useAddServiceArea() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ technicianId, serviceAreaId }: { technicianId: string; serviceAreaId: string }) => {
-      const { data } = await apiClient.post(endpoints.admin.technicianAreas(technicianId), { serviceAreaId });
+    mutationFn: async ({
+      technicianId,
+      serviceAreaId,
+    }: {
+      technicianId: string;
+      serviceAreaId: string;
+    }) => {
+      const { data } = await apiClient.post(endpoints.admin.technicianAreas(technicianId), {
+        serviceAreaId,
+      });
       return data;
     },
     onSuccess: (_, { technicianId }) => {
@@ -152,8 +188,16 @@ export function useAddServiceArea() {
 export function useRemoveServiceArea() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ technicianId, serviceAreaId }: { technicianId: string; serviceAreaId: string }) => {
-      const { data } = await apiClient.delete(endpoints.admin.technicianArea(technicianId, serviceAreaId));
+    mutationFn: async ({
+      technicianId,
+      serviceAreaId,
+    }: {
+      technicianId: string;
+      serviceAreaId: string;
+    }) => {
+      const { data } = await apiClient.delete(
+        endpoints.admin.technicianArea(technicianId, serviceAreaId),
+      );
       return data;
     },
     onSuccess: (_, { technicianId }) => {

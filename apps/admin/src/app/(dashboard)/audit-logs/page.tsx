@@ -1,14 +1,15 @@
 'use client';
 
-import * as React from 'react';
-import type { ColumnDef } from '@tanstack/react-table';
 import { useQuery } from '@tanstack/react-query';
+import type { ColumnDef } from '@tanstack/react-table';
+import * as React from 'react';
+
+import { DataTable, SortableHeader } from '@/components/data-table/data-table';
+import { Badge } from '@/components/ui';
 import { apiClient } from '@/lib/api/client';
 import { endpoints } from '@/lib/api/endpoints';
 import type { AuditLog } from '@/lib/types';
 import { formatDateTime } from '@/lib/utils';
-import { Badge } from '@/components/ui';
-import { DataTable, SortableHeader } from '@/components/data-table/data-table';
 
 function ActionBadge({ action }: { action: string }) {
   const variant = action === 'CREATE' ? 'success' : action === 'DELETE' ? 'danger' : 'info';
@@ -43,8 +44,12 @@ export default function AuditLogsPage() {
       header: 'Actor',
       cell: ({ row }) => (
         <div>
-          <p className="text-sm font-medium text-[#111827]">{row.original.user?.name ?? 'System'}</p>
-          <p className="text-xs text-[#9CA3AF]">{row.original.user?.phone}</p>
+          <p className="text-sm font-medium text-[#111827]">
+            {row.original.user?.name ?? 'System'}
+          </p>
+          <p className="text-xs text-[#9CA3AF]">
+            {row.original.user?.phone || row.original.user?.email || '—'}
+          </p>
         </div>
       ),
       size: 180,

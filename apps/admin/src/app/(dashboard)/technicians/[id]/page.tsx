@@ -216,7 +216,9 @@ export default function TechnicianProfilePage({ params }: { params: Promise<{ id
               </Badge>
             </div>
             <p className="text-sm text-[#6B7280]">
-              {tech.user?.phone} · Joined {formatDate(tech.createdAt)}
+              {[tech.user?.phone || tech.user?.email, `Joined ${formatDate(tech.createdAt)}`]
+                .filter(Boolean)
+                .join(' · ')}
             </p>
           </div>
           <div className="ml-auto flex gap-2">
@@ -258,8 +260,8 @@ export default function TechnicianProfilePage({ params }: { params: Promise<{ id
         <div className="rounded-xl border border-[#FDE68A] bg-[#FEF3C7] p-4 text-sm text-[#92400E]">
           <p className="font-semibold">Technician Registration Incomplete</p>
           <p className="text-xs text-[#B45309] mt-0.5">
-            This user verified their phone number via OTP but has not finished submitting the
-            onboarding setup (name, services, and coverage areas).
+            This user verified their email via OTP but has not finished submitting the onboarding
+            setup (name, services, and coverage areas).
           </p>
         </div>
       )}

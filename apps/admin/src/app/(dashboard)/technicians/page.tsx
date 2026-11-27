@@ -45,11 +45,15 @@ function CreateTechnicianDialog({ open, onClose }: { open: boolean; onClose: () 
   }, [open]);
 
   const handleCreate = () => {
-    if (!name.trim() || !phone.trim()) {
-      return toast.error('Name and phone are required');
+    if (!name.trim() || (!email.trim() && !phone.trim())) {
+      return toast.error('Name and email (or phone) are required');
     }
     createMutation.mutate(
-      { name: name.trim(), phone: phone.trim(), email: email.trim() || undefined },
+      {
+        name: name.trim(),
+        email: email.trim() || undefined,
+        phone: phone.trim() || undefined,
+      },
       {
         onSuccess: () => {
           toast.success('Technician created successfully');
@@ -74,23 +78,25 @@ function CreateTechnicianDialog({ open, onClose }: { open: boolean; onClose: () 
           />
         </div>
         <div>
-          <label className="text-sm font-medium text-[#374151] mb-1 block">Phone Number</label>
-          <input
-            type="text"
-            className="w-full rounded-lg border border-[#E5E7EB] bg-[#F8F8F7] px-3 py-2 text-sm text-[#374151] focus:outline-none focus:ring-2 focus:ring-[#6F7F5F33]"
-            placeholder="+919876543210"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="text-sm font-medium text-[#374151] mb-1 block">Email (Optional)</label>
+          <label className="text-sm font-medium text-[#374151] mb-1 block">Email Address</label>
           <input
             type="email"
             className="w-full rounded-lg border border-[#E5E7EB] bg-[#F8F8F7] px-3 py-2 text-sm text-[#374151] focus:outline-none focus:ring-2 focus:ring-[#6F7F5F33]"
             placeholder="john@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="text-sm font-medium text-[#374151] mb-1 block">
+            Phone Number (Optional)
+          </label>
+          <input
+            type="text"
+            className="w-full rounded-lg border border-[#E5E7EB] bg-[#F8F8F7] px-3 py-2 text-sm text-[#374151] focus:outline-none focus:ring-2 focus:ring-[#6F7F5F33]"
+            placeholder="+919876543210"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
           />
         </div>
         <div className="flex justify-end gap-2 pt-2">
@@ -101,7 +107,7 @@ function CreateTechnicianDialog({ open, onClose }: { open: boolean; onClose: () 
             variant="primary"
             onClick={handleCreate}
             loading={createMutation.isPending}
-            disabled={!name.trim() || !phone.trim()}
+            disabled={!name.trim() || (!email.trim() && !phone.trim())}
           >
             Create Technician
           </Button>
@@ -179,7 +185,7 @@ export default function TechniciansPage() {
                   <span className="text-[#9CA3AF] italic">Incomplete Registration</span>
                 )}
               </div>
-              <div className="text-xs text-[#9CA3AF]">{t.user?.phone}</div>
+              <div className="text-xs text-[#9CA3AF]">{t.user?.phone || t.user?.email || '—'}</div>
             </div>
           </div>
         );

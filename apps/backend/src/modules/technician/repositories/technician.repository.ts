@@ -41,7 +41,7 @@ export class TechnicianRepository {
     data: {
       name?: string;
       email?: string;
-      phone?: string;
+      phone?: string | null;
       profilePictureUrl?: string;
       latitude?: number;
       longitude?: number;

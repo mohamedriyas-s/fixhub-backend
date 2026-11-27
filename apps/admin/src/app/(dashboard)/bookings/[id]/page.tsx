@@ -1,27 +1,58 @@
 'use client';
 
-import * as React from 'react';
-import Link from 'next/link';
-import { useBooking, useAssignTechnician, useUpdateNotes, useCancelBooking } from '@/lib/api/queries/use-bookings';
-import { useEligibleTechnicians } from '@/lib/api/queries/use-technicians';
-import { useRefundPayment } from '@/lib/api/queries/use-payments';
-import { bookingStatusLabel, bookingStatusVariant, formatCurrency, formatDate, formatDateTime } from '@/lib/utils';
-import type { BookingStatus, BookingTimeline } from '@/lib/types';
-import { Avatar, Badge, Button, Card, CardContent, CardHeader, CardTitle, Skeleton, Dialog, Select } from '@/components/ui';
-import { toast } from 'sonner';
 import { ArrowLeft, CheckCircle, Clock, MapPin, Phone, User } from 'lucide-react';
+import Link from 'next/link';
+import * as React from 'react';
+import { toast } from 'sonner';
+
+import {
+  Avatar,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Dialog,
+  Select,
+  Skeleton,
+} from '@/components/ui';
+import {
+  useAssignTechnician,
+  useBooking,
+  useCancelBooking,
+  useUpdateNotes,
+} from '@/lib/api/queries/use-bookings';
+import { useRefundPayment } from '@/lib/api/queries/use-payments';
+import { useEligibleTechnicians } from '@/lib/api/queries/use-technicians';
+import type { BookingStatus, BookingTimeline } from '@/lib/types';
+import {
+  bookingStatusLabel,
+  bookingStatusVariant,
+  formatCurrency,
+  formatDate,
+  formatDateTime,
+} from '@/lib/utils';
 
 function TimelineItem({ entry, isLast }: { entry: BookingTimeline; isLast: boolean }) {
   const variant = bookingStatusVariant(entry.status as BookingStatus);
   return (
     <div className="flex gap-3">
       <div className="flex flex-col items-center">
-        <div className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold
-          ${variant === 'success' ? 'bg-green-100 text-green-700' :
-            variant === 'danger' ? 'bg-red-100 text-red-700' :
-            variant === 'info' ? 'bg-blue-100 text-blue-700' :
-            variant === 'warning' ? 'bg-yellow-100 text-yellow-700' :
-            'bg-gray-100 text-gray-600'}`}>
+        <div
+          className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold
+          ${
+            variant === 'success'
+              ? 'bg-green-100 text-green-700'
+              : variant === 'danger'
+                ? 'bg-red-100 text-red-700'
+                : variant === 'info'
+                  ? 'bg-blue-100 text-blue-700'
+                  : variant === 'warning'
+                    ? 'bg-yellow-100 text-yellow-700'
+                    : 'bg-gray-100 text-gray-600'
+          }`}
+        >
           <CheckCircle className="h-3.5 w-3.5" />
         </div>
         {!isLast && <div className="flex-1 w-px bg-[#E5E7EB] my-1" />}
@@ -50,7 +81,10 @@ function AssignTechnicianDialog({
   subServiceId: string;
   pincode: string;
 }) {
-  const { data: techData, isLoading: isLoadingTechs } = useEligibleTechnicians(subServiceId, pincode);
+  const { data: techData, isLoading: isLoadingTechs } = useEligibleTechnicians(
+    subServiceId,
+    pincode,
+  );
   const assignMutation = useAssignTechnician();
   const [selectedTech, setSelectedTech] = React.useState('');
 
@@ -68,15 +102,14 @@ function AssignTechnicianDialog({
           onClose();
         },
         onError: () => toast.error('Failed to assign technician'),
-      }
+      },
     );
   };
 
-  const options = (techData ?? [])
-    .map((t) => ({
-      label: `${t.user?.name || 'Unknown'} (${t.user?.phone})`,
-      value: t.id,
-    }));
+  const options = (techData ?? []).map((t) => ({
+    label: `${t.user?.name || 'Unknown'} (${t.user?.phone || t.user?.email || 'No contact'})`,
+    value: t.id,
+  }));
 
   return (
     <Dialog open={open} onClose={onClose} title="Assign Technician">
@@ -84,7 +117,9 @@ function AssignTechnicianDialog({
         {isLoadingTechs ? (
           <p className="text-sm text-[#6B7280]">Loading eligible technicians...</p>
         ) : options.length === 0 ? (
-          <p className="text-sm text-[#EF4444]">No eligible technicians available for this service in this area.</p>
+          <p className="text-sm text-[#EF4444]">
+            No eligible technicians available for this service in this area.
+          </p>
         ) : (
           <Select
             label="Select Technician"
@@ -95,7 +130,9 @@ function AssignTechnicianDialog({
           />
         )}
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
           <Button
             onClick={handleAssign}
             loading={assignMutation.isPending}
@@ -135,7 +172,7 @@ function CancelBookingDialog({
           onClose();
         },
         onError: () => toast.error('Failed to cancel booking'),
-      }
+      },
     );
   };
 
@@ -143,7 +180,9 @@ function CancelBookingDialog({
     <Dialog open={open} onClose={onClose} title="Cancel Booking">
       <div className="space-y-4">
         <div>
-          <label className="text-sm font-medium text-[#374151] mb-1 block">Cancellation Reason</label>
+          <label className="text-sm font-medium text-[#374151] mb-1 block">
+            Cancellation Reason
+          </label>
           <textarea
             className="w-full resize-none rounded-lg border border-[#E5E7EB] bg-[#F8F8F7] px-3 py-2 text-sm text-[#374151] focus:outline-none focus:ring-2 focus:ring-[#6F7F5F33]"
             rows={3}
@@ -153,8 +192,15 @@ function CancelBookingDialog({
           />
         </div>
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="secondary" onClick={onClose}>Back</Button>
-          <Button variant="danger" onClick={handleCancel} loading={cancelMutation.isPending} disabled={!reason.trim()}>
+          <Button variant="secondary" onClick={onClose}>
+            Back
+          </Button>
+          <Button
+            variant="danger"
+            onClick={handleCancel}
+            loading={cancelMutation.isPending}
+            disabled={!reason.trim()}
+          >
             Cancel Booking
           </Button>
         </div>
@@ -198,7 +244,7 @@ function RefundDialog({
           onClose();
         },
         onError: () => toast.error('Failed to process refund'),
-      }
+      },
     );
   };
 
@@ -227,7 +273,9 @@ function RefundDialog({
           />
         </div>
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
           <Button variant="danger" onClick={handleRefund} loading={refundMutation.isPending}>
             Confirm Refund
           </Button>
@@ -259,7 +307,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
       {
         onSuccess: () => toast.success('Notes saved successfully'),
         onError: () => toast.error('Failed to save notes'),
-      }
+      },
     );
   };
 
@@ -292,12 +340,12 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
         </Link>
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-lg font-bold text-[#111827]">
-              {customerName}
-            </h1>
+            <h1 className="text-lg font-bold text-[#111827]">{customerName}</h1>
             <Badge variant={bookingStatusVariant(status)}>{bookingStatusLabel(status)}</Badge>
           </div>
-          <p className="text-sm text-[#6B7280]">Booking ID: {booking.bookingNumber} · Created {formatDateTime(booking.createdAt)}</p>
+          <p className="text-sm text-[#6B7280]">
+            Booking ID: {booking.bookingNumber} · Created {formatDateTime(booking.createdAt)}
+          </p>
         </div>
       </div>
 
@@ -306,7 +354,9 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
         <div className="space-y-4 lg:col-span-2">
           {/* Service Info */}
           <Card>
-            <CardHeader><CardTitle>Service Details</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Service Details</CardTitle>
+            </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-4">
                 {[
@@ -328,12 +378,16 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
 
           {/* Customer */}
           <Card>
-            <CardHeader><CardTitle>Customer</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Customer</CardTitle>
+            </CardHeader>
             <CardContent>
               <div className="flex items-center gap-3">
                 <Avatar name={booking.customer?.user?.name} size="lg" />
                 <div>
-                  <p className="font-semibold text-[#111827]">{booking.customer?.user?.name ?? '—'}</p>
+                  <p className="font-semibold text-[#111827]">
+                    {booking.customer?.user?.name ?? '—'}
+                  </p>
                   <p className="text-sm text-[#6B7280]">{booking.customer?.user?.phone}</p>
                   {booking.customer?.user?.email && (
                     <p className="text-sm text-[#6B7280]">{booking.customer.user.email}</p>
@@ -344,7 +398,8 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                 <div className="mt-4 flex gap-2 rounded-lg bg-[#F8F8F7] p-3">
                   <MapPin className="h-4 w-4 flex-shrink-0 text-[#9CA3AF] mt-0.5" />
                   <div className="text-sm text-[#374151]">
-                    <span className="font-medium">{booking.address.label}</span> · {booking.address.line1}
+                    <span className="font-medium">{booking.address.label}</span> ·{' '}
+                    {booking.address.line1}
                     {booking.address.line2 && `, ${booking.address.line2}`}
                     {booking.address.landmark && ` (Near ${booking.address.landmark})`}
                     <br />
@@ -359,9 +414,9 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
           <Card>
             <CardHeader>
               <CardTitle>Technician</CardTitle>
-              <Button 
-                variant="secondary" 
-                size="sm" 
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => setAssignDialogOpen(true)}
                 disabled={status !== 'CONFIRMED' && status !== 'PENDING_PAYMENT'}
               >
@@ -371,16 +426,26 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
             <CardContent>
               {booking.technician ? (
                 <div className="flex items-center gap-3">
-                  <Avatar name={booking.technician.user?.name} src={booking.technician.profilePictureUrl} size="lg" />
+                  <Avatar
+                    name={booking.technician.user?.name}
+                    src={booking.technician.profilePictureUrl}
+                    size="lg"
+                  />
                   <div>
                     <p className="font-semibold text-[#111827]">{booking.technician.user?.name}</p>
-                    <p className="text-sm text-[#6B7280]">{booking.technician.user?.phone}</p>
+                    {booking.technician.user?.phone && (
+                      <p className="text-sm text-[#6B7280]">{booking.technician.user.phone}</p>
+                    )}
+                    {booking.technician.user?.email && (
+                      <p className="text-sm text-[#6B7280]">{booking.technician.user.email}</p>
+                    )}
                     <div className="mt-1 flex items-center gap-2">
                       <Badge variant={booking.technician.isAvailable ? 'success' : 'neutral'}>
                         {booking.technician.isAvailable ? 'Available' : 'Busy'}
                       </Badge>
                       <span className="text-xs text-[#9CA3AF]">
-                        ★ {Number(booking.technician.rating).toFixed(1)} · {booking.technician.totalJobs} jobs
+                        ★ {Number(booking.technician.rating).toFixed(1)} ·{' '}
+                        {booking.technician.totalJobs} jobs
                       </span>
                     </div>
                   </div>
@@ -388,8 +453,8 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               ) : (
                 <div className="flex items-center justify-between rounded-lg bg-[#FFFBEB] px-4 py-3">
                   <span className="text-sm text-[#92400E]">No technician assigned</span>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     onClick={() => setAssignDialogOpen(true)}
                     disabled={status !== 'CONFIRMED' && status !== 'PENDING_PAYMENT'}
                   >
@@ -403,16 +468,30 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
           {/* Payment */}
           {booking.payment && (
             <Card>
-              <CardHeader><CardTitle>Payment</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle>Payment</CardTitle>
+              </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-3 gap-4">
                   {[
                     { label: 'Amount', value: formatCurrency(booking.payment.amount) },
                     { label: 'Method', value: booking.payment.method ?? '—' },
-                    { label: 'Status', value: <Badge variant={booking.payment.status === 'CAPTURED' ? 'success' : 'warning'}>{booking.payment.status}</Badge> },
+                    {
+                      label: 'Status',
+                      value: (
+                        <Badge
+                          variant={booking.payment.status === 'CAPTURED' ? 'success' : 'warning'}
+                        >
+                          {booking.payment.status}
+                        </Badge>
+                      ),
+                    },
                     { label: 'Gateway ID', value: booking.payment.razorpayPaymentId ?? '—' },
                     { label: 'Order ID', value: booking.payment.razorpayOrderId ?? '—' },
-                    { label: 'Paid At', value: booking.payment.paidAt ? formatDateTime(booking.payment.paidAt) : '—' },
+                    {
+                      label: 'Paid At',
+                      value: booking.payment.paidAt ? formatDateTime(booking.payment.paidAt) : '—',
+                    },
                   ].map(({ label, value }) => (
                     <div key={label}>
                       <p className="text-[11px] text-[#9CA3AF] uppercase tracking-wide">{label}</p>
@@ -428,7 +507,9 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
         {/* Right column — timeline */}
         <div className="space-y-4">
           <Card>
-            <CardHeader><CardTitle>Status Timeline</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Status Timeline</CardTitle>
+            </CardHeader>
             <CardContent className="pt-2">
               {booking.timeline && booking.timeline.length > 0 ? (
                 <div>
@@ -448,7 +529,9 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
 
           {/* Admin Notes */}
           <Card>
-            <CardHeader><CardTitle>Notes</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Notes</CardTitle>
+            </CardHeader>
             <CardContent>
               <textarea
                 className="w-full resize-none rounded-lg border border-[#E5E7EB] bg-[#F8F8F7] px-3 py-2 text-sm text-[#374151] focus:outline-none focus:ring-2 focus:ring-[#6F7F5F33]"
@@ -457,9 +540,9 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
               />
-              <Button 
-                size="sm" 
-                className="mt-2 w-full" 
+              <Button
+                size="sm"
+                className="mt-2 w-full"
                 variant="secondary"
                 onClick={handleSaveNotes}
                 loading={updateNotesMutation.isPending}
@@ -472,21 +555,23 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
           {/* Actions */}
           {status !== 'COMPLETED' && status !== 'CANCELLED' && (
             <Card>
-              <CardHeader><CardTitle>Actions</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle>Actions</CardTitle>
+              </CardHeader>
               <CardContent className="space-y-2">
-                <Button 
-                  variant="secondary" 
-                  className="w-full" 
+                <Button
+                  variant="secondary"
+                  className="w-full"
                   size="sm"
                   onClick={() => setCancelDialogOpen(true)}
                 >
                   Cancel Booking
                 </Button>
                 {booking.payment?.status === 'CAPTURED' && (
-                  <Button 
-                    variant="danger" 
-                    className="w-full" 
-                    size="sm" 
+                  <Button
+                    variant="danger"
+                    className="w-full"
+                    size="sm"
                     onClick={() => setRefundDialogOpen(true)}
                   >
                     Process Refund

@@ -758,8 +758,12 @@ export class BookingRepository {
 
   private listInclude(includeHistory: boolean): Prisma.BookingInclude {
     return {
-      customer: { include: { user: { select: { id: true, name: true, phone: true } } } },
-      technician: { include: { user: { select: { id: true, name: true, phone: true } } } },
+      customer: {
+        include: { user: { select: { id: true, name: true, phone: true, email: true } } },
+      },
+      technician: {
+        include: { user: { select: { id: true, name: true, phone: true, email: true } } },
+      },
       subService: {
         select: {
           id: true,

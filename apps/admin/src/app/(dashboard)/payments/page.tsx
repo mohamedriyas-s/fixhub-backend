@@ -1,16 +1,16 @@
 'use client';
 
-import * as React from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { ColumnDef } from '@tanstack/react-table';
+import * as React from 'react';
+import { toast } from 'sonner';
 
-import { usePayments } from '@/lib/api/queries/use-payments';
+import { DataTable, SortableHeader } from '@/components/data-table/data-table';
+import { Badge, Button, Tabs } from '@/components/ui';
 import { apiClient } from '@/lib/api/client';
 import { endpoints } from '@/lib/api/endpoints';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
+import { usePayments } from '@/lib/api/queries/use-payments';
 import { formatCurrency, formatDateTime, paymentStatusVariant } from '@/lib/utils';
-import { Badge, Button, Tabs } from '@/components/ui';
-import { DataTable, SortableHeader } from '@/components/data-table/data-table';
 
 export default function PaymentsPage() {
   const [tab, setTab] = React.useState('all');
@@ -31,7 +31,7 @@ export default function PaymentsPage() {
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || 'Failed to refund payment');
-    }
+    },
   });
 
   const columns: ColumnDef<any, unknown>[] = [
@@ -39,7 +39,9 @@ export default function PaymentsPage() {
       id: 'bookingNumber',
       header: 'Booking',
       cell: ({ row }) => (
-        <span className="font-mono text-xs font-semibold text-[#1F2937]">{row.original.booking?.bookingNumber ?? '—'}</span>
+        <span className="font-mono text-xs font-semibold text-[#1F2937]">
+          {row.original.booking?.bookingNumber ?? '—'}
+        </span>
       ),
       size: 160,
     },
@@ -48,8 +50,14 @@ export default function PaymentsPage() {
       header: 'Customer',
       cell: ({ row }) => (
         <div>
-          <p className="text-sm font-medium text-[#111827]">{row.original.booking?.customer?.user?.name ?? '—'}</p>
-          <p className="text-xs text-[#9CA3AF]">{row.original.booking?.customer?.user?.phone}</p>
+          <p className="text-sm font-medium text-[#111827]">
+            {row.original.booking?.customer?.user?.name ?? '—'}
+          </p>
+          <p className="text-xs text-[#9CA3AF]">
+            {row.original.booking?.customer?.user?.phone ||
+              row.original.booking?.customer?.user?.email ||
+              '—'}
+          </p>
         </div>
       ),
       size: 180,
@@ -80,7 +88,9 @@ export default function PaymentsPage() {
         const ps = row.original.status;
         return ps ? (
           <Badge variant={paymentStatusVariant(ps as any)}>{ps}</Badge>
-        ) : <span className="text-xs text-[#9CA3AF]">No payment</span>;
+        ) : (
+          <span className="text-xs text-[#9CA3AF]">No payment</span>
+        );
       },
       size: 130,
     },
@@ -99,7 +109,9 @@ export default function PaymentsPage() {
       header: 'Date',
       cell: ({ row }) => (
         <span className="text-xs text-[#9CA3AF]">
-          {row.original.paidAt ? formatDateTime(row.original.paidAt) : formatDateTime(row.original.createdAt)}
+          {row.original.paidAt
+            ? formatDateTime(row.original.paidAt)
+            : formatDateTime(row.original.createdAt)}
         </span>
       ),
       size: 150,
@@ -118,7 +130,9 @@ export default function PaymentsPage() {
             onClick={() => handleRefund(payment.id)}
             disabled={true}
           >
-            {refundMutation.isPending && refundMutation.variables === payment.id ? 'Refunding...' : 'Refund'}
+            {refundMutation.isPending && refundMutation.variables === payment.id
+              ? 'Refunding...'
+              : 'Refund'}
           </Button>
         );
       },
@@ -129,7 +143,9 @@ export default function PaymentsPage() {
   const pageCount = data?.meta ? Math.ceil(data.meta.total / 20) : 1;
 
   const handleRefund = (paymentId: string) => {
-    if (window.confirm('Are you sure you want to refund this payment? This action cannot be undone.')) {
+    if (
+      window.confirm('Are you sure you want to refund this payment? This action cannot be undone.')
+    ) {
       refundMutation.mutate(paymentId);
     }
   };

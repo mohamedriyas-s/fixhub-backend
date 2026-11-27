@@ -31,14 +31,31 @@ export class AdminRepository {
       this.prisma.customer.count(),
       this.prisma.technician.count(),
       this.prisma.booking.count({
-        where: { status: { in: ['PENDING_PAYMENT', 'CONFIRMED', 'ASSIGNED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS', 'PRICE_REVISION_PENDING'] } },
+        where: {
+          status: {
+            in: [
+              'PENDING_PAYMENT',
+              'CONFIRMED',
+              'ASSIGNED',
+              'ACCEPTED',
+              'EN_ROUTE',
+              'ARRIVED',
+              'IN_PROGRESS',
+              'PRICE_REVISION_PENDING',
+            ],
+          },
+        },
       }),
       this.prisma.booking.findMany({
         take: 5,
         orderBy: { createdAt: 'desc' },
         include: {
-          customer: { include: { user: { select: { id: true, name: true, phone: true } } } },
-          technician: { include: { user: { select: { id: true, name: true, phone: true } } } },
+          customer: {
+            include: { user: { select: { id: true, name: true, phone: true, email: true } } },
+          },
+          technician: {
+            include: { user: { select: { id: true, name: true, phone: true, email: true } } },
+          },
           subService: {
             select: {
               id: true,
@@ -62,13 +79,15 @@ export class AdminRepository {
       this.prisma.bookingTimeline.findMany({
         take: 5,
         orderBy: { createdAt: 'desc' },
-        include: { booking: { select: { bookingNumber: true, subService: { select: { name: true } } } } },
+        include: {
+          booking: { select: { bookingNumber: true, subService: { select: { name: true } } } },
+        },
       }),
     ]);
 
     // 1. Process Revenue Data
     const revenueMap = new Map<string, { revenue: number; bookings: number }>();
-    
+
     // Initialize last 30 days
     for (let i = 29; i >= 0; i--) {
       const d = new Date();
@@ -148,9 +167,21 @@ export class AdminRepository {
         where,
         skip: query.skip,
         take: query.limit,
-        orderBy: sortBy === 'createdAt' || sortBy === 'updatedAt' ? { [sortBy]: query.sortOrder ?? 'desc' } : { user: { [sortBy]: query.sortOrder ?? 'asc' } },
+        orderBy:
+          sortBy === 'createdAt' || sortBy === 'updatedAt'
+            ? { [sortBy]: query.sortOrder ?? 'desc' }
+            : { user: { [sortBy]: query.sortOrder ?? 'asc' } },
         include: {
-          user: { select: { id: true, name: true, email: true, phone: true, isActive: true, createdAt: true } },
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+              isActive: true,
+              createdAt: true,
+            },
+          },
           _count: { select: { addresses: true, bookings: true } },
         },
       }),
@@ -164,7 +195,17 @@ export class AdminRepository {
     return this.prisma.customer.findUnique({
       where: { id },
       include: {
-        user: { select: { id: true, name: true, email: true, phone: true, isActive: true, createdAt: true, updatedAt: true } },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
         addresses: true,
         bookings: {
           take: 10,
@@ -193,7 +234,7 @@ export class AdminRepository {
     };
 
     const sortBy = this.technicianSortField(query.sortBy);
-    
+
     // Sort logic for nested user fields vs technician fields
     let orderBy: Prisma.TechnicianOrderByWithRelationInput = {};
     if (sortBy === 'name' || sortBy === 'email') {
@@ -209,7 +250,16 @@ export class AdminRepository {
         take: query.limit,
         orderBy,
         include: {
-          user: { select: { id: true, name: true, email: true, phone: true, isActive: true, createdAt: true } },
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+              isActive: true,
+              createdAt: true,
+            },
+          },
           _count: { select: { bookings: true } },
         },
       }),
@@ -223,7 +273,17 @@ export class AdminRepository {
     return this.prisma.technician.findUnique({
       where: { id },
       include: {
-        user: { select: { id: true, name: true, email: true, phone: true, isActive: true, createdAt: true, updatedAt: true } },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
         specializations: { include: { subService: { include: { category: true } } } },
         serviceAreas: { include: { serviceArea: true } },
         documents: true,
@@ -245,10 +305,14 @@ export class AdminRepository {
       where: { id },
       data: {
         verificationStatus: status,
-        ...(status === VerificationStatus.REJECTED && rejectionNote ? { rejectionNote } : { rejectionNote: null }),
+        ...(status === VerificationStatus.REJECTED && rejectionNote
+          ? { rejectionNote }
+          : { rejectionNote: null }),
         ...(status === VerificationStatus.VERIFIED && { isAvailable: false }), // Reset availability on status change
       },
-      include: { user: { select: { id: true, name: true, phone: true, isActive: true } } },
+      include: {
+        user: { select: { id: true, name: true, phone: true, email: true, isActive: true } },
+      },
     });
   }
 
@@ -272,13 +336,13 @@ export class AdminRepository {
               customer: {
                 select: {
                   user: {
-                    select: { name: true, phone: true }
-                  }
-                }
-              }
-            }
-          }
-        }
+                    select: { name: true, phone: true, email: true },
+                  },
+                },
+              },
+            },
+          },
+        },
       }),
       this.prisma.payment.count({ where }),
     ]);
@@ -288,20 +352,31 @@ export class AdminRepository {
 
   // ─── Technician CRUD ────────────────────────────────────
 
-  async createTechnician(dto: { name: string; phone: string; email?: string }) {
+  async createTechnician(dto: { name: string; phone?: string; email?: string }) {
+    const normalizedEmail = dto.email?.trim().toLowerCase() || undefined;
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
           name: dto.name,
-          phone: dto.phone,
-          email: dto.email,
+          phone: dto.phone?.trim() || null,
+          email: normalizedEmail,
+          loginEmail: normalizedEmail,
           role: 'TECHNICIAN',
         },
       });
       const technician = await tx.technician.create({
         data: { userId: user.id },
         include: {
-          user: { select: { id: true, name: true, email: true, phone: true, isActive: true, createdAt: true } },
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+              isActive: true,
+              createdAt: true,
+            },
+          },
         },
       });
       return technician;
@@ -309,7 +384,10 @@ export class AdminRepository {
   }
 
   async updateTechnicianDetails(id: string, dto: { name?: string; email?: string }) {
-    const tech = await this.prisma.technician.findUnique({ where: { id }, select: { userId: true } });
+    const tech = await this.prisma.technician.findUnique({
+      where: { id },
+      select: { userId: true },
+    });
     if (!tech) return null;
     return this.prisma.user.update({
       where: { id: tech.userId },
@@ -356,7 +434,7 @@ export class AdminRepository {
         serviceAreas: { some: { serviceArea: { pincode, isActive: true, deletedAt: null } } },
       },
       include: {
-        user: { select: { id: true, name: true, phone: true, isActive: true } },
+        user: { select: { id: true, name: true, phone: true, email: true, isActive: true } },
         specializations: { include: { subService: { include: { category: true } } } },
         serviceAreas: { include: { serviceArea: true } },
       },
@@ -366,15 +444,31 @@ export class AdminRepository {
 
   // ─── Customer CRUD ──────────────────────────────────────
 
-  async createCustomer(dto: { name: string; phone: string; email?: string }) {
+  async createCustomer(dto: { name: string; phone?: string; email?: string }) {
+    const normalizedEmail = dto.email?.trim().toLowerCase() || undefined;
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
-        data: { name: dto.name, phone: dto.phone, email: dto.email, role: 'CUSTOMER' },
+        data: {
+          name: dto.name,
+          phone: dto.phone?.trim() || null,
+          email: normalizedEmail,
+          loginEmail: normalizedEmail,
+          role: 'CUSTOMER',
+        },
       });
       const customer = await tx.customer.create({
         data: { userId: user.id },
         include: {
-          user: { select: { id: true, name: true, email: true, phone: true, isActive: true, createdAt: true } },
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+              isActive: true,
+              createdAt: true,
+            },
+          },
         },
       });
       return customer;
@@ -382,7 +476,10 @@ export class AdminRepository {
   }
 
   async updateCustomerDetails(id: string, dto: { name?: string; email?: string }) {
-    const customer = await this.prisma.customer.findUnique({ where: { id }, select: { userId: true } });
+    const customer = await this.prisma.customer.findUnique({
+      where: { id },
+      select: { userId: true },
+    });
     if (!customer) return null;
     return this.prisma.user.update({
       where: { id: customer.userId },
@@ -415,8 +512,8 @@ export class AdminRepository {
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          customer: { select: { user: { select: { name: true, phone: true } } } },
-          technician: { select: { user: { select: { name: true, phone: true } } } },
+          customer: { select: { user: { select: { name: true, phone: true, email: true } } } },
+          technician: { select: { user: { select: { name: true, phone: true, email: true } } } },
           subService: { select: { name: true } },
         },
       }),
@@ -479,7 +576,9 @@ export class AdminRepository {
         updatedBy: dto.adminUserId,
       },
       include: {
-        customer: { include: { user: { select: { id: true, name: true, phone: true } } } },
+        customer: {
+          include: { user: { select: { id: true, name: true, phone: true, email: true } } },
+        },
         subService: { include: { category: true } },
         address: true,
       },
@@ -521,14 +620,17 @@ export class AdminRepository {
     return this.prisma.pricingRule.findMany({ orderBy: { createdAt: 'asc' } });
   }
 
-  async createPricingRule(dto: {
-    categoryId?: string;
-    label: string;
-    baseFee: number;
-    taxPercent: number;
-    cancellationFeePercent?: number;
-    cancellationWindowMins?: number;
-  }, adminUserId: string) {
+  async createPricingRule(
+    dto: {
+      categoryId?: string;
+      label: string;
+      baseFee: number;
+      taxPercent: number;
+      cancellationFeePercent?: number;
+      cancellationWindowMins?: number;
+    },
+    adminUserId: string,
+  ) {
     return this.prisma.pricingRule.create({
       data: {
         categoryId: dto.categoryId,
@@ -542,14 +644,18 @@ export class AdminRepository {
     });
   }
 
-  async updatePricingRule(id: string, dto: {
-    label?: string;
-    baseFee?: number;
-    taxPercent?: number;
-    cancellationFeePercent?: number;
-    cancellationWindowMins?: number;
-    isActive?: boolean;
-  }, adminUserId: string) {
+  async updatePricingRule(
+    id: string,
+    dto: {
+      label?: string;
+      baseFee?: number;
+      taxPercent?: number;
+      cancellationFeePercent?: number;
+      cancellationWindowMins?: number;
+      isActive?: boolean;
+    },
+    adminUserId: string,
+  ) {
     return this.prisma.pricingRule.update({
       where: { id },
       data: { ...dto, updatedBy: adminUserId },
@@ -570,25 +676,33 @@ export class AdminRepository {
     };
 
     const [items, total] = await this.prisma.$transaction([
-      this.prisma.coupon.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: 'desc' } }),
+      this.prisma.coupon.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
       this.prisma.coupon.count({ where }),
     ]);
 
     return this.paginate(items, total, { page, limit });
   }
 
-  async createCoupon(dto: {
-    code: string;
-    description?: string;
-    type: 'PERCENTAGE' | 'FLAT';
-    value: number;
-    maxDiscountAmount?: number;
-    minOrderAmount?: number;
-    firstBookingOnly?: boolean;
-    maxUses?: number;
-    expiresAt?: string;
-    categoryId?: string;
-  }, adminUserId: string) {
+  async createCoupon(
+    dto: {
+      code: string;
+      description?: string;
+      type: 'PERCENTAGE' | 'FLAT';
+      value: number;
+      maxDiscountAmount?: number;
+      minOrderAmount?: number;
+      firstBookingOnly?: boolean;
+      maxUses?: number;
+      expiresAt?: string;
+      categoryId?: string;
+    },
+    adminUserId: string,
+  ) {
     return this.prisma.coupon.create({
       data: {
         code: dto.code.toUpperCase(),
@@ -606,12 +720,15 @@ export class AdminRepository {
     });
   }
 
-  async updateCoupon(id: string, dto: {
-    description?: string;
-    maxUses?: number;
-    expiresAt?: string;
-    isActive?: boolean;
-  }) {
+  async updateCoupon(
+    id: string,
+    dto: {
+      description?: string;
+      maxUses?: number;
+      expiresAt?: string;
+      isActive?: boolean;
+    },
+  ) {
     return this.prisma.coupon.update({
       where: { id },
       data: {
@@ -631,7 +748,14 @@ export class AdminRepository {
   }
 
   private technicianSortField(sortBy?: string) {
-    const allowed = new Set(['name', 'email', 'createdAt', 'rating', 'totalJobs', 'verificationStatus']);
+    const allowed = new Set([
+      'name',
+      'email',
+      'createdAt',
+      'rating',
+      'totalJobs',
+      'verificationStatus',
+    ]);
     return allowed.has(sortBy ?? '') ? sortBy! : 'createdAt';
   }
 
