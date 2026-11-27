@@ -45,6 +45,8 @@ class _BookingTrackingScreenState extends ConsumerState<BookingTrackingScreen> {
       body: bookingAsync.when(
         data: (booking) {
           final isArrived = booking.statusType == BookingStatusType.arrived;
+          final isEnRoute = booking.statusType == BookingStatusType.enRoute;
+          final canShowTechMarker = isEnRoute && !isArrived;
           
           // Get locations
           final customerLat = booking.address?.latitude;
@@ -67,7 +69,7 @@ class _BookingTrackingScreenState extends ConsumerState<BookingTrackingScreen> {
                   ? LatLng(initialTechLat, initialTechLng)
                   : null);
 
-          final initialCameraPos = isArrived ? customerPos : (techPos ?? customerPos);
+          final initialCameraPos = canShowTechMarker ? (techPos ?? customerPos) : customerPos;
 
           Set<Marker> markers = {
             Marker(
@@ -78,7 +80,7 @@ class _BookingTrackingScreenState extends ConsumerState<BookingTrackingScreen> {
             ),
           };
 
-          if (techPos != null && !isArrived) {
+          if (techPos != null && canShowTechMarker) {
             markers.add(
               Marker(
                 markerId: const MarkerId('technician'),
@@ -111,43 +113,66 @@ class _BookingTrackingScreenState extends ConsumerState<BookingTrackingScreen> {
                       top: AppSpacing.md,
                       left: AppSpacing.md,
                       right: AppSpacing.md,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'Booking ID',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                        color: AppColors.textSecondary,
-                                      ),
-                                ),
-                                Text(
-                                  '#${booking.id.substring(0, 8).toUpperCase()}',
-                                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
                                 ),
                               ],
                             ),
-                            FixHubStatusChip(status: booking.statusType, label: booking.displayStatus),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Booking ID',
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                            color: AppColors.textSecondary,
+                                          ),
+                                    ),
+                                    Text(
+                                      '#${booking.id.substring(0, 8).toUpperCase()}',
+                                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                                FixHubStatusChip(status: booking.statusType, label: booking.displayStatus),
+                              ],
+                            ),
+                          ),
+                          if (!isEnRoute && !isArrived) ...[
+                            const SizedBox(height: AppSpacing.sm),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: AppColors.surface,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              child: Text(
+                                'Technician has not started travelling yet. Live location will appear once they are en route.',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                              ),
+                            ),
                           ],
-                        ),
+                        ],
                       ),
                     ),
                   ],

@@ -463,7 +463,36 @@ class BookingDetailScreen extends ConsumerWidget {
               // Action Buttons
               const SizedBox(height: AppSpacing.lg),
               
-              if ([BookingStatusType.assigned, BookingStatusType.enRoute].contains(booking.statusType))
+              if (booking.statusType == BookingStatusType.assigned)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.directions_car_outlined,
+                        color: AppColors.textSecondary,
+                        size: 22,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          'Technician has not started travelling yet. Live tracking will be available once they are en route.',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              if (booking.statusType == BookingStatusType.enRoute)
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
