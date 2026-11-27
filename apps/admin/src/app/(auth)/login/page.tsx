@@ -3,7 +3,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
-import { Zap } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
@@ -56,14 +55,9 @@ export default function LoginPage() {
         {/* Card */}
         <div className="card p-8">
           {/* Logo */}
-          <div className="mb-8 flex flex-col items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#1F2937] shadow-md">
-              <Zap className="h-6 w-6 text-white" />
-            </div>
-            <div className="text-center">
-              <h1 className="text-xl font-bold text-[#111827]">FixHub Admin</h1>
-              <p className="mt-0.5 text-sm text-[#9CA3AF]">Operations Console</p>
-            </div>
+          <div className="mb-8 flex flex-col items-center gap-2">
+            <img src="/images/logo-horizontal.svg" alt="HelpTap" className="h-10 w-auto" />
+            <p className="text-sm text-[#9CA3AF]">Admin Operations Console</p>
           </div>
 
           <form onSubmit={form.handleSubmit((d) => loginMutation.mutate(d))} className="space-y-4">
@@ -92,7 +86,7 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-6 text-center text-xs text-[#9CA3AF]">
-          FixHub Admin Panel · Restricted access
+          HelpTap Admin Panel · Restricted access
         </p>
       </div>
     </div>

@@ -18,10 +18,9 @@ import {
   Tag,
   Users,
   Wrench,
-  Zap,
 } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname , useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import * as React from 'react';
 import { toast } from 'sonner';
 
@@ -113,19 +112,20 @@ export function Sidebar() {
     >
       {/* Logo */}
       <div className="flex h-14 items-center border-b border-[#E5E7EB] px-4">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-[#1F2937]">
-            <Zap className="h-4 w-4 text-white" />
+        {collapsed ? (
+          <img
+            src="/images/icon-reversed-navy-bg.svg"
+            alt="HelpTap"
+            className="h-7 w-7 flex-shrink-0 rounded-lg"
+          />
+        ) : (
+          <div className="flex items-center gap-2">
+            <img src="/images/logo-horizontal.svg" alt="HelpTap" className="h-8 w-auto" />
+            <span className="text-[10px] font-medium text-[#9CA3AF] uppercase tracking-wider">
+              Admin
+            </span>
           </div>
-          {!collapsed && (
-            <div>
-              <span className="text-sm font-bold text-[#111827] tracking-tight">FixHub</span>
-              <span className="ml-1 text-[10px] font-medium text-[#9CA3AF] uppercase tracking-wider">
-                Admin
-              </span>
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Collapse toggle */}

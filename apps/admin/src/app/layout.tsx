@@ -8,8 +8,11 @@ import { Providers } from './providers';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'FixHub Admin',
-  description: 'FixHub Admin Panel — Manage technicians, bookings, and services',
+  title: 'HelpTap Admin',
+  description: 'HelpTap Admin Panel — Manage technicians, bookings, and services',
+  icons: {
+    icon: '/images/icon-reversed-navy-bg.svg',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

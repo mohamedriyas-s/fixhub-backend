@@ -1,10 +1,11 @@
 'use client';
 
+import { Bell, ChevronRight, Search } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import * as React from 'react';
-import { Bell, ChevronRight, Search } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+
 import { NotificationDropdown } from './notification-dropdown';
 
 const routeLabels: Record<string, string> = {
@@ -31,9 +32,7 @@ function Breadcrumb() {
     return <span className="text-sm font-semibold text-[#111827]">Dashboard</span>;
   }
 
-  const crumbs: { label: string; href: string }[] = [
-    { label: 'FixHub', href: '/' },
-  ];
+  const crumbs: { label: string; href: string }[] = [{ label: 'HelpTap', href: '/' }];
 
   let acc = '';
   segments.forEach((seg) => {
@@ -90,7 +89,6 @@ export function Header({ onCommandPalette }: HeaderProps) {
 
         {/* Notifications */}
         <NotificationDropdown />
-
 
         {/* Divider */}
         <div className="h-5 w-px bg-[#E5E7EB]" />
