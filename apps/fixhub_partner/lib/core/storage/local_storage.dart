@@ -8,6 +8,8 @@ class LocalStorage {
   static const String _accessTokenKey = 'access_token';
   static const String _refreshTokenKey = 'refresh_token';
   static const String _userBox = 'partner_user_data';
+  static const String _notificationBox = 'partner_notification_prefs';
+  static const String _dismissedAssignedJobsKey = 'dismissed_assigned_job_ids';
 
   Future<Box> _getBox(String name) async {
     if (Hive.isBoxOpen(name)) {
@@ -53,10 +55,28 @@ class LocalStorage {
     return Map<String, dynamic>.from(box.toMap());
   }
 
+  Future<Set<String>> getDismissedAssignedJobIds() async {
+    final box = await _getBox(_notificationBox);
+    final raw = box.get(_dismissedAssignedJobsKey);
+    if (raw is List) {
+      return raw.map((e) => e.toString()).toSet();
+    }
+    return <String>{};
+  }
+
+  Future<void> addDismissedAssignedJobIds(Iterable<String> ids) async {
+    final box = await _getBox(_notificationBox);
+    final existing = await getDismissedAssignedJobIds();
+    existing.addAll(ids);
+    await box.put(_dismissedAssignedJobsKey, existing.toList());
+  }
+
   Future<void> clearAll() async {
     await clearTokens();
     final userBox = await _getBox(_userBox);
     await userBox.clear();
+    final notifBox = await _getBox(_notificationBox);
+    await notifBox.clear();
   }
 
   Future<bool> isLoggedIn() async {

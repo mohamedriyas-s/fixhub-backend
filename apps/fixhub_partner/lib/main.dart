@@ -34,7 +34,8 @@ Future<void> main() async {
   final container = ProviderContainer();
 
   try {
-    await container.read(fcmServiceProvider).initialize();
+    await FcmService.initLocalNotifications();
+    await container.read(fcmServiceProvider).initListeners();
   } catch (e) {
     debugPrint('FCM init failed: $e');
   }

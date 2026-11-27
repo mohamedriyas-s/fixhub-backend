@@ -12,10 +12,12 @@ import '../../../../firebase_options.dart';
 // ─── Background handler (top-level, required by FCM) ─────────────────────────
 
 @pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   debugPrint('[FCM] Background message: ${message.messageId}');
-  await FCMService.showLocalNotification(message);
+  // Do NOT call showLocalNotification here when the backend sends a
+  // `notification` block — Android/iOS already renders the system tray
+  // notification automatically in background/terminated states.
 }
 
 // ─── Local notifications plugin (singleton) ───────────────────────────────────
@@ -139,21 +141,20 @@ class FCMService {
 
   // ── 2. Token registration (call after auth succeeds) ─────────────────────────
 
-  /// Registers the background message handler, requests permissions, fetches
-  /// the FCM token, and sends it to the backend.
-  ///
-  /// Safe to call multiple times — subsequent calls are no-ops if already done.
-  bool _initialized = false;
+  /// Sets up foreground/open listeners once and always syncs the FCM token
+  /// with the backend after login or session restore.
+  bool _listenersInitialized = false;
 
   Future<void> registerAfterLogin() async {
-    // Set up the background handler first — idempotent.
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-    // Wire foreground message display (idempotent listener).
-    if (!_initialized) {
+    // Wire foreground & tap listeners (idempotent).
+    if (!_listenersInitialized) {
       FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
       FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationOpen);
-      _initialized = true;
+      _messaging.onTokenRefresh.listen((newToken) async {
+        debugPrint('[FCM] Token refreshed.');
+        await _sendTokenToBackend(newToken);
+      });
+      _listenersInitialized = true;
     }
 
     // Request permissions (iOS / Android 13+).
@@ -175,12 +176,6 @@ class FCMService {
     if (token != null) {
       await _sendTokenToBackend(token);
     }
-
-    // Refresh listener — keep token current.
-    _messaging.onTokenRefresh.listen((newToken) async {
-      debugPrint('[FCM] Token refreshed.');
-      await _sendTokenToBackend(newToken);
-    });
 
     // Check if the app was launched from a terminated state via a notification.
     final initialMessage = await _messaging.getInitialMessage();

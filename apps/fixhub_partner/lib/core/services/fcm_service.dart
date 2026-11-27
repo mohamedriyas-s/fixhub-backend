@@ -2,12 +2,25 @@ import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/auth/data/auth_repository.dart';
 import '../../features/notifications/presentation/notification_provider.dart';
 import '../../features/jobs/presentation/job_provider.dart';
 import '../routing/app_router.dart';
 import '../../app.dart';
+
+final FlutterLocalNotificationsPlugin _localNotifications =
+    FlutterLocalNotificationsPlugin();
+
+const AndroidNotificationChannel _bookingAlertsChannel =
+    AndroidNotificationChannel(
+  'fixhub_booking_alerts',
+  'Booking & Job Alerts',
+  description: 'Notifications for job offers, assignments, and status updates.',
+  importance: Importance.max,
+  playSound: true,
+);
 
 final fcmServiceProvider = Provider<FcmService>((ref) {
   return FcmService(ref);
@@ -16,9 +29,29 @@ final fcmServiceProvider = Provider<FcmService>((ref) {
 class FcmService {
   final Ref _ref;
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
-  bool _isInitialized = false;
+  bool _listenersInitialized = false;
 
   FcmService(this._ref);
+
+  /// Creates the high-importance Android notification channel at app startup
+  /// so outside-app FCM notifications arrive with heads-up alert and sound.
+  static Future<void> initLocalNotifications() async {
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const darwinInit = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+
+    await _localNotifications.initialize(
+      const InitializationSettings(android: androidInit, iOS: darwinInit),
+    );
+
+    final androidPlugin = _localNotifications
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    await androidPlugin?.createNotificationChannel(_bookingAlertsChannel);
+  }
 
   void _invalidateNotificationAndJobProviders() {
     _ref.invalidate(unreadCountProvider);
@@ -28,11 +61,59 @@ class FcmService {
     _ref.invalidate(assignedJobsCountProvider);
   }
 
-  Future<void> initialize() async {
-    if (_isInitialized) return;
-    _isInitialized = true;
+  void _handleMessageNavigation(RemoteMessage message) {
+    _invalidateNotificationAndJobProviders();
+    final bookingId = message.data['bookingId']?.toString();
+    if (bookingId != null && bookingId.isNotEmpty) {
+      _ref.read(routerProvider).push('/job-details/$bookingId');
+    } else {
+      _ref.read(routerProvider).push('/notifications');
+    }
+  }
 
-    // Request permission
+  /// Attaches foreground, tap, and token-refresh listeners once at startup.
+  /// Safe to call before login; does NOT sync the token to the backend.
+  Future<void> initListeners() async {
+    if (_listenersInitialized) return;
+    _listenersInitialized = true;
+
+    _messaging.onTokenRefresh.listen(syncToken);
+
+    // Foreground messages — show a SnackBar and invalidate caches
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      debugPrint('FCM: Foreground message: ${message.messageId}');
+      _invalidateNotificationAndJobProviders();
+
+      final notification = message.notification;
+      final bookingId = message.data['bookingId']?.toString();
+      _showForegroundBanner(
+        title:
+            notification?.title ?? message.data['title']?.toString() ?? 'FixHub',
+        body: notification?.body ?? message.data['body']?.toString() ?? '',
+        bookingId: bookingId,
+      );
+    });
+
+    // When app opened from a background notification tap
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      debugPrint('FCM: Opened from notification: ${message.messageId}');
+      _handleMessageNavigation(message);
+    });
+
+    // Check if app was launched from a terminated-state notification
+    final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+    if (initialMessage != null) {
+      debugPrint('FCM: App launched from notification: ${initialMessage.messageId}');
+      await Future.delayed(const Duration(milliseconds: 500));
+      _handleMessageNavigation(initialMessage);
+    }
+  }
+
+  /// Call after authentication succeeds (login or restored session).
+  /// Requests notification permission and always syncs the FCM token.
+  Future<void> initialize() async {
+    await initListeners();
+
     final settings = await _messaging.requestPermission(
       alert: true,
       badge: true,
@@ -43,7 +124,6 @@ class FcmService {
         settings.authorizationStatus == AuthorizationStatus.provisional) {
       debugPrint('FCM: Permission granted');
 
-      // Get token and sync to backend
       try {
         final token = await _messaging.getToken();
         if (token != null) {
@@ -52,47 +132,6 @@ class FcmService {
         }
       } catch (e) {
         debugPrint('FCM: Failed to get token: $e');
-      }
-
-      // Listen for token refresh
-      _messaging.onTokenRefresh.listen(syncToken);
-
-      // Foreground messages — show a SnackBar and invalidate caches
-      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        debugPrint('FCM: Foreground message: ${message.messageId}');
-        _invalidateNotificationAndJobProviders();
-
-        final notification = message.notification;
-        final bookingId = message.data['bookingId']?.toString();
-        _showForegroundBanner(
-          title: notification?.title ?? message.data['title']?.toString() ?? 'FixHub',
-          body: notification?.body ?? message.data['body']?.toString() ?? '',
-          bookingId: bookingId,
-        );
-      });
-
-      void handleMessageNavigation(RemoteMessage message) {
-        _invalidateNotificationAndJobProviders();
-        final bookingId = message.data['bookingId']?.toString();
-        if (bookingId != null && bookingId.isNotEmpty) {
-          _ref.read(routerProvider).push('/job-details/$bookingId');
-        } else {
-          _ref.read(routerProvider).push('/notifications');
-        }
-      }
-
-      // When app opened from a background notification tap
-      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-        debugPrint('FCM: Opened from notification: ${message.messageId}');
-        handleMessageNavigation(message);
-      });
-
-      // Check if app was launched from a terminated-state notification
-      final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
-      if (initialMessage != null) {
-        debugPrint('FCM: App launched from notification: ${initialMessage.messageId}');
-        await Future.delayed(const Duration(milliseconds: 500));
-        handleMessageNavigation(initialMessage);
       }
     } else {
       debugPrint('FCM: Permission not granted (${settings.authorizationStatus})');
