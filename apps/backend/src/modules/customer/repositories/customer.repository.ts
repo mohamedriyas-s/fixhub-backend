@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { PrismaService } from '../../../common/database/prisma.service';
 
@@ -65,22 +65,33 @@ export class CustomerRepository {
 
   async addAddress(userId: string, data: any) {
     const customer = await this.prisma.customer.findUnique({ where: { userId } });
-    if (!customer) throw new Error('Customer not found');
+    if (!customer) throw new NotFoundException('Customer not found');
 
-    return this.prisma.address.create({
-      data: {
-        customer: { connect: { id: customer.id } },
-        label: data.label,
-        line1: data.line1 ?? data.line_1,
-        line2: data.line2 ?? data.line_2,
-        landmark: data.landmark,
-        city: data.city,
-        state: data.state,
-        pincode: data.pincode ?? data.postalCode,
-        latitude: data.latitude ?? 0,
-        longitude: data.longitude ?? 0,
-        isDefault: data.isDefault ?? data.is_default ?? false,
-      },
+    const isDefault = data.isDefault ?? data.is_default ?? false;
+
+    return this.prisma.$transaction(async (tx) => {
+      if (isDefault) {
+        await tx.address.updateMany({
+          where: { customerId: customer.id, deletedAt: null, isDefault: true },
+          data: { isDefault: false },
+        });
+      }
+
+      return tx.address.create({
+        data: {
+          customer: { connect: { id: customer.id } },
+          label: data.label,
+          line1: data.line1 ?? data.line_1,
+          line2: data.line2 ?? data.line_2,
+          landmark: data.landmark,
+          city: data.city,
+          state: data.state,
+          pincode: data.pincode ?? data.postalCode,
+          latitude: data.latitude ?? 0,
+          longitude: data.longitude ?? 0,
+          isDefault,
+        },
+      });
     });
   }
 
@@ -112,6 +123,28 @@ export class CustomerRepository {
     return this.prisma.address.update({
       where: { id: addressId },
       data: { deletedAt: new Date() },
+    });
+  }
+
+  async setDefaultAddress(userId: string, addressId: string) {
+    const customer = await this.prisma.customer.findUnique({ where: { userId } });
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    const address = await this.prisma.address.findFirst({
+      where: { id: addressId, customerId: customer.id, deletedAt: null },
+    });
+    if (!address) throw new NotFoundException('Address not found');
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.address.updateMany({
+        where: { customerId: customer.id, deletedAt: null, isDefault: true },
+        data: { isDefault: false },
+      });
+
+      return tx.address.update({
+        where: { id: addressId },
+        data: { isDefault: true },
+      });
     });
   }
 }

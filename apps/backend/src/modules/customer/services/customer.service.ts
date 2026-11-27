@@ -73,4 +73,8 @@ export class CustomerService {
   async deleteAddress(userId: string, addressId: string) {
     return this.customerRepository.deleteAddress(addressId);
   }
+
+  async setDefaultAddress(userId: string, addressId: string) {
+    return this.customerRepository.setDefaultAddress(userId, addressId);
+  }
 }

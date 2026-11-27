@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 
@@ -46,6 +46,22 @@ export class CustomerController {
     @Body() data: any,
   ) {
     return this.customerService.updateAddress(user.userId, id, data);
+  }
+
+  @Patch('addresses/:id')
+  @ApiOperation({ summary: 'Partially update an address' })
+  async patchAddress(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() data: any,
+  ) {
+    return this.customerService.updateAddress(user.userId, id, data);
+  }
+
+  @Patch('addresses/:id/default')
+  @ApiOperation({ summary: 'Set default address' })
+  async setDefaultAddress(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.customerService.setDefaultAddress(user.userId, id);
   }
 
   @Delete('addresses/:id')
