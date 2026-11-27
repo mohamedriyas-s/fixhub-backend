@@ -5,6 +5,7 @@ import { Queue } from 'bullmq';
 import { PrismaModule } from '../../common/database/prisma.module';
 import { QUEUE_NAMES } from '../../common/queue/queue.constants';
 import { QueueModule } from '../../common/queue/queue.module';
+import { NotificationModule } from '../notification/notification.module';
 import { AdminController } from './controllers/admin.controller';
 import { AdminNotificationController } from './controllers/admin-notification.controller';
 import { AuditLogController } from './controllers/audit-log.controller';
@@ -18,7 +19,7 @@ import { SettingsService } from './services/settings.service';
 import { DataArchiveWorker } from './workers/data-archive.worker';
 
 @Module({
-  imports: [PrismaModule, QueueModule],
+  imports: [PrismaModule, QueueModule, NotificationModule],
   controllers: [
     AdminController,
     AuditLogController,

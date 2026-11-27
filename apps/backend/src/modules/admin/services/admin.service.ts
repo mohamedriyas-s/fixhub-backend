@@ -1,8 +1,15 @@
 import { ErrorCodes } from '@fixhub/shared';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { VerificationStatus } from '@prisma/client';
+import { NotificationType, VerificationStatus } from '@prisma/client';
 
+import { NotificationService } from '../../notification/services/notification.service';
 import {
   CouponQueryDto,
   CreateCouponDto,
@@ -22,10 +29,13 @@ import { AdminNotificationService, AdminNotifType } from './admin-notification.s
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name);
+
   constructor(
     private readonly adminRepository: AdminRepository,
     private readonly adminNotifService: AdminNotificationService,
     private readonly eventEmitter: EventEmitter2,
+    @Optional() private readonly notificationService?: NotificationService,
   ) {}
 
   async getDashboardStats() {
@@ -194,6 +204,22 @@ export class AdminService {
           `Technician ID ${id} has been verified and is now active.`,
           { technicianId: id, status },
         );
+
+        if (result.user?.id && this.notificationService) {
+          await this.notificationService
+            .sendPushNotification({
+              userId: result.user.id,
+              title: 'Account Verified! 🎉',
+              body: 'Your technician account has been verified. You can now go online and accept jobs!',
+              type: NotificationType.SYSTEM,
+              payload: { technicianId: id, status, screen: 'dashboard' },
+            })
+            .catch((err) => {
+              this.logger.warn(
+                `Failed to notify technician ${result.user?.id} on verification: ${err?.message ?? err}`,
+              );
+            });
+        }
       } else if (status === VerificationStatus.REJECTED) {
         await this.adminNotifService.createAndBroadcast(
           AdminNotifType.TECHNICIAN_REJECTED,
@@ -201,6 +227,22 @@ export class AdminService {
           `Technician ID ${id} verification was rejected.${rejectionNote ? ` Reason: ${rejectionNote}` : ''}`,
           { technicianId: id, status, rejectionNote },
         );
+
+        if (result.user?.id && this.notificationService) {
+          await this.notificationService
+            .sendPushNotification({
+              userId: result.user.id,
+              title: 'Verification Update',
+              body: `Your technician verification was not approved.${rejectionNote ? ` Reason: ${rejectionNote}` : ' Please review your documents and try again.'}`,
+              type: NotificationType.SYSTEM,
+              payload: { technicianId: id, status, screen: 'profile' },
+            })
+            .catch((err) => {
+              this.logger.warn(
+                `Failed to notify technician ${result.user?.id} on rejection: ${err?.message ?? err}`,
+              );
+            });
+        }
       }
 
       return result;

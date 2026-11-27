@@ -4,6 +4,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { VerificationStatus } from '@prisma/client';
 
+import { NotificationService } from '../../notification/services/notification.service';
 import { AdminRepository } from '../repositories/admin.repository';
 import { AdminService } from './admin.service';
 import { AdminNotificationService } from './admin-notification.service';
@@ -11,6 +12,7 @@ import { AdminNotificationService } from './admin-notification.service';
 describe('AdminService', () => {
   let service: AdminService;
   let adminRepository: jest.Mocked<AdminRepository>;
+  let notificationService: jest.Mocked<NotificationService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -35,6 +37,12 @@ describe('AdminService', () => {
           },
         },
         {
+          provide: NotificationService,
+          useValue: {
+            sendPushNotification: jest.fn().mockResolvedValue({ queued: true }),
+          },
+        },
+        {
           provide: EventEmitter2,
           useValue: {
             emit: jest.fn(),
@@ -45,6 +53,7 @@ describe('AdminService', () => {
 
     service = module.get<AdminService>(AdminService);
     adminRepository = module.get(AdminRepository);
+    notificationService = module.get(NotificationService);
   });
 
   it('should be defined', () => {
@@ -70,10 +79,11 @@ describe('AdminService', () => {
   });
 
   describe('verifyTechnician', () => {
-    it('should update verification status', async () => {
+    it('should update verification status and notify technician', async () => {
       adminRepository.verifyTechnician.mockResolvedValue({
         id: 'tech-1',
         verificationStatus: VerificationStatus.VERIFIED,
+        user: { id: 'tech-user-1', name: 'Ravi', phone: null, isActive: true },
       } as never);
 
       const result = await service.verifyTechnician('tech-1', VerificationStatus.VERIFIED);
@@ -82,6 +92,12 @@ describe('AdminService', () => {
         'tech-1',
         VerificationStatus.VERIFIED,
         undefined,
+      );
+      expect(notificationService.sendPushNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'tech-user-1',
+          title: expect.stringContaining('Verified'),
+        }),
       );
     });
 
