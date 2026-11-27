@@ -257,18 +257,20 @@ class _EnRouteScreenState extends ConsumerState<EnRouteScreen> {
                                       color: AppColors.textSecondary,
                                     ),
                               ),
-                              IconButton(
-                                onPressed: () => _callCustomer(job.customer.phone),
-                                icon: const Icon(
-                                  Icons.call_rounded,
-                                  size: 20,
-                                  color: AppColors.primary,
+                              if (job.customer.phone.trim().isNotEmpty)
+                                IconButton(
+                                  onPressed: () =>
+                                      _callCustomer(job.customer.phone),
+                                  icon: const Icon(
+                                    Icons.call_rounded,
+                                    size: 20,
+                                    color: AppColors.primary,
+                                  ),
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: AppColors.primaryContainer,
+                                    padding: const EdgeInsets.all(8),
+                                  ),
                                 ),
-                                style: IconButton.styleFrom(
-                                  backgroundColor: AppColors.primaryContainer,
-                                  padding: const EdgeInsets.all(8),
-                                ),
-                              ),
                             ],
                           ),
                           const SizedBox(height: AppSpacing.sm),

@@ -130,7 +130,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         ? profile.phone!.trim()
         : (user != null && user.phone.trim().isNotEmpty
             ? user.phone.trim()
-            : '');
+            : ((profile?.email != null && profile!.email!.trim().isNotEmpty)
+                ? profile.email!.trim()
+                : (user?.email?.trim() ?? '')));
 
     // Listen for newly assigned jobs and notify the technician only for unacknowledged ones
     ref.listen<AsyncValue<PaginatedJobs>>(myJobsProvider(null), (_, next) async {

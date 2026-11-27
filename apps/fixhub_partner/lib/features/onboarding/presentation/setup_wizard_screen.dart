@@ -156,6 +156,7 @@ class _Step1BasicInfo extends ConsumerStatefulWidget {
 
 class _Step1BasicInfoState extends ConsumerState<_Step1BasicInfo> {
   late final TextEditingController _nameCtrl;
+  late final TextEditingController _phoneCtrl;
   late final TextEditingController _emailCtrl;
 
   @override
@@ -164,22 +165,29 @@ class _Step1BasicInfoState extends ConsumerState<_Step1BasicInfo> {
     final s = ref.read(setupWizardProvider);
     final authState = ref.read(authProvider);
     String initialName = s.name ?? '';
+    String initialPhone = s.phone ?? '';
     String initialEmail = s.email ?? '';
     if (initialName.isEmpty && authState is AuthAuthenticated && authState.user.name != null && authState.user.name!.isNotEmpty) {
       initialName = authState.user.name!;
       ref.read(setupWizardProvider.notifier).setName(initialName);
+    }
+    if (initialPhone.isEmpty && authState is AuthAuthenticated && authState.user.phone.isNotEmpty) {
+      initialPhone = authState.user.phone;
+      ref.read(setupWizardProvider.notifier).setPhone(initialPhone);
     }
     if (initialEmail.isEmpty && authState is AuthAuthenticated && authState.user.email != null && authState.user.email!.isNotEmpty) {
       initialEmail = authState.user.email!;
       ref.read(setupWizardProvider.notifier).setEmail(initialEmail);
     }
     _nameCtrl = TextEditingController(text: initialName);
+    _phoneCtrl = TextEditingController(text: initialPhone);
     _emailCtrl = TextEditingController(text: initialEmail);
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _phoneCtrl.dispose();
     _emailCtrl.dispose();
     super.dispose();
   }
@@ -243,6 +251,21 @@ class _Step1BasicInfoState extends ConsumerState<_Step1BasicInfo> {
               hintText: 'e.g. Ramesh Kumar',
               prefixIcon: const Icon(Icons.person_outline_rounded),
               errorText: hasNameError ? 'Please enter your full name' : null,
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.base),
+
+          _FieldLabel(label: 'Contact Phone Number *'),
+          const SizedBox(height: AppSpacing.sm),
+          TextFormField(
+            controller: _phoneCtrl,
+            keyboardType: TextInputType.phone,
+            onChanged: (v) =>
+                ref.read(setupWizardProvider.notifier).setPhone(v.trim()),
+            decoration: const InputDecoration(
+              hintText: 'e.g. +91 98765 43210',
+              prefixIcon: Icon(Icons.phone_outlined),
             ),
           ),
 

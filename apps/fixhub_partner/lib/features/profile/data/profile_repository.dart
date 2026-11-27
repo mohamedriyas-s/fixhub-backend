@@ -55,7 +55,12 @@ class TechnicianProfile {
     );
   }
 
-  String get displayName => name ?? phone ?? 'Technician';
+  String get displayName {
+    if (name != null && name!.trim().isNotEmpty) return name!.trim();
+    if (email != null && email!.trim().isNotEmpty) return email!.trim();
+    if (phone != null && phone!.trim().isNotEmpty) return phone!.trim();
+    return 'Technician';
+  }
   bool get isVerified => verificationStatus == 'VERIFIED';
 
   /// Profile is considered complete when the technician has set a name,
@@ -98,13 +103,14 @@ class ProfileRepository {
     String? email,
     String? profilePictureUrl,
     String? phone,
+    bool clearPhone = false,
   }) async {
     final response = await _dio.put(
       ApiEndpoints.technicianProfile,
       data: {
         if (name != null) 'name': name,
         if (email != null) 'email': email,
-        if (phone != null) 'phone': phone,
+        if (clearPhone) 'phone': null else if (phone != null) 'phone': phone,
         if (profilePictureUrl != null) 'profilePictureUrl': profilePictureUrl,
       },
     );

@@ -221,12 +221,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     onSave: () async {
                       setState(() => _isSaving = true);
                       try {
+                        final phoneText = _phoneController.text.trim();
                         final updated = await ref.read(profileProvider.notifier).updateProfile(
                           name: _nameController.text.trim().isNotEmpty
                               ? _nameController.text.trim()
                               : null,
-                          phone: _phoneController.text.trim().isEmpty
-                              ? null : _phoneController.text.trim(),
+                          phone: phoneText.isEmpty ? null : phoneText,
+                          clearPhone: phoneText.isEmpty,
                           email: _emailController.text.trim().isNotEmpty
                               ? _emailController.text.trim()
                               : null,
@@ -235,10 +236,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         ref.read(authProvider.notifier).updateUser(
                           name: updated.name,
                           email: updated.email,
+                          phone: updated.phone ?? '',
                         );
                         if (mounted) {
                           _nameController.text = updated.name ?? '';
                           _emailController.text = updated.email ?? '';
+                          _phoneController.text = updated.phone ?? '';
                           setState(() => _isEditing = false);
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(

@@ -44,6 +44,7 @@ final locationAutoDetectProvider = FutureProvider.autoDispose<Map<String, String
 class SetupWizardState {
   final int step; // 0, 1, 2
   final String? name;
+  final String? phone;
   final String? email;
   final String? selectedCategoryId;
   final List<String> selectedSubServiceIds;
@@ -54,6 +55,7 @@ class SetupWizardState {
   const SetupWizardState({
     this.step = 0,
     this.name,
+    this.phone,
     this.email,
     this.selectedCategoryId,
     this.selectedSubServiceIds = const [],
@@ -65,6 +67,7 @@ class SetupWizardState {
   SetupWizardState copyWith({
     int? step,
     String? name,
+    String? phone,
     String? email,
     String? selectedCategoryId,
     List<String>? selectedSubServiceIds,
@@ -75,6 +78,7 @@ class SetupWizardState {
     return SetupWizardState(
       step: step ?? this.step,
       name: name ?? this.name,
+      phone: phone ?? this.phone,
       email: email ?? this.email,
       selectedCategoryId: selectedCategoryId ?? this.selectedCategoryId,
       selectedSubServiceIds:
@@ -98,6 +102,9 @@ class SetupWizardNotifier extends Notifier<SetupWizardState> {
 
   void setName(String name) =>
       state = state.copyWith(name: name, error: null);
+
+  void setPhone(String phone) =>
+      state = state.copyWith(phone: phone, error: null);
 
   void setEmail(String email) =>
       state = state.copyWith(email: email, error: null);
@@ -148,6 +155,13 @@ class SetupWizardNotifier extends Notifier<SetupWizardState> {
           state = state.copyWith(error: 'Please enter your full name');
           return false;
         }
+        final rawPhone = (state.phone ?? '').trim().replaceAll(RegExp(r'[\s\-]'), '');
+        if (rawPhone.isEmpty ||
+            !RegExp(r'^(\+91|91|0)?[6-9]\d{9}$').hasMatch(rawPhone)) {
+          state = state.copyWith(
+              error: 'Please enter a valid 10-digit contact phone number');
+          return false;
+        }
         return true;
       case 1:
         if (state.selectedSubServiceIds.isEmpty) {
@@ -174,9 +188,10 @@ class SetupWizardNotifier extends Notifier<SetupWizardState> {
     try {
       final repo = ref.read(profileRepositoryProvider);
 
-      // Step 1: Update profile (name + email)
+      // Step 1: Update profile (name + phone + email)
       await repo.updateProfile(
         name: state.name?.trim(),
+        phone: state.phone?.trim().isEmpty == true ? null : state.phone?.trim(),
         email: state.email?.trim().isEmpty == true ? null : state.email?.trim(),
       );
 

@@ -160,12 +160,18 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   /// Update local user fields after a profile edit without waiting for network.
-  void updateUser({String? name, String? email, String? profilePictureUrl}) {
+  void updateUser({
+    String? name,
+    String? email,
+    String? phone,
+    String? profilePictureUrl,
+  }) {
     if (state is AuthAuthenticated) {
       final current = (state as AuthAuthenticated).user;
       final updated = current.copyWith(
         name: name ?? current.name,
         email: email ?? current.email,
+        phone: phone ?? current.phone,
         profilePictureUrl: profilePictureUrl ?? current.profilePictureUrl,
       );
       _storage.saveUserData(updated.toJson());

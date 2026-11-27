@@ -61,14 +61,19 @@ class JobCustomer {
   factory JobCustomer.fromJson(Map<String, dynamic> json) {
     final user = json['user'] as Map<String, dynamic>?;
     return JobCustomer(
-      id: (user?['id'] ?? json['id']) as String,
+      id: (user?['id'] ?? json['id'] ?? '').toString(),
       name: (user?['name'] ?? json['name']) as String?,
-      phone: (user?['phone'] ?? json['phone']) as String,
+      phone: (user?['phone'] ?? json['phone']) as String? ?? '',
       email: (user?['email'] ?? json['email']) as String?,
     );
   }
 
-  String get displayName => name ?? phone;
+  String get displayName {
+    if (name != null && name!.trim().isNotEmpty) return name!.trim();
+    if (email != null && email!.trim().isNotEmpty) return email!.trim();
+    if (phone.trim().isNotEmpty) return phone.trim();
+    return 'Customer';
+  }
 }
 
 class JobSubService {

@@ -347,7 +347,8 @@ class _JobDetailsBodyState extends ConsumerState<_JobDetailsBody> {
   }
 
   Future<void> _callCustomer() async {
-    final phone = widget.job.customer.phone;
+    final phone = widget.job.customer.phone.trim();
+    if (phone.isEmpty) return;
     final uri = Uri.parse('tel:$phone');
     if (await canLaunchUrl(uri)) launchUrl(uri);
   }
@@ -674,18 +675,20 @@ class _JobDetailsBodyState extends ConsumerState<_JobDetailsBody> {
                 // ── Customer ─────────────────────────────────────
                 _Section(
                   title: 'Customer',
-                  trailing: IconButton(
-                    onPressed: _callCustomer,
-                    icon: const Icon(
-                      Icons.call_rounded,
-                      size: 20,
-                      color: AppColors.primary,
-                    ),
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.primaryContainer,
-                      padding: const EdgeInsets.all(8),
-                    ),
-                  ),
+                  trailing: job.customer.phone.trim().isNotEmpty
+                      ? IconButton(
+                          onPressed: _callCustomer,
+                          icon: const Icon(
+                            Icons.call_rounded,
+                            size: 20,
+                            color: AppColors.primary,
+                          ),
+                          style: IconButton.styleFrom(
+                            backgroundColor: AppColors.primaryContainer,
+                            padding: const EdgeInsets.all(8),
+                          ),
+                        )
+                      : null,
                   child: Column(
                     children: [
                       _DetailRow(
@@ -693,11 +696,19 @@ class _JobDetailsBodyState extends ConsumerState<_JobDetailsBody> {
                         label: 'Name',
                         value: job.customer.displayName,
                       ),
-                      _DetailRow(
-                        icon: Icons.phone_outlined,
-                        label: 'Phone',
-                        value: job.customer.phone,
-                      ),
+                      if (job.customer.phone.trim().isNotEmpty)
+                        _DetailRow(
+                          icon: Icons.phone_outlined,
+                          label: 'Phone',
+                          value: job.customer.phone,
+                        ),
+                      if (job.customer.email != null &&
+                          job.customer.email!.trim().isNotEmpty)
+                        _DetailRow(
+                          icon: Icons.email_outlined,
+                          label: 'Email',
+                          value: job.customer.email!,
+                        ),
                     ],
                   ),
                 ),
